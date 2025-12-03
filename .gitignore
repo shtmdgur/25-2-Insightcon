@@ -1,0 +1,153 @@
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================
+# Virtual Environments
+# ============================================
+.env
+.venv/
+venv/
+ENV/
+env/
+.conda/
+
+# ============================================
+# Credentials & Secrets (절대 커밋 금지!)
+# ============================================
+.env
+.env.*
+*.key
+*.pem
+*.p12
+secrets/
+credentials.json
+config.local.*
+
+# ============================================
+# Data Files (원본 데이터는 제외)
+# ============================================
+# 원본 데이터는 제외하되, .gitkeep으로 폴더 구조 유지
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/onthology/*
+!data/onthology/.gitkeep
+
+# ============================================
+# Ontology Files (큰 파일은 LFS 사용 고려)
+# ============================================
+*.owl
+*.rdf
+*.ttl
+*.n3
+*.nt
+
+# ============================================
+# Models & Weights
+# ============================================
+models/*.bin
+models/*.pt
+models/*.pth
+models/*.h5
+models/*.ckpt
+models/checkpoints/
+models/weights/
+*.pkl
+*.joblib
+
+# ============================================
+# Jupyter Notebooks
+# ============================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ============================================
+# IDE & Editors
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Testing
+# ============================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.cover
+*.log
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ============================================
+# Poetry
+# ============================================
+# 주의: poetry.lock은 반드시 커밋해야 함!
+# poetry.lock  # 이 줄은 주석 처리 (커밋 필요)
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+*.out
+
+# ============================================
+# Cache
+# ============================================
+.cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/

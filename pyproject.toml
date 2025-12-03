@@ -1,0 +1,19 @@
+[project]
+name = "25-2-insightcon"
+version = "0.1.0"
+description = "온톨로지 기반 AI 금융 코파일럿 프로젝트"
+authors = [
+    {name = "shtmdgur",email = "tony34036@gmail.com"}
+]
+readme = "README.md"
+requires-python = "3.10"
+dependencies = [
+]
+
+[tool.poetry]
+package-mode = false
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
