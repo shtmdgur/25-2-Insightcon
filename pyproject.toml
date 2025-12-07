@@ -6,7 +6,7 @@ authors = [
     {name = "shtmdgur",email = "tony34036@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     # PDF 처리
     "pymupdf4llm>=0.0.8",
