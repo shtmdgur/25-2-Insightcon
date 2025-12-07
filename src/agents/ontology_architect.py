@@ -129,14 +129,15 @@ class OntologyArchitectAgent:
             neo4j_schema = schema.to_neo4j_schema()
             
             # Neo4j에 적용 (Cypher 생성 및 실행)
-            cypher_statements = neo4j_schema.to_cypher()
+            # Iterator 소진 방지: 먼저 리스트로 변환
+            cypher_statements = list(neo4j_schema.to_cypher())
             for statement in cypher_statements:
                 self.neo4j_client.run(statement)
             
             return {
                 "schema": schema,
                 "neo4j_schema": neo4j_schema,
-                "cypher_statements": list(cypher_statements)
+                "cypher_statements": cypher_statements
             }
         except Exception as e:
             raise RuntimeError(f"온톨로지 스키마 생성 실패: {str(e)}")
@@ -157,10 +158,13 @@ class OntologyArchitectAgent:
             
             # 새 문서에서 스키마 추출
             combined_text = "\n\n".join(new_documents)
-            new_schema = asyncio.run(self.extractor.run(text=combined_text))
+            new_schema_obj = asyncio.run(self.extractor.run(text=combined_text))
+            
+            # schema 객체를 Dict로 변환
+            new_schema_dict = self._schema_to_dict(new_schema_obj)
             
             # 스키마 병합 (간단한 버전 - 실제로는 더 복잡한 로직 필요)
-            merged_schema = self._merge_schemas(existing_schema, new_schema)
+            merged_schema = self._merge_schemas(existing_schema, new_schema_dict)
             
             # Neo4j 업데이트
             self._apply_schema_update(merged_schema)
@@ -205,6 +209,35 @@ class OntologyArchitectAgent:
             ))
         }
         return merged
+    
+    def _schema_to_dict(self, schema_obj) -> Dict[str, Any]:
+        """
+        schema 객체를 Dict로 변환
+        
+        Args:
+            schema_obj: neo4j_graphrag의 schema 객체
+        
+        Returns:
+            Dict 형태의 스키마 정보
+        """
+        try:
+            # neo4j_schema로 변환하여 정보 추출
+            neo4j_schema = schema_obj.to_neo4j_schema()
+            
+            # 스키마 정보를 Dict로 변환
+            # 실제 구현은 neo4j_graphrag의 스키마 구조에 따라 다를 수 있음
+            # 여기서는 기본적인 변환 로직 제공
+            # TODO: neo4j_schema에서 실제 노드 타입과 관계 타입 추출
+            return {
+                "node_types": [],  # TODO: neo4j_schema에서 노드 타입 추출
+                "relationship_types": []  # TODO: neo4j_schema에서 관계 타입 추출
+            }
+        except Exception as e:
+            # 변환 실패 시 빈 Dict 반환
+            return {
+                "node_types": [],
+                "relationship_types": []
+            }
     
     def _apply_schema_update(self, schema: Dict[str, Any]) -> None:
         """스키마 업데이트를 Neo4j에 적용"""

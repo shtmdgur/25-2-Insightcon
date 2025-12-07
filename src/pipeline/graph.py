@@ -107,15 +107,12 @@ def create_workflow() -> StateGraph:
     workflow.add_edge("ontology_architect", "graphrag_query")
     
     # 조건부 엣지: GraphRAG Query → (Sector Analyst, Company Analyst) 병렬
-    # route_to_analysts가 리스트를 반환하면 LangGraph가 병렬 실행
-    # 주의: LangGraph 버전에 따라 구현 방식이 다를 수 있음
+    # path_map 없이 사용하면 route_to_analysts가 리스트를 반환할 수 있음
+    # 이 경우 LangGraph가 병렬 실행을 지원함
     workflow.add_conditional_edges(
         "graphrag_query",
-        route_to_analysts,
-        {
-            "sector_analyst": "sector_analyst",
-            "company_analyst": "company_analyst"
-        }
+        route_to_analysts
+        # path_map 없이 사용하여 병렬 실행 지원
     )
     
     # 모든 분석 에이전트 완료 후 리포트 생성으로 수렴
