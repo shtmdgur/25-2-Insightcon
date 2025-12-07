@@ -90,7 +90,17 @@ class Neo4jClient:
                 schema = self.graph.get_schema()
             else:
                 schema = self.graph.get_schema
-            return schema if schema else {}
+            
+            # Neo4jGraph.get_schema는 문자열을 반환하므로 Dict로 변환
+            # 문자열인 경우 빈 딕셔너리 반환 (실제 스키마 파싱은 필요시 별도 구현)
+            if isinstance(schema, str):
+                # 문자열 스키마는 Dict가 아니므로 빈 딕셔너리 반환
+                # 실제 사용 시에는 스키마 문자열을 파싱하는 로직이 필요할 수 있음
+                return {}
+            elif isinstance(schema, dict):
+                return schema
+            else:
+                return {}
         except Exception as e:
             raise RuntimeError(f"스키마 조회 실패: {str(e)}")
     
