@@ -2,7 +2,11 @@
 LangGraph 워크플로우 파이프라인
 """
 from .state import ReportState
-from .graph import create_workflow, compile_workflow, get_workflow_app
+from .graph import (
+    create_workflow,
+    compile_workflow,
+    get_workflow_app
+)
 from .nodes import (
     kg_construction_node,
     quality_check_node,

@@ -1,8 +1,15 @@
 """
 LangGraph 워크플로우 그래프 생성
 """
+import time
+import json
+from pathlib import Path
 from typing import List
 from langgraph.graph import StateGraph, END
+
+# 로그 파일 경로 설정
+_DEBUG_LOG_PATH = Path(__file__).parent.parent.parent.parent / ".cursor" / "debug.log"
+_DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 from .state import ReportState
 from .nodes import (
@@ -45,6 +52,14 @@ def route_to_analysts(state: ReportState) -> List[str]:
     Returns:
         실행할 노드 이름 리스트
     """
+    # #region agent log
+    try:
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"graph.py:route_to_analysts","message":"Function entry","data":{"report_type":state.get("report_type"),"target_companies":state.get("target_companies")},"timestamp":int(time.time()*1000)}) + "\n")
+    except Exception:
+        pass
+    # #endregion agent log
+    
     report_type = state.get("report_type", "sector")
     nodes = []
     
@@ -58,12 +73,23 @@ def route_to_analysts(state: ReportState) -> List[str]:
     if not nodes:
         nodes.append("sector_analyst")
     
+    # #region agent log
+    try:
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"graph.py:route_to_analysts","message":"Function exit","data":{"returned_nodes":nodes,"nodes_count":len(nodes)},"timestamp":int(time.time()*1000)}) + "\n")
+    except Exception:
+        pass
+    # #endregion agent log
+    
     return nodes
 
 
 def create_workflow() -> StateGraph:
     """
     LangGraph 워크플로우 그래프 생성
+    
+    스마트 워크플로우: document가 있으면 그래프 구축을 실행하고,
+    없으면 자동으로 스킵하여 질의 처리만 수행합니다.
     
     Returns:
         StateGraph 객체 (컴파일 전)
@@ -107,12 +133,14 @@ def create_workflow() -> StateGraph:
     workflow.add_edge("ontology_architect", "graphrag_query")
     
     # 조건부 엣지: GraphRAG Query → (Sector Analyst, Company Analyst) 병렬
-    # path_map 없이 사용하면 route_to_analysts가 리스트를 반환할 수 있음
-    # 이 경우 LangGraph가 병렬 실행을 지원함
+    # route_to_analysts가 리스트를 반환하면 병렬 실행
     workflow.add_conditional_edges(
         "graphrag_query",
-        route_to_analysts
-        # path_map 없이 사용하여 병렬 실행 지원
+        route_to_analysts,
+        {
+            "sector_analyst": "sector_analyst",
+            "company_analyst": "company_analyst"
+        }
     )
     
     # 모든 분석 에이전트 완료 후 리포트 생성으로 수렴
@@ -137,7 +165,7 @@ def compile_workflow():
     return app
 
 
-# 전역 워크플로우 인스턴스 (선택적)
+# 전역 워크플로우 인스턴스 (싱글톤)
 _workflow_app = None
 
 

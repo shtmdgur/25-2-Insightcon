@@ -96,8 +96,9 @@ class KGConstructionAgent:
                 if company_props:
                     # 속성을 개별적으로 설정
                     # 주의: 속성 이름에 특수문자가 있으면 이스케이프 필요
+                    # name 파라미터가 properties에 의해 덮어쓰이지 않도록 순서 조정
                     set_clauses = ", ".join([f"c.`{k}` = ${k}" for k in company_props.keys()])
-                    params = {"name": company_name, **company_props}
+                    params = {**company_props, "name": company_name}
                     self.neo4j_client.run(f"""
                         MERGE (c:Company {{name: $name}})
                         SET {set_clauses}
@@ -116,8 +117,9 @@ class KGConstructionAgent:
                 
                 product_props = product.get('properties', {})
                 if product_props:
+                    # name 파라미터가 properties에 의해 덮어쓰이지 않도록 순서 조정
                     set_clauses = ", ".join([f"p.`{k}` = ${k}" for k in product_props.keys()])
-                    params = {"name": product_name, **product_props}
+                    params = {**product_props, "name": product_name}
                     self.neo4j_client.run(f"""
                         MERGE (p:ProductLine {{name: $name}})
                         SET {set_clauses}
@@ -139,8 +141,9 @@ class KGConstructionAgent:
                     "value": metric.get('value', '')
                 }
                 if metric_props:
+                    # name 파라미터가 properties에 의해 덮어쓰이지 않도록 순서 조정
                     set_clauses = ", ".join([f"m.`{k}` = ${k}" for k in metric_props.keys()])
-                    params = {"name": metric_name, **metric_props}
+                    params = {**metric_props, "name": metric_name}
                     self.neo4j_client.run(f"""
                         MERGE (m:Metric {{name: $name}})
                         SET {set_clauses}

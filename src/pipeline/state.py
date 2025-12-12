@@ -12,6 +12,7 @@ class ReportState(TypedDict):
     query: str  # 사용자 질의
     target_companies: Optional[List[str]]  # 분석 대상 기업 목록
     report_type: str  # "sector" | "company" | "all"
+    document: Optional[str]  # 새로 처리할 문서 (그래프 구축용)
     
     # 온톨로지 관련
     ontology_schema: Optional[Dict]  # 생성된 온톨로지 스키마
@@ -31,3 +32,4 @@ class ReportState(TypedDict):
     # 메타데이터 (병렬 실행 시 reducer 필요)
     errors: Annotated[List[str], operator.add]  # 에러 목록 (병렬 노드에서 추가 가능)
     execution_trace: Annotated[List[str], operator.add]  # 실행 추적 로그 (병렬 노드에서 추가 가능)
+    execution_times: Annotated[List[Dict[str, float]], operator.add]  # 실행 시간 추적 (노드명: 소요시간)

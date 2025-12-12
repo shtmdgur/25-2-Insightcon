@@ -2,8 +2,17 @@
 LangGraph 노드 함수 구현
 각 에이전트를 LangGraph 노드로 래핑
 """
-from typing import Dict, Any
+import time
+import json
+import hashlib
+from pathlib import Path
+from functools import lru_cache, wraps
+from typing import Dict, Any, Tuple
 from .state import ReportState
+
+# 로그 파일 경로 설정
+_DEBUG_LOG_PATH = Path(__file__).parent.parent.parent.parent / ".cursor" / "debug.log"
+_DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 from ..agents.kg_construction import KGConstructionAgent
 from ..agents.quality_check import QualityCheckAgent
 from ..agents.ontology_architect import OntologyArchitectAgent
@@ -11,11 +20,95 @@ from ..agents.sector_analyst import SectorAnalystAgent
 from ..agents.company_analyst import CompanyAnalystAgent
 from ..utils.neo4j_client import Neo4jClient
 from ..utils.llm_client import LLMSelector
+from ..utils.document_loader import load_document
 
 
 # 전역 클라이언트 인스턴스 (실제로는 의존성 주입 사용 권장)
 _neo4j_client = None
 _llm_selector = None
+
+# GraphRAG 결과 캐시
+_graphrag_cache = {}
+
+
+def track_execution_time(node_name: str):
+    """
+    노드 실행 시간을 추적하는 데코레이터
+    
+    Args:
+        node_name: 노드 이름
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(state: ReportState) -> ReportState:
+            # #region agent log
+            try:
+                with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":f"nodes.py:{node_name}","message":"Node entry","data":{"node_name":node_name,"has_document":state.get("document") is not None,"has_query":bool(state.get("query"))},"timestamp":int(time.time()*1000)}) + "\n")
+            except Exception:
+                pass
+            # #endregion agent log
+            
+            start_time = time.time()
+            try:
+                result = func(state)
+                elapsed_time = time.time() - start_time
+                
+                # 실행 시간을 결과에 추가
+                # LangGraph reducer를 위해 리스트로 반환 (기존 state와 병합됨)
+                execution_times = [{node_name: elapsed_time}]
+                result['execution_times'] = execution_times
+                
+                # 실행 추적 로그에도 추가
+                # LangGraph reducer를 위해 리스트로 반환 (기존 state와 병합됨)
+                trace = [f"{node_name} completed in {elapsed_time:.2f}s"]
+                result['execution_trace'] = trace
+                
+                # #region agent log
+                try:
+                    with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":f"nodes.py:{node_name}","message":"Node exit","data":{"node_name":node_name,"elapsed_time":elapsed_time,"result_keys":list(result.keys())},"timestamp":int(time.time()*1000)}) + "\n")
+                except Exception:
+                    pass
+                # #endregion agent log
+                
+                return result
+            except Exception as e:
+                elapsed_time = time.time() - start_time
+                error_msg = f"{node_name} error after {elapsed_time:.2f}s: {str(e)}"
+                
+                # #region agent log
+                try:
+                    with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":f"nodes.py:{node_name}","message":"Node error","data":{"node_name":node_name,"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)}) + "\n")
+                except Exception:
+                    pass
+                # #endregion agent log
+                
+                # LangGraph reducer를 위해 리스트로 반환
+                return {
+                    'errors': [error_msg],
+                    'execution_trace': [error_msg],
+                    'execution_times': [{node_name: elapsed_time}]
+                }
+        return wrapper
+    return decorator
+
+
+def _get_cache_key(query: str, target_companies: list) -> str:
+    """
+    GraphRAG 쿼리 캐시 키 생성
+    
+    Args:
+        query: 사용자 질의
+        target_companies: 대상 기업 목록
+    
+    Returns:
+        캐시 키 (해시값)
+    """
+    companies_str = ",".join(sorted(target_companies)) if target_companies else ""
+    cache_string = f"{query}::{companies_str}"
+    return hashlib.md5(cache_string.encode()).hexdigest()
 
 
 def _get_neo4j_client() -> Neo4jClient:
@@ -34,9 +127,11 @@ def _get_llm_selector() -> LLMSelector:
     return _llm_selector
 
 
+@track_execution_time("kg_construction")
 def kg_construction_node(state: ReportState) -> ReportState:
     """
     KG Construction Agent 실행 노드
+    문서가 있을 때만 그래프를 구축하고, 없으면 스킵
     
     Args:
         state: 워크플로우 상태
@@ -45,38 +140,63 @@ def kg_construction_node(state: ReportState) -> ReportState:
         업데이트된 상태
     """
     try:
+        # 새 문서가 있는지 확인
+        document_input = state.get('document')
+        
+        # 문서가 없으면 스킵
+        if not document_input:
+            return {
+                'kg_data': None,
+                'execution_trace': ["KG Construction skipped (no new document)"]
+            }
+        
+        # 문서 로드 (파일 경로인 경우 파일을 읽어서 텍스트로 변환)
+        try:
+            document = load_document(document_input)
+        except Exception as e:
+            error_msg = f"문서 로드 실패: {str(e)}"
+            return {
+                'errors': [error_msg],
+                'execution_trace': [error_msg],
+                'kg_data': None
+            }
+        
+        # 문서가 없으면 스킵
+        if not document:
+            return {
+                'kg_data': None,
+                'execution_trace': ["KG Construction skipped (document is empty)"]
+            }
+        
+        # 문서가 있으면 그래프 구축
         neo4j_client = _get_neo4j_client()
         llm_selector = _get_llm_selector()
         llm = llm_selector.get_llm("deep")
         
         agent = KGConstructionAgent(llm, neo4j_client)
+        result = agent.process_document(document)
         
-        # 문서 처리 (실제로는 state에서 문서를 가져와야 함)
-        # 여기서는 간단한 예시로 처리
-        document = state.get('query', '')  # 실제로는 별도 문서 필드 필요
-        
-        if document:
-            result = agent.process_document(document)
-            return {
-                'kg_data': result,
-                'execution_trace': ["KG Construction completed"]
-            }
-        else:
-            return {
-                'execution_trace': ["KG Construction skipped (no document)"]
-            }
+        return {
+            'kg_data': result,
+            'execution_trace': ["KG Construction completed"]
+        }
         
     except Exception as e:
         error_msg = f"KG Construction error: {str(e)}"
+        import traceback
+        traceback.print_exc()  # 스택 트레이스 출력 추가
         return {
             'errors': [error_msg],
-            'execution_trace': [error_msg]
+            'execution_trace': [error_msg],
+            'kg_data': None  # 명시적으로 None 반환
         }
 
 
+@track_execution_time("quality_check")
 def quality_check_node(state: ReportState) -> ReportState:
     """
     Quality Check Agent 실행 노드
+    그래프 업데이트가 없으면 스킵
     
     Args:
         state: 워크플로우 상태
@@ -85,12 +205,20 @@ def quality_check_node(state: ReportState) -> ReportState:
         업데이트된 상태
     """
     try:
+        # 그래프 업데이트가 없으면 스킵
+        kg_data = state.get('kg_data')
+        if not kg_data:
+            return {
+                'schema_issues': [],
+                'execution_trace': ["Quality Check skipped (no graph update)"]
+            }
+        
+        # 그래프 업데이트가 있을 때만 검사
         neo4j_client = _get_neo4j_client()
         agent = QualityCheckAgent(neo4j_client)
         
         # 품질 검사 실행
-        graph_data = state.get('kg_data')
-        check_result = agent.check(graph_data)
+        check_result = agent.check(kg_data)
         
         # 결과를 상태에 저장
         schema_issues = check_result.get('schema_issues', [])
@@ -119,6 +247,7 @@ def quality_check_node(state: ReportState) -> ReportState:
         }
 
 
+@track_execution_time("ontology_architect")
 def ontology_architect_node(state: ReportState) -> ReportState:
     """
     Ontology Architect Agent 실행 노드
@@ -155,9 +284,11 @@ def ontology_architect_node(state: ReportState) -> ReportState:
         }
 
 
+@track_execution_time("graphrag_query")
 def graphrag_query_node(state: ReportState) -> ReportState:
     """
     GraphRAG 쿼리 실행 노드
+    캐싱을 통해 동일한 질의는 캐시에서 반환
     
     Args:
         state: 워크플로우 상태
@@ -166,9 +297,29 @@ def graphrag_query_node(state: ReportState) -> ReportState:
         업데이트된 상태
     """
     try:
-        neo4j_client = _get_neo4j_client()
         query = state.get('query', '')
         target_companies = state.get('target_companies') or []
+        
+        # 캐시 키 생성
+        cache_key = _get_cache_key(query, target_companies)
+        
+        # #region agent log
+        try:
+            with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"nodes.py:graphrag_query_node","message":"Cache check","data":{"cache_key":cache_key,"cache_hit":cache_key in _graphrag_cache,"cache_size":len(_graphrag_cache)},"timestamp":int(time.time()*1000)}) + "\n")
+        except Exception:
+            pass
+        # #endregion agent log
+        
+        # 캐시 확인
+        if cache_key in _graphrag_cache:
+            return {
+                'graphrag_results': _graphrag_cache[cache_key],
+                'execution_trace': ["GraphRAG query completed (from cache)"]
+            }
+        
+        # 캐시 미스 - Neo4j 쿼리 실행
+        neo4j_client = _get_neo4j_client()
         
         # 간단한 GraphRAG 쿼리 (실제로는 더 정교한 구현 필요)
         if target_companies and len(target_companies) > 0:
@@ -264,6 +415,15 @@ def graphrag_query_node(state: ReportState) -> ReportState:
                     # 개별 레코드 처리 실패는 무시하고 계속 진행
                     continue
         
+        # 결과를 캐시에 저장
+        _graphrag_cache[cache_key] = graphrag_results
+        
+        # 캐시 크기 제한 (최대 100개)
+        if len(_graphrag_cache) > 100:
+            # 가장 오래된 항목 제거 (FIFO)
+            oldest_key = next(iter(_graphrag_cache))
+            del _graphrag_cache[oldest_key]
+        
         return {
             'graphrag_results': graphrag_results,
             'execution_trace': ["GraphRAG query completed"]
@@ -277,6 +437,7 @@ def graphrag_query_node(state: ReportState) -> ReportState:
         }
 
 
+@track_execution_time("sector_analyst")
 def sector_analyst_node(state: ReportState) -> ReportState:
     """
     Sector Analyst 실행 노드
@@ -310,6 +471,7 @@ def sector_analyst_node(state: ReportState) -> ReportState:
         }
 
 
+@track_execution_time("company_analyst")
 def company_analyst_node(state: ReportState) -> ReportState:
     """
     Company Analyst 실행 노드
@@ -348,6 +510,7 @@ def company_analyst_node(state: ReportState) -> ReportState:
         }
 
 
+@track_execution_time("report_generation")
 def report_generation_node(state: ReportState) -> ReportState:
     """
     최종 리포트 생성 노드
