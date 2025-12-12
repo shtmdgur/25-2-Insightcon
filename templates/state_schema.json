@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReportState",
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "target_companies": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "report_type": {
+      "type": "string",
+      "enum": ["sector", "company", "all"]
+    },
+    "document": { "type": ["string", "null"] },
+    "ontology_schema": { "type": "object", "additionalProperties": true },
+    "schema_issues": { "type": ["array", "null"], "items": { "type": "string" } },
+    "kg_data": { "type": ["object", "null"] },
+    "graphrag_results": { "type": ["object", "null"] },
+    "sector_analysis": { "type": ["string", "null"] },
+    "company_analysis": { "type": ["object", "null"] },
+    "final_report": { "type": ["string", "null"] },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "execution_trace": { "type": "array", "items": { "type": "string" } },
+    "execution_times": { "type": "array", "items": { "type": "object" } }
+  },
+  "required": ["query", "report_type"],
+  "additionalProperties": true
+}
+
