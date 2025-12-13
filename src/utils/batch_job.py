@@ -9,14 +9,14 @@ import time
 import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Gemini API 설정
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# Gemini Client 초기화
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 
 class BatchJobStatus:

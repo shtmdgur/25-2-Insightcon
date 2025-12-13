@@ -7,14 +7,15 @@ import os
 import logging
 from typing import Optional, Dict, Any
 from pathlib import Path
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Gemini API 설정
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# Gemini Client 초기화
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 
 class GeminiFilesClient:
@@ -54,9 +55,8 @@ class GeminiFilesClient:
         # 파일 업로드
         logger.info(f"Uploading file to Gemini: {file_path}")
         
-        file_obj = genai.upload_file(
-            path=file_path,
-            display_name=display_name or Path(file_path).name
+        file_obj = client.files.upload(
+            path=file_path
         )
         
         # 캐시에 저장
@@ -97,7 +97,7 @@ class GeminiFilesClient:
             return False
         
         try:
-            genai.delete_file(file_obj.name)
+            client.files.delete(name=file_obj.name)
             del self.uploaded_files[file_path]
             logger.info(f"File deleted: {file_path}")
             return True

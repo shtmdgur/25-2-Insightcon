@@ -11,12 +11,16 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import pymupdf4llm
 import fitz  # PyMuPDF
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from ..parser_interface import ParserInterface
 from ...utils.gemini_files import get_gemini_files_client
 
 logger = logging.getLogger(__name__)
+
+# Gemini Client 초기화
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 
 class VLMParser(ParserInterface):
@@ -26,12 +30,9 @@ class VLMParser(ParserInterface):
     2. VLM (Gemini): 문서 내 포함된 이미지를 분석하여 캡션 생성
     """
     
-    def __init__(self, model_name: str = "gemini-2.5-flash"):
+    def __init__(self, model_name: str = "gemini-2.0-flash-exp"):
         self.model_name = model_name
         self.files_client = get_gemini_files_client()
-        
-        # VLM 모델 설정
-        self.model = genai.GenerativeModel(model_name)
         
         # 이미지 저장 임시 경로
         self.temp_image_dir = Path("temp/extracted_images")
@@ -135,10 +136,13 @@ class VLMParser(ParserInterface):
                 }
                 """
                 
-                response = self.model.generate_content([
-                    genai.get_file(file_uri),
-                    prompt
-                ])
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=[
+                        types.Part.from_uri(file_uri=file_uri, mime_type="image/png"),
+                        prompt
+                    ]
+                )
                 
                 # 3. 결과 파싱
                 analysis = self._parse_vlm_response(response.text)
