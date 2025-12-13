@@ -70,7 +70,7 @@ class OntologyArchitectAgent:
         if self.use_graphrag:
             # Neo4j GraphRAG용 VertexAI LLM 설정
             self.graphrag_llm = VertexAILLM(
-                model_name="gemini-1.5-pro",  # 또는 gemini-1.0-pro
+                model_name="gemini-2.5-pro",
                 project_id=self.project_id,
                 location=self.location
             )
