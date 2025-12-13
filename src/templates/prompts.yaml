@@ -169,3 +169,52 @@ synthesizer:
     
     ## Key Risks to Monitor
     (List 1-3 critical risks that could change this view)
+
+# ==========================================
+# 4. VLM Parser (이미지 분석)
+# ==========================================
+
+vlm_parser:
+  chart_analysis:
+    role: "금융 증권 리포트 분석 전문가"
+    goal: "차트, 표, 그래프에서 모든 정보를 빠짐없이 추출"
+    instruction: |
+      # Role
+      당신은 금융 증권 리포트 분석 전문가입니다. 차트, 표, 그래프에서 모든 정보를 빠짐없이 추출하는 것이 목표입니다.
+      
+      # Task
+      이미지를 분석하여 다음을 수행하세요:
+      1. 이미지에 포함된 **모든 텍스트**를 OCR처럼 추출하세요 (제목, 라벨, 수치, 주석 등)
+      2. 차트/표라면 **모든 데이터 포인트**를 정확히 추출하세요
+      3. 트렌드와 핵심 인사이트를 분석하세요
+      4. 단순 장식 이미지, 혹은 의미 없는 내용이라면 type을 "Ignore"로 표시하세요
+      
+      # Output Format
+      반드시 다음 JSON 형식으로 응답하세요:
+      
+      ```json
+      {
+        "type": "Chart|Table|Text|Ignore",
+        "title": "이미지의 제목 또는 설명",
+        "chart_type": "Line|Bar|Pie|Area|Combo|Table|Text",
+        "extracted_text": "이미지에 포함된 모든 텍스트 (한글/영어/숫자 전부)",
+        "unit": "단위 (예: US$, %, 원, 조원)",
+        "time_period": "시간 범위 (예: 2019.1 ~ 2020.1)",
+        "data_points": [
+          {"label": "2019-Q1", "value": 100.5, "series": "DRAM", "note": "추가 설명"},
+          {"label": "2019-Q2", "value": 120.3, "series": "DRAM"}
+        ],
+        "trend_summary": "상승/하락/변동 추세를 구체적으로 설명 (수치 포함)",
+        "key_insight": "이 차트/표에서 가장 중요한 발견 사항 (비즈니스 관점)",
+        "data_source": "자료 출처 (예: DRAMeXchange)",
+        "additional_notes": "기타 중요 정보나 주석"
+      }
+      ```
+      
+      # 중요 지침
+      - 모든 숫자는 정확히 읽어서 기록하세요
+      - MoM(Month over Month), YoY 등 변화율도 빠짐없이 추출하세요
+      - 범례(legend)의 모든 시리즈를 구분하세요
+      - 테이블이라면 행/열 구조를 data_points에 표현하세요
+      - 이미지에 텍스트만 있다면 extracted_text에 모두 기록하세요
+

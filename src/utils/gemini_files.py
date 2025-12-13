@@ -5,6 +5,7 @@ Gemini Files API 통합
 """
 import os
 import logging
+import mimetypes
 from typing import Optional, Dict, Any
 from pathlib import Path
 from google import genai
@@ -52,12 +53,24 @@ class GeminiFilesClient:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         
-        # 파일 업로드
+        # 파일 업로드 (한글 경로 지원을 위해 파일 객체로 전달)
         logger.info(f"Uploading file to Gemini: {file_path}")
         
-        file_obj = client.files.upload(
-            path=file_path
-        )
+        # MIME 타입 자동 감지
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if mime_type is None:
+            # 기본값: PDF
+            mime_type = 'application/pdf'
+        
+        # 한글 경로 문제 우회: 파일을 직접 열어서 전달
+        with open(file_path, 'rb') as f:
+            file_obj = client.files.upload(
+                file=f,
+                config={
+                    'display_name': Path(file_path).name,
+                    'mime_type': mime_type
+                }
+            )
         
         # 캐시에 저장
         self.uploaded_files[file_path] = file_obj

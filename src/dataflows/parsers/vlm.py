@@ -56,12 +56,15 @@ class VLMParser(ParserInterface):
             
             logger.info(f"Extracting text and images from {file_path}...")
             
-            # pymupdf4llm 파싱
+            # pymupdf4llm 파싱 (옵션 최적화)
             md_text = pymupdf4llm.to_markdown(
                 file_path,
                 write_images=True,
                 image_path=str(image_output_dir),
-                image_format="png"
+                image_format="png",
+                page_chunks=False,  # 페이지별 분할 안 함 (전체 텍스트)
+                margins=(0, 0, 0, 0),  # 여백 최소화로 더 많은 텍스트 추출
+                dpi=150  # 이미지 해상도 향상
             )
             
             # 2. 추출된 이미지 확인 및 VLM 분석

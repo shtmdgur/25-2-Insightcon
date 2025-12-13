@@ -68,5 +68,37 @@
 
 ---
 
+## 개선 사항 (2025-12-13 추가)
+
+### VLM Parser 개선 ✓
+**파일**: `src/dataflows/parsers/vlm_enhanced.py`  
+**내용**:
+- PyMuPDF4LLM 파싱 옵션 최적화 (`page_chunks=False`, `margins=(0,0,0,0)`, `dpi=150`)
+- VLM 프롬프트 YAML 관리 (`templates/prompts.yaml`에서 로드)
+- 금융 리포트 특화 차트 분석 (모든 텍스트/데이터 포인트 추출)
+
+### Gemini Files API 개선 ✓
+**파일**: `src/utils/gemini_files.py`  
+**내용**:
+- 한글 경로 지원 (파일 객체로 업로드)
+- MIME 타입 자동 감지 (`mimetypes` 모듈)
+- 파일 업로드 오류 수정 (`path` → `file` 파라미터)
+
+### Prompts YAML 확장 ✓
+**파일**: `src/templates/prompts.yaml`  
+**내용**:
+- VLM Parser 섹션 추가 (`vlm_parser.chart_analysis`)
+- 금융 리포트 특화 프롬프트 (상세한 차트/표 분석 지침)
+
+### 테스트 스크립트 개선 ✓
+**파일**: `test/test_phase0.py`  
+**내용**:
+- Enhanced VLM Parser 테스트 추가 (옵션 6)
+- MD 파일 자동 저장 기능
+- 전체 텍스트 출력 옵션
+
+---
+
 ## 다음 단계
 Phase 1: Knowledge Graph Update 시작
+
