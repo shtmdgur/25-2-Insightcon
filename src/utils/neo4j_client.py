@@ -2,11 +2,13 @@
 Neo4j 클라이언트 유틸리티
 """
 import os
-from typing import Optional, Dict, Any
+import logging
+from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from langchain_neo4j import Neo4jGraph
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 class Neo4jClient:
@@ -107,3 +109,107 @@ class Neo4jClient:
     def refresh_schema(self) -> None:
         """스키마 정보 새로고침"""
         self.graph.refresh_schema()
+    
+    def inject_subgraph(
+        self,
+        nodes: List[Dict[str, Any]],
+        relationships: List[Dict[str, Any]]
+    ) -> Dict[str, int]:
+        """
+        복잡한 서브그래프를 Neo4j에 주입
+        
+        Args:
+            nodes: 노드 리스트
+                [
+                    {
+                        "type": "Company",
+                        "properties": {"name": "삼성전자", "ticker": "005930"}
+                    },
+                    ...
+                ]
+            relationships: 관계 리스트
+                [
+                    {
+                        "type": "MANUFACTURES",
+                        "from": {"type": "Company", "name": "삼성전자"},
+                        "to": {"type": "Product", "name": "반도체"},
+                        "properties": {"weight": 0.9}
+                    },
+                    ...
+                ]
+        
+        Returns:
+            주입 통계 {"nodes": int, "relationships": int}
+        """
+        stats = {"nodes": 0, "relationships": 0, "errors": 0}
+        
+        # 1. 노드 생성
+        for node in nodes:
+            try:
+                node_type = node.get("type", "Node")
+                properties = node.get("properties", {})
+                
+                # MERGE를 사용하여 중복 방지
+                # name 속성이 있으면 name 기준 MERGE, 없으면 모든 속성 기준
+                if "name" in properties:
+                    query = f"""
+                    MERGE (n:{node_type} {{name: $name}})
+                    SET n += $properties,
+                        n.last_updated = datetime()
+                    """
+                    params = {
+                        "name": properties["name"],
+                        "properties": properties
+                    }
+                else:
+                    query = f"""
+                    CREATE (n:{node_type})
+                    SET n = $properties,
+                        n.last_updated = datetime()
+                    """
+                    params = {"properties": properties}
+                
+                self.run(query, params)
+                stats["nodes"] += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to inject node: {node}. Error: {str(e)}")
+                stats["errors"] += 1
+        
+        # 2. 관계 생성
+        for rel in relationships:
+            try:
+                rel_type = rel.get("type", "RELATED_TO")
+                from_node = rel.get("from", {})
+                to_node = rel.get("to", {})
+                rel_properties = rel.get("properties", {})
+                
+                # FROM 노드와 TO 노드를 매칭하여 관계 생성
+                query = f"""
+                MATCH (from:{from_node.get('type', 'Node')} {{name: $from_name}})
+                MATCH (to:{to_node.get('type', 'Node')} {{name: $to_name}})
+                MERGE (from)-[r:{rel_type}]->(to)
+                SET r += $rel_properties,
+                    r.last_updated = datetime()
+                """
+                
+                params = {
+                    "from_name": from_node.get("name"),
+                    "to_name": to_node.get("name"),
+                    "rel_properties": rel_properties
+                }
+                
+                self.run(query, params)
+                stats["relationships"] += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to inject relationship: {rel}. Error: {str(e)}")
+                stats["errors"] += 1
+        
+        return stats
+    
+    def close(self) -> None:
+        """연결 종료"""
+        # Neo4jGraph는 close 메서드가 없을 수 있음
+        # 필요시 driver.close() 호출
+        pass

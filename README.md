@@ -58,15 +58,45 @@ cp .env.example .env
 
 ## 🚀 실행 예시
 
+### Phase 0: PyMuPDF + VLM Parser
 ```bash
-poetry run python src/pipeline/run_multi_agent.py
+poetry run python test/test_phase0.py
 ```
 
-또는 실험용 노트북을 열어 단계별 워크플로를 확인할 수 있습니다 (`1205 2차인콘.ipynb`).
+### Gemini PDF → Neo4j Pipeline (NEW)
+```bash
+poetry run python test/test_gemini_pdf_neo4j.py
+```
+
+## 🌿 브랜치 구조
+
+- `main`: 안정 버전
+- `dev`: 개발 브랜치
+- `sh-develop4`: Phase 0 구현 (PyMuPDF + VLM)
+- `sh-geminiParsingPDF`: **Gemini PDF Native Parser** (PDF → KG → Neo4j)
+
+## 🔥 Gemini PDF Pipeline (sh-geminiParsingPDF 브랜치)
+
+PDF를 Gemini API(gemini-2.5-pro)로 직접 분석하여 Knowledge Graph를 추출하고 Neo4j에 주입하는 파이프라인:
+
+```
+PDF → Gemini Files API → Structured Output (JSON) → Neo4j
+```
+
+**특징**:
+- Structured JSON Schema로 일관된 KG 추출
+- 7가지 엔티티 타입 (Company, Product, Metric, Event, Trend, Technology, Person)
+- 7가지 관계 타입 (PRODUCES, COMPETES_WITH, HAS_METRIC 등)
+- Neo4j 바로 주입 가능
+- Batch API 지원 (50% 비용 절감)
+
+**문서**: `docs/implementation_logs/gemini_pdf_neo4j_pipeline.md`
 
 ## 📚 문서
 
 - 추가 설명 및 예시는 `docs/README.md`를 참고하세요.
+- Phase 0 구현: `docs/implementation_logs/phase0_작업내역.md`
+- Gemini PDF Pipeline: `docs/implementation_logs/gemini_pdf_neo4j_pipeline.md`
 
 ## 📝 개발 규칙
 

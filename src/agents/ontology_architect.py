@@ -1,111 +1,80 @@
 """
 온톨로지 아키텍트 에이전트
-증권 리포트 템플릿에서 온톨로지 스키마를 자동으로 추출하고 Neo4j에 적용
+Neo4j GraphRAG + Vertex AI (Gemini)를 사용하여 온톨로지 스키마 자동 생성
 """
-from typing import List, Dict, Any, Optional
-import asyncio
+from typing import List, Dict, Any
+import logging
 import os
 from dotenv import load_dotenv
 
-# neo4j_graphrag의 올바른 import 경로
+from langchain_google_vertexai import VertexAI
+from langchain_core.language_models import BaseChatModel
+
+from ..utils.neo4j_client import Neo4jClient
+
+# Neo4j GraphRAG 라이브러리 (Vertex AI 지원)
 try:
     from neo4j_graphrag.experimental.components.schema import SchemaFromTextExtractor
-    from neo4j_graphrag.llm import OpenAILLM
+    from neo4j_graphrag.llm import VertexAILLM
     NEO4J_GRAPHRAG_AVAILABLE = True
 except ImportError:
     try:
         from neo4j_graphrag.components.schema import SchemaFromTextExtractor
-        from neo4j_graphrag.llm import OpenAILLM
+        from neo4j_graphrag.llm import VertexAILLM
         NEO4J_GRAPHRAG_AVAILABLE = True
     except ImportError:
         SchemaFromTextExtractor = None
-        OpenAILLM = None
+        VertexAILLM = None
         NEO4J_GRAPHRAG_AVAILABLE = False
 
-from langchain_core.language_models import BaseChatModel
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
-
-from ..utils.neo4j_client import Neo4jClient
-
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 class OntologyArchitectAgent:
     """
     온톨로지 스키마를 자동으로 생성하고 Neo4j에 적용하는 에이전트
+    Vertex AI (Gemini)와 Neo4j GraphRAG를 활용
     """
     
-    def __init__(self, llm: BaseChatModel, neo4j_client: Neo4jClient):
+    def __init__(
+        self, 
+        llm: BaseChatModel, 
+        neo4j_client: Neo4jClient,
+        project_id: str = None,
+        location: str = "us-central1"
+    ):
         """
         OntologyArchitectAgent 초기화
         
         Args:
-            llm: LLM 모델 (LangChain BaseChatModel, 스키마 추출에 사용)
+            llm: LLM 모델 (LangChain BaseChatModel)
             neo4j_client: Neo4j 클라이언트
+            project_id: Google Cloud 프로젝트 ID (환경변수에서 자동 설정 가능)
+            location: Vertex AI 리전
         """
         if not NEO4J_GRAPHRAG_AVAILABLE:
-            raise ImportError(
-                "neo4j_graphrag.experimental.components.schema를 import할 수 없습니다. "
-                "neo4j-graphrag 패키지가 올바르게 설치되었는지 확인하세요."
+            logger.warning(
+                "neo4j_graphrag를 사용할 수 없습니다. "
+                "LangChain만 사용하여 스키마를 생성합니다."
             )
-        
+            self.use_graphrag = False
+        else:
+            self.use_graphrag = True
+            
         self.llm = llm
         self.neo4j_client = neo4j_client
+        self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
+        self.location = location
         
-        # LangChain LLM을 neo4j_graphrag의 OpenAILLM으로 변환
-        # 주의: neo4j_graphrag는 OpenAI만 직접 지원하므로, Gemini인 경우 OpenAI API를 사용
-        neo4j_llm = self._convert_langchain_to_neo4j_llm(llm)
-        self.extractor = SchemaFromTextExtractor(llm=neo4j_llm)
-    
-    def _convert_langchain_to_neo4j_llm(self, langchain_llm: BaseChatModel) -> OpenAILLM:
-        """
-        LangChain LLM을 neo4j_graphrag의 OpenAILLM으로 변환
-        
-        주의: neo4j_graphrag는 OpenAI만 직접 지원하므로,
-        Gemini를 사용하는 경우 OpenAI API 키가 필요합니다.
-        Gemini를 사용하려면 OpenAI API 키를 .env에 설정해야 합니다.
-        
-        Args:
-            langchain_llm: LangChain BaseChatModel
-            
-        Returns:
-            neo4j_graphrag OpenAILLM 인스턴스
-        """
-        # OpenAI API 키 가져오기
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            # LangChain LLM에서 API 키 추출 시도
-            if hasattr(langchain_llm, 'openai_api_key'):
-                api_key = langchain_llm.openai_api_key
-            elif hasattr(langchain_llm, 'api_key'):
-                api_key = langchain_llm.api_key
-        
-        if not api_key:
-            # Gemini를 사용하는 경우에도 neo4j_graphrag는 OpenAI가 필요
-            # 따라서 OpenAI API 키가 없으면 에러 발생
-            raise ValueError(
-                "neo4j_graphrag는 OpenAI API를 필요로 합니다. "
-                "Gemini를 사용하더라도 .env에 OPENAI_API_KEY를 설정해야 합니다."
+        if self.use_graphrag:
+            # Neo4j GraphRAG용 VertexAI LLM 설정
+            self.graphrag_llm = VertexAILLM(
+                model_name="gemini-2.5-pro",
+                project_id=self.project_id,
+                location=self.location
             )
-        
-        # 모델 이름 추출 (기본값: gpt-4o)
-        model_name = "gpt-4o"
-        if isinstance(langchain_llm, ChatOpenAI):
-            model_name = langchain_llm.model_name or langchain_llm.model or "gpt-4o"
-        elif isinstance(langchain_llm, ChatGoogleGenerativeAI):
-            # Gemini를 사용하는 경우에도 OpenAI API를 사용 (neo4j_graphrag 제약)
-            # 사용자에게 알림
-            model_name = "gpt-4o"  # Gemini 대신 OpenAI 사용
-        
-        # neo4j_graphrag OpenAILLM 생성
-        return OpenAILLM(
-            model_name=model_name,
-            model_params={
-                "max_tokens": 2000,
-                "response_format": {"type": "json_object"},
-            }
-        )
+            self.extractor = SchemaFromTextExtractor(llm=self.graphrag_llm)
     
     def generate_schema(self, templates: List[str]) -> Dict[str, Any]:
         """
@@ -113,11 +82,19 @@ class OntologyArchitectAgent:
         
         Args:
             templates: 증권 리포트 템플릿 문서 리스트
-                예: [CFA 템플릿, J.P. Morgan 템플릿, 한국 반도체 리포트 샘플]
         
         Returns:
             추출된 스키마 정보
         """
+        if self.use_graphrag:
+            return self._generate_schema_with_graphrag(templates)
+        else:
+            return self._generate_schema_with_langchain(templates)
+    
+    def _generate_schema_with_graphrag(self, templates: List[str]) -> Dict[str, Any]:
+        """Neo4j GraphRAG를 사용한 스키마 생성"""
+        import asyncio
+        
         try:
             # 템플릿을 하나의 텍스트로 결합
             combined_text = "\n\n".join(templates)
@@ -129,7 +106,6 @@ class OntologyArchitectAgent:
             neo4j_schema = schema.to_neo4j_schema()
             
             # Neo4j에 적용 (Cypher 생성 및 실행)
-            # Iterator 소진 방지: 먼저 리스트로 변환
             cypher_statements = list(neo4j_schema.to_cypher())
             for statement in cypher_statements:
                 self.neo4j_client.run(statement)
@@ -137,110 +113,90 @@ class OntologyArchitectAgent:
             return {
                 "schema": schema,
                 "neo4j_schema": neo4j_schema,
-                "cypher_statements": cypher_statements
+                "cypher_statements": cypher_statements,
+                "method": "graphrag"
             }
         except Exception as e:
+            logger.error(f"GraphRAG 스키마 생성 실패: {str(e)}")
             raise RuntimeError(f"온톨로지 스키마 생성 실패: {str(e)}")
     
-    def update_schema(self, new_documents: List[str]) -> Dict[str, Any]:
-        """
-        기존 스키마에 새로운 개념 추가
+    def _generate_schema_with_langchain(self, templates: List[str]) -> Dict[str, Any]:
+        """LangChain을 사용한 스키마 생성 (폴백)"""
+        # 1. 템플릿 결합
+        combined_text = "\n\n".join(templates)[:50000]  # 토큰 제한 고려
         
-        Args:
-            new_documents: 새로운 문서 리스트
+        # 2. 스키마 추출 프롬프트
+        prompt = f"""
+        당신은 지식 그래프 전문가입니다.
+        다음 문서들을 분석하여 금융 도메인에 적합한 온톨로지 스키마를 정의하세요.
         
-        Returns:
-            업데이트된 스키마 정보
+        문서:
+        {combined_text}
+        
+        다음 항목들을 정의해야 합니다:
+        1. Node Labels: 예 - Company, Product, Industry, Event
+        2. Relationship Types: 예 - COMPETITOR_OF, SUPPLIER_OF, AFFECTS
+        3. Properties: 각 노드와 관계의 필수 속성들
+        
+        출력은 반드시 실행 가능한 Cypher Query 형식으로 작성하세요.
+        
+        예시:
+        CREATE CONSTRAINT FOR (c:Company) REQUIRE c.name IS UNIQUE;
         """
+        
         try:
-            # 기존 스키마 조회
-            existing_schema = self._get_existing_schema()
+            # 3. LLM 호출
+            response = self.llm.invoke(prompt)
+            cypher_queries = self._extract_cypher_queries(response.content)
             
-            # 새 문서에서 스키마 추출
-            combined_text = "\n\n".join(new_documents)
-            new_schema_obj = asyncio.run(self.extractor.run(text=combined_text))
+            # 4. Neo4j 적용
+            executed_queries = []
+            for query in cypher_queries:
+                try:
+                    self.neo4j_client.run(query)
+                    executed_queries.append(query)
+                    logger.info(f"Executed schema query: {query}")
+                except Exception as e:
+                    logger.warning(f"Failed to execute query: {query}. Error: {e}")
             
-            # schema 객체를 Dict로 변환
-            new_schema_dict = self._schema_to_dict(new_schema_obj)
-            
-            # 스키마 병합 (간단한 버전 - 실제로는 더 복잡한 로직 필요)
-            merged_schema = self._merge_schemas(existing_schema, new_schema_dict)
-            
-            # Neo4j 업데이트
-            self._apply_schema_update(merged_schema)
-            
-            return merged_schema
-        except Exception as e:
-            raise RuntimeError(f"온톨로지 스키마 업데이트 실패: {str(e)}")
-    
-    def _get_existing_schema(self) -> Dict[str, Any]:
-        """현재 Neo4j의 스키마 조회"""
-        try:
-            # Neo4j에서 스키마 정보 조회
-            schema_info = self.neo4j_client.get_schema()
-            return schema_info
-        except Exception:
-            # 스키마가 없으면 빈 딕셔너리 반환
-            return {}
-    
-    def _merge_schemas(
-        self, 
-        existing: Dict[str, Any], 
-        new: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        기존 스키마와 새 스키마 병합
-        
-        Args:
-            existing: 기존 스키마
-            new: 새 스키마
-        
-        Returns:
-            병합된 스키마
-        """
-        # 간단한 병합 로직 (실제로는 더 정교한 로직 필요)
-        merged = {
-            "node_types": list(set(
-                existing.get("node_types", []) + new.get("node_types", [])
-            )),
-            "relationship_types": list(set(
-                existing.get("relationship_types", []) + 
-                new.get("relationship_types", [])
-            ))
-        }
-        return merged
-    
-    def _schema_to_dict(self, schema_obj) -> Dict[str, Any]:
-        """
-        schema 객체를 Dict로 변환
-        
-        Args:
-            schema_obj: neo4j_graphrag의 schema 객체
-        
-        Returns:
-            Dict 형태의 스키마 정보
-        """
-        try:
-            # neo4j_schema로 변환하여 정보 추출
-            neo4j_schema = schema_obj.to_neo4j_schema()
-            
-            # 스키마 정보를 Dict로 변환
-            # 실제 구현은 neo4j_graphrag의 스키마 구조에 따라 다를 수 있음
-            # 여기서는 기본적인 변환 로직 제공
-            # TODO: neo4j_schema에서 실제 노드 타입과 관계 타입 추출
             return {
-                "node_types": [],  # TODO: neo4j_schema에서 노드 타입 추출
-                "relationship_types": []  # TODO: neo4j_schema에서 관계 타입 추출
+                "generated_schema_queries": executed_queries,
+                "raw_response": response.content,
+                "method": "langchain_fallback"
             }
+            
         except Exception as e:
-            # 변환 실패 시 빈 Dict 반환
-            return {
-                "node_types": [],
-                "relationship_types": []
-            }
-    
-    def _apply_schema_update(self, schema: Dict[str, Any]) -> None:
-        """스키마 업데이트를 Neo4j에 적용"""
-        # 스키마 업데이트 로직 구현
-        # 실제로는 neo4j-graphrag의 스키마 업데이트 기능 활용
-        pass
+            logger.error(f"Schema generation failed: {str(e)}")
+            raise RuntimeError(f"온톨로지 스키마 생성 실패: {str(e)}")
+
+    def _extract_cypher_queries(self, text: str) -> List[str]:
+        """LLM 응답에서 Cypher 쿼리 추출"""
+        import re
+        
+        queries = []
+        lines = text.split('\n')
+        
+        current_query = ""
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("//"):
+                continue
+                
+            if (line.upper().startswith("CREATE") or 
+                line.upper().startswith("MERGE") or 
+                line.upper().startswith("CALL")):
+                current_query = line
+            elif current_query:
+                current_query += " " + line
+            
+            if current_query and current_query.endswith(";"):
+                queries.append(current_query)
+                current_query = ""
+                
+        # 코드 블록에서 추출 (백업)
+        if not queries:
+            matches = re.findall(r"```cypher(.*?)```", text, re.DOTALL)
+            for match in matches:
+                queries.extend([q.strip() for q in match.split(';') if q.strip()])
+                
+        return queries
