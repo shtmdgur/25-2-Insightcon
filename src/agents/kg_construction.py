@@ -1,17 +1,25 @@
 """
-지식 그래프 구축 에이전트
-문서에서 엔티티와 관계를 추출하여 Neo4j에 주입
+지식 그래프 구축 에이전트 (Seed Ontology 기반)
+
+Pydantic 모델을 사용하여 구조화된 출력을 강제하고 환각을 방지합니다.
 """
 from typing import List, Dict, Any, Optional
 from langchain_core.language_models import BaseChatModel
+from langchain_core.output_parsers import PydanticOutputParser
 import json
+import logging
 
 from ..utils.neo4j_client import Neo4jClient
+from ..models.nodes import KnowledgeGraph, Entity, Relation
+
+logger = logging.getLogger(__name__)
 
 
 class KGConstructionAgent:
     """
     문서에서 엔티티와 관계를 추출하여 지식 그래프를 구축하는 에이전트
+    
+    Seed Ontology 기반 추출로 환각(Hallucination) 방지
     """
     
     def __init__(self, llm: BaseChatModel, neo4j_client: Neo4jClient):
@@ -24,217 +32,163 @@ class KGConstructionAgent:
         """
         self.llm = llm
         self.neo4j_client = neo4j_client
+        self.parser = PydanticOutputParser(pydantic_object=KnowledgeGraph)
     
-    def extract_entities(self, document: str) -> Dict[str, Any]:
+    def extract_entities(self, document: str, source: Optional[str] = None) -> KnowledgeGraph:
         """
-        문서에서 엔티티 추출
+        문서에서 엔티티 및 관계 추출 (Seed Ontology 기반)
         
         Args:
             document: 분석할 문서 텍스트
+            source: 출처 (문서명 등)
         
         Returns:
-            추출된 엔티티 정보
+            KnowledgeGraph 객체 (Pydantic 모델)
         """
         prompt = f"""
-        다음 문서에서 엔티티를 추출하세요.
-        
-        문서:
-        {document}
-        
-        추출할 엔티티:
-        - Company (기업)
-        - ProductLine (제품)
-        - Metric (재무 지표)
-        
-        JSON 형식:
-        {{
-            "companies": [{{"name": "...", "properties": {{}}}}],
-            "products": [{{"name": "...", "properties": {{}}}}],
-            "metrics": [{{"name": "...", "value": "...", "properties": {{}}}}]
-        }}
-        """
+다음 문서에서 지식 그래프를 추출하세요.
+
+문서:
+{document}
+
+지침:
+1. 허용된 엔티티 타입만 사용하세요:
+   - Company: 기업명
+   - Product: 제품/서비스명
+   - Event: 중요 이벤트 (실적 발표, M&A 등)
+   - Metric: 재무 지표 (매출, 영업이익 등)
+   - Trend: 시장 트렌드
+   - Financial: 재무 정보 (분기별)
+
+2. 허용된 관계 타입만 사용하세요:
+   - COMPETITOR_OF: 경쟁 관계
+   - SUPPLIER_OF: 공급 관계
+   - MANUFACTURES: 제조 관계
+   - AFFECTS: 영향 관계
+   - HAS_METRIC: 지표 보유
+   - HAS_FINANCIAL: 재무 정보 보유
+   - HAS_TREND: 트렌드 보유
+
+3. 엔티티 이름은 정규화하세요 (예: "삼성" → "삼성전자")
+
+4. 관계는 문서에서 **명시적으로 언급된 것만** 추출하세요.
+
+{self.parser.get_format_instructions()}
+"""
         
         try:
             response = self.llm.invoke(prompt)
-            content = response.content
+            kg = self.parser.parse(response.content)
             
-            # JSON 파싱
-            entities = json.loads(content)
-            return entities
-        except json.JSONDecodeError:
-            # JSON 파싱 실패 시 텍스트에서 수동 추출 시도
-            return self._fallback_extraction(content)
+            # 메타데이터 추가
+            kg.metadata = {
+                "source": source or "unknown",
+                "extraction_method": "seed_ontology"
+            }
+            
+            logger.info(f"Extracted {len(kg.entities)} entities and {len(kg.relations)} relations")
+            return kg
+            
         except Exception as e:
-            raise RuntimeError(f"엔티티 추출 실패: {str(e)}")
+            logger.error(f"Entity extraction failed: {str(e)}")
+            # Fallback: 빈 KG 반환
+            return KnowledgeGraph(
+                entities=[],
+                relations=[],
+                metadata={"error": str(e)}
+            )
     
-    def inject_to_neo4j(self, entities: Dict[str, Any]) -> Dict[str, int]:
+    def inject_to_neo4j(self, kg: KnowledgeGraph) -> Dict[str, int]:
         """
-        추출된 엔티티를 Neo4j에 주입
+        추출된 Knowledge Graph를 Neo4j에 주입
         
         Args:
-            entities: 추출된 엔티티 정보
+            kg: KnowledgeGraph 객체
         
         Returns:
-            주입된 엔티티 개수 통계
+            주입된 엔티티 및 관계 개수
         """
         stats = {
-            "companies": 0,
-            "products": 0,
-            "metrics": 0,
-            "relationships": 0
+            "entities": 0,
+            "relations": 0,
+            "errors": 0
         }
         
-        try:
-            # Company 노드 생성
-            for company in entities.get('companies', []):
-                company_name = company.get('name')
-                if not company_name:
-                    continue
+        # 1. 엔티티 주입
+        for entity in kg.entities:
+            try:
+                # MERGE 쿼리 생성 (중복 방지)
+                query = f"""
+                MERGE (e:{entity.type.value} {{name: $name}})
+                SET e += $properties,
+                    e.confidence = $confidence,
+                    e.last_updated = datetime()
+                """
                 
-                company_props = company.get('properties', {})
-                # Neo4j 호환성을 위해 SET 구문을 개별 속성으로 설정
-                if company_props:
-                    # 속성을 개별적으로 설정
-                    # 주의: 속성 이름에 특수문자가 있으면 이스케이프 필요
-                    # name 파라미터가 properties에 의해 덮어쓰이지 않도록 순서 조정
-                    set_clauses = ", ".join([f"c.`{k}` = ${k}" for k in company_props.keys()])
-                    params = {**company_props, "name": company_name}
-                    self.neo4j_client.run(f"""
-                        MERGE (c:Company {{name: $name}})
-                        SET {set_clauses}
-                    """, params)
-                else:
-                    self.neo4j_client.run("""
-                        MERGE (c:Company {name: $name})
-                    """, {"name": company_name})
-                stats["companies"] += 1
-            
-            # ProductLine 노드 생성
-            for product in entities.get('products', []):
-                product_name = product.get('name')
-                if not product_name:
-                    continue
-                
-                product_props = product.get('properties', {})
-                if product_props:
-                    # name 파라미터가 properties에 의해 덮어쓰이지 않도록 순서 조정
-                    set_clauses = ", ".join([f"p.`{k}` = ${k}" for k in product_props.keys()])
-                    params = {**product_props, "name": product_name}
-                    self.neo4j_client.run(f"""
-                        MERGE (p:ProductLine {{name: $name}})
-                        SET {set_clauses}
-                    """, params)
-                else:
-                    self.neo4j_client.run("""
-                        MERGE (p:ProductLine {name: $name})
-                    """, {"name": product_name})
-                stats["products"] += 1
-            
-            # Metric 노드 생성
-            for metric in entities.get('metrics', []):
-                metric_name = metric.get('name')
-                if not metric_name:
-                    continue
-                
-                metric_props = {
-                    **metric.get('properties', {}),
-                    "value": metric.get('value', '')
+                params = {
+                    "name": entity.name,
+                    "properties": entity.properties,
+                    "confidence": entity.confidence
                 }
-                if metric_props:
-                    # name 파라미터가 properties에 의해 덮어쓰이지 않도록 순서 조정
-                    set_clauses = ", ".join([f"m.`{k}` = ${k}" for k in metric_props.keys()])
-                    params = {**metric_props, "name": metric_name}
-                    self.neo4j_client.run(f"""
-                        MERGE (m:Metric {{name: $name}})
-                        SET {set_clauses}
-                    """, params)
-                else:
-                    self.neo4j_client.run("""
-                        MERGE (m:Metric {name: $name})
-                    """, {"name": metric_name})
-                stats["metrics"] += 1
-            
-            # 관계 생성 (간단한 버전)
-            # 주의: 현재는 모든 제품/지표를 모든 기업에 연결하는 단순 로직
-            # 실제로는 문서에서 추출한 관계 정보를 사용해야 함
-            # 예: company['products'] 리스트에 해당 기업의 제품만 포함
-            for company in entities.get('companies', []):
-                company_name = company.get('name')
-                if not company_name:
-                    continue
                 
-                # Company -[MANUFACTURES]-> ProductLine 관계
-                # TODO: company['products'] 같은 속성에서 실제 관계 추출
-                for product in entities.get('products', []):
-                    product_name = product.get('name')
-                    if not product_name:
-                        continue
-                    
-                    try:
-                        self.neo4j_client.run("""
-                            MATCH (c:Company {name: $company_name})
-                            MATCH (p:ProductLine {name: $product_name})
-                            MERGE (c)-[:MANUFACTURES]->(p)
-                        """, {
-                            "company_name": company_name,
-                            "product_name": product_name
-                        })
-                        stats["relationships"] += 1
-                    except Exception:
-                        # 관계 생성 실패는 무시 (이미 존재하거나 노드가 없을 수 있음)
-                        pass
+                self.neo4j_client.run(query, params)
+                stats["entities"] += 1
                 
-                # Company -[HAS_METRIC]-> Metric 관계
-                # TODO: company['metrics'] 같은 속성에서 실제 관계 추출
-                for metric in entities.get('metrics', []):
-                    metric_name = metric.get('name')
-                    if not metric_name:
-                        continue
-                    
-                    try:
-                        self.neo4j_client.run("""
-                            MATCH (c:Company {name: $company_name})
-                            MATCH (m:Metric {name: $metric_name})
-                            MERGE (c)-[:HAS_METRIC]->(m)
-                        """, {
-                            "company_name": company_name,
-                            "metric_name": metric_name
-                        })
-                        stats["relationships"] += 1
-                    except Exception:
-                        # 관계 생성 실패는 무시
-                        pass
-            
-            return stats
-        except Exception as e:
-            raise RuntimeError(f"Neo4j 주입 실패: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to inject entity {entity.name}: {str(e)}")
+                stats["errors"] += 1
+        
+        # 2. 관계 주입
+        for relation in kg.relations:
+            try:
+                # 주어와 목적어가 존재하는지 확인 후 관계 생성
+                query = f"""
+                MATCH (s {{name: $subject}})
+                MATCH (o {{name: $object}})
+                MERGE (s)-[r:{relation.predicate.value}]->(o)
+                SET r.weight = $weight,
+                    r.source = $source,
+                    r.last_updated = datetime()
+                """
+                
+                params = {
+                    "subject": relation.subject,
+                    "object": relation.object,
+                    "weight": relation.weight,
+                    "source": relation.source or "unknown"
+                }
+                
+                self.neo4j_client.run(query, params)
+                stats["relations"] += 1
+                
+            except Exception as e:
+                logger.error(
+                    f"Failed to inject relation "
+                    f"{relation.subject} -[{relation.predicate.value}]-> {relation.object}: "
+                    f"{str(e)}"
+                )
+                stats["errors"] += 1
+        
+        return stats
     
-    def process_document(self, document: str) -> Dict[str, Any]:
+    def process_document(self, document: str, source: Optional[str] = None) -> Dict[str, Any]:
         """
         문서를 처리하여 지식 그래프 구축
         
         Args:
             document: 처리할 문서
+            source: 출처
         
         Returns:
-            처리 결과 (엔티티, 통계 등)
+            처리 결과 (KG, 통계 등)
         """
         # 엔티티 추출
-        entities = self.extract_entities(document)
+        kg = self.extract_entities(document, source)
         
         # Neo4j에 주입
-        stats = self.inject_to_neo4j(entities)
+        stats = self.inject_to_neo4j(kg)
         
         return {
-            "entities": entities,
+            "knowledge_graph": kg.dict(),
             "stats": stats
-        }
-    
-    def _fallback_extraction(self, text: str) -> Dict[str, Any]:
-        """JSON 파싱 실패 시 대체 추출 방법"""
-        # 간단한 대체 로직 (실제로는 더 정교한 로직 필요)
-        return {
-            "companies": [],
-            "products": [],
-            "metrics": []
         }
