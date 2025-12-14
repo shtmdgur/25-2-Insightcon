@@ -255,22 +255,65 @@ RETURN n
 
 ---
 
+### 1.10 KGConstructionAgent Orchestrator 아키텍처 재설계 ✅
+**파일**: `docs/11_시스템_고도화_계획.md`, `docs/12_시스템_설계_명세서.md`, `docs/implementation_logs/implementation_plan.md`
+**내용**:
+- **Orchestrator 아키텍처 도입**:
+  - KGConstructionAgent를 Multi-Agent Orchestrator로 재설계
+  - 모든 데이터 소스의 파서를 통합 관리하는 중앙 허브 역할
+- **Parser Agent 구조**:
+  - PDFParserAgent (완료 ✅) - GeminiPDFParser 래핑
+  - PriceParserAgent (구현 예정) - 주가 CSV 파싱
+  - DARTParserAgent (구현 예정) - 공시 데이터 파싱
+  - MacroParserAgent (구현 예정) - 매크로 지표 파싱
+  - NewsParserAgent (구현 예정) - 뉴스 텍스트 파싱
+- **핵심 기능**:
+  1. 데이터 소스 자동 스캔 (`data/raw/*`)
+  2. Parser Agent 선택 및 병렬 실행
+  3. JSON 수집 및 병합 (KGMerger)
+  4. Entity 정규화 (Entity Normalizer)
+  5. Neo4j 주입 및 결과 리포트
+- **사용 인터페이스**:
+  ```python
+  agent = KGConstructionAgent()
+  report = agent.construct_knowledge_graph(auto_scan=True)
+  ```
+- **문서 업데이트**:
+  - `orchestrator_architecture.md` 신규 작성
+  - `11_시스템_고도화_계획.md` - Parser Agent 아키텍처 섹션 추가
+  - `12_시스템_설계_명세서.md` - KGConstructionAgent → Orchestrator로 재정의
+  - `implementation_plan.md` - Sub-Agent 리스트 추가
+- **Backup 정리**:
+  - `demo_e2e_pipeline.py` → `backup/`
+  - `demo_phase1_agents.py` → `backup/`
+  - Orchestrator가 이 역할들을 통합 수행
+
+---
+
 ## Phase 1 생성/수정 파일
 
-### 생성된 파일 (6개)
+### 생성된 파일 (10개)
 1. `src/models/__init__.py`
 2. `src/models/nodes.py`
 3. `src/utils/batch_job.py`
 4. `src/utils/entity_normalizer.py`
 5. `src/utils/time_series_processor.py`
-7. `src/dataflows/kg_merger.py` (New)
-8. `src/models/deprecated/graph_schema.py` (Moved)
+6. `src/utils/event_extractor.py`
+7. `src/dataflows/kg_merger.py`
+8. `test/test_integration.py`
+9. `test/README.md`
+10. `backup/README.md` (New)
 
-### 수정된 파일 (2개)
-1. `src/agents/kg_construction.py`
+### 수정된 파일 (7개)
+1. `src/agents/kg_construction.py` (Orchestrator 재설계 예정)
 2. `src/utils/neo4j_client.py`
-3. `src/dataflows/parsers/gemini_pdf.py` (Refactored)
-4. `src/dataflows/neo4j_loader.py` (Refactored)
+3. `src/dataflows/parsers/gemini_pdf.py`
+4. `src/dataflows/neo4j_loader.py`
+5. `src/models/nodes.py` (Schema Integration + Gemini API 최적화)
+6. `src/templates/prompts.yaml` (Prompt Enhancement)
+7. `docs/11_시스템_고도화_계획.md` (Orchestrator Architecture)
+8. `docs/12_시스템_설계_명세서.md` (Orchestrator Architecture)
+9. `docs/implementation_logs/implementation_plan.md` (Orchestrator Architecture)
 
 ---
 

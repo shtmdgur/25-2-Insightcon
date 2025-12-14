@@ -161,17 +161,64 @@ class RelationType(str, Enum):
 
 #### [MODIFY] [kg_construction.py](file:///d:/0.Sogang/동아리 및 학회/Insight/2025-2/2차 인사이콘/25-2-Insightcon/src/agents/kg_construction.py)
 
-**변경사항**: Seed Ontology 기반 추출 로직으로 개선
+**변경사항**: Multi-Agent Orchestrator로 전면 리팩토링
 
-Pydantic 모델을 사용하여 구조화된 출력을 강제합니다.
+기존 텍스트 → KG 추출 로직을 제거하고, 다음 기능으로 재설계:
+
+**새로운 역할**:
+1. **데이터 소스 자동 스캔** (`_scan_data_sources`)
+2. **Parser Agent 오케스트레이션** (`_orchestrate_parsers`)
+3. **JSON 수집 및 병합** (`_collect_json_files`, `_merge_and_refine`)
+4. **Entity 정규화** (EntityNormalizer 통합)
+5. **Neo4j 주입** (`_load_to_neo4j`)
+6. **결과 리포트 생성** (`_generate_report`)
+
+**Sub-Agents 관리**:
+```python
+class KGConstructionAgent:
+    def __init__(self):
+        # Parser Agents
+        self.pdf_parser_agent = PDFParserAgent()  # 완료 ✅
+        self.price_parser_agent = PriceParserAgent()  # 구현 예정
+        self.dart_parser_agent = DARTParserAgent()  # 구현 예정
+        
+        # 유틸리티
+        self.merger = KGMerger()
+        self.normalizer = EntityNormalizer()
+        self.loader = Neo4jKGLoader()
+```
+
+**Main API**:
+```python
+def construct_knowledge_graph(
+    data_sources: Optional[Dict] = None,
+    auto_scan: bool = True
+) -> Dict
+```
 
 ---
 
-#### [NEW] [batch_job.py](file:///d:/0.Sogang/동아리 및 학회/Insight/2025-2/2차 인사이콘/25-2-Insightcon/src/utils/batch_job.py)
+#### [NEW] [pdf_parser_agent.py](file:///d:/0.Sogang/동아리 및 학회/Insight/2025-2/2차 인사이콘/25-2-Insightcon/src/agents/parsers/pdf_parser_agent.py)
 
-**목적**: Gemini Batch API 통합 (비용 절감)
+**목적**: PDF 파싱 전담 Sub-Agent (GeminiPDFParser 래핑)
 
-대량 KG 구축 작업을 Batch API로 처리하여 비용을 50% 절감합니다.
+배치 처리 및 에러 핸들링을 담당합니다.
+
+---
+
+#### [NEW] [price_parser_agent.py](file:///d:/0.Sogang/동아리 및 학회/Insight/2025-2/2차 인사이콘/25-2-Insightcon/src/agents/parsers/price_parser_agent.py)
+
+**목적**: 주가 CSV 파싱 Sub-Agent
+
+시계열 데이터를 Neo4j에 직접 주입하거나 JSON으로 저장합니다.
+
+---
+
+#### [NEW] [dart_parser_agent.py](file:///d:/0.Sogang/동아리 및 학회/Insight/2025-2/2차 인사이콘/25-2-Insightcon/src/agents/parsers/dart_parser_agent.py)
+
+**목적**: DART 공시 CSV 파싱 Sub-Agent
+
+복잡한 이벤트 관계를 추출하여 JSON으로 저장합니다.
 
 ---
 
