@@ -20,7 +20,7 @@ from google.genai import types
 
 from ..parser_interface import ParserInterface
 from ...utils.gemini_files import get_gemini_files_client
-from ...models.graph_schema import KnowledgeGraph, get_kg_json_schema
+from ...models.nodes import KnowledgeGraph, get_kg_json_schema
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class GeminiPDFParser(ParserInterface):
     def __init__(
         self,
         model_name: str = "gemini-2.5-pro",
-        use_batch: bool = False
+        use_batch: bool = False # 테스트 단계에서는 False, 향후 True로 변경
     ):
         """
         Args:
@@ -79,8 +79,27 @@ class GeminiPDFParser(ParserInterface):
             
             kg_json = self._extract_knowledge_graph(file_uri)
             
-            # 3. Pydantic 모델로 파싱
-            knowledge_graph = KnowledgeGraph.model_validate(kg_json)
+            # 3. Pydantic 모델로 파싱 (Gemini API 출력을 nodes.KnowledgeGraph로 변환)
+            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
+            
+            # 4. JSON 파일로 저장 (data/processed/)
+            import os
+            from datetime import datetime
+            from pathlib import Path
+            
+            # 파일명 생성: {file_id}_{timestamp}.json
+            file_id = Path(file_path).stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # 프로젝트 루트 기준 경로
+            project_root = Path(__file__).parent.parent.parent.parent
+            processed_dir = project_root / "data" / "processed"
+            json_path = processed_dir / f"{file_id}_{timestamp}.json"
+            
+            # JSON 저장
+            knowledge_graph.save_to_json(str(json_path))
+            
+            logger.info(f"Saved KG to: {json_path}")
             
             logger.info(
                 f"Extracted {len(knowledge_graph.entities)} entities "
@@ -95,7 +114,8 @@ class GeminiPDFParser(ParserInterface):
                     "model": self.model_name,
                     "entity_count": len(knowledge_graph.entities),
                     "relation_count": len(knowledge_graph.relations),
-                    "file_path": file_path
+                    "file_path": file_path,
+                    "json_path": str(json_path)  # JSON 저장 경로 추가
                 }
             }
             
@@ -146,32 +166,3 @@ class GeminiPDFParser(ParserInterface):
         # JSON 파싱
         import json
         return json.loads(response.text)
-    
-    def _get_default_prompt(self) -> str:
-        """기본 KG 추출 프롬프트"""
-        return """
-# Role
-당신은 금융 도메인 Knowledge Graph 전문가입니다.
-
-# Task
-이 PDF 문서를 분석하여 다음을 추출하세요:
-
-1. **엔티티(Entities)**: 회사, 제품, 지표, 이벤트, 트렌드, 기술, 인물
-2. **관계(Relations)**: 엔티티 간의 의미 있는 연결
-
-# 중요 지침
-- 엔티티 ID는 고유하고 의미 있게 만드세요 (예: "삼성전자", "DRAM_2024Q1")
-- 모든 숫자 데이터는 properties에 저장하세요
-- 시간 정보(날짜, 분기, 연도)는 반드시 포함하세요
-- 관계는 방향성이 명확해야 합니다
-- 불확실한 정보는 포함하지 마세요
-
-# 도메인 주요 엔티티
-- Company: 기업명, 시가총액, 본사 등
-- Product: 제품명, 카테고리, 사양 등  
-- Metric: 매출, 영업이익, 점유율 등 (반드시 수치 포함)
-- Event: 신제품 출시, M&A, 실적 발표 등
-- Trend: 가격 추세, 수요 변화 등
-
-출력은 반드시 정의된 JSON Schema를 따라야 합니다.
-"""

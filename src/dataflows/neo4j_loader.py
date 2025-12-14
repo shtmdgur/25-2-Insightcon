@@ -8,7 +8,7 @@ from typing import Dict, Any, List, Optional
 from neo4j import GraphDatabase
 from neo4j.exceptions import ServiceUnavailable, AuthError
 
-from ..models.graph_schema import KnowledgeGraph, Entity, Relation
+from ..models.nodes import KnowledgeGraph, Entity, Relation
 
 logger = logging.getLogger(__name__)
 
@@ -45,26 +45,23 @@ class Neo4jKGLoader:
     
     def load_knowledge_graph(
         self,
-        kg: KnowledgeGraph,
-        clear_existing: bool = False
+        kg: KnowledgeGraph
     ) -> Dict[str, int]:
         """
-        Knowledge Graph를 Neo4j에 로드
+        Knowledge Graph를 Neo4j에 UPSERT 방식으로 로드
+        
+        전략:
+        - MERGE를 사용하여 기존 노드/관계가 있으면 업데이트, 없으면 생성
+        - 데이터 누적 방식으로 기존 그래프 보존
         
         Args:
             kg: KnowledgeGraph 객체
-            clear_existing: 기존 데이터 삭제 여부
         
         Returns:
             {"nodes_created": N, "relationships_created": M}
         """
         with self.driver.session() as session:
             stats = {"nodes_created": 0, "relationships_created": 0}
-            
-            # 기존 데이터 삭제 (옵션)
-            if clear_existing:
-                logger.warning("Clearing existing graph data...")
-                session.run("MATCH (n) DETACH DELETE n")
             
             # 1. 엔티티(노드) 생성
             logger.info(f"Loading {len(kg.entities)} entities...")
@@ -88,54 +85,44 @@ class Neo4jKGLoader:
     
     def _create_entity(self, session, entity: Entity):
         """엔티티(노드) 생성"""
-        import json
-        
-        # properties가 JSON 문자열이면 파싱
-        props = {}
-        if entity.properties:
-            try:
-                props = json.loads(entity.properties)
-            except:
-                props = {"raw": entity.properties}
-        
+        # properties는 이미 dict로 제공됨 (nodes.py Entity.properties)
         query = f"""
-        MERGE (n:`{entity.label}` {{id: $id}})
+        MERGE (n:`{entity.type.value}` {{id: $id}})
         SET n.name = $name
         SET n += $properties
+        SET n.confidence = $confidence
         RETURN n
         """
         
         session.run(
             query,
-            id=entity.id,
+            id=entity.name,  # nodes.py에서는 name을 id로 사용
             name=entity.name,
-            properties=props
+            properties=entity.properties,
+            confidence=entity.confidence
         )
     
     def _create_relation(self, session, relation: Relation):
         """관계(엣지) 생성"""
-        import json
-        
-        # properties가 JSON 문자열이면 파싱
+        # properties는 이미 dict로 제공됨
         props = {}
-        if relation.properties:
-            try:
-                props = json.loads(relation.properties)
-            except:
-                props = {"raw": relation.properties}
+        if relation.weight != 1.0:
+            props["weight"] = relation.weight
+        if relation.source:
+            props["source"] = relation.source
         
         query = f"""
         MATCH (source {{id: $source_id}})
         MATCH (target {{id: $target_id}})
-        MERGE (source)-[r:`{relation.type}`]->(target)
+        MERGE (source)-[r:`{relation.predicate.value}`]->(target)
         SET r += $properties
         RETURN r
         """
         
         session.run(
             query,
-            source_id=relation.source_id,
-            target_id=relation.target_id,
+            source_id=relation.subject,
+            target_id=relation.object,
             properties=props
         )
     
@@ -173,24 +160,50 @@ class Neo4jKGLoader:
                 "nodes_by_label": label_stats,
                 "relationships_by_type": rel_type_stats
             }
+    
+    def load_from_json_files(self, json_paths: List[str], merge: bool = True) -> Dict[str, int]:
+        """
+        JSON 파일들을 로드하여 Neo4j에 주입
+        
+        Args:
+            json_paths: JSON 파일 경로 리스트
+            merge: True면 병합 후 주입, False면 개별 주입
+        
+        Returns:
+            주입 통계
+        """
+        from pathlib import Path
+        from .kg_merger import KGMerger
+        
+        if merge and len(json_paths) > 1:
+            # 병합 후 주입
+            logger.info(f"Merging {len(json_paths)} JSON files...")
+            merger = KGMerger()
+            kg = merger.merge_knowledge_graphs([Path(p) for p in json_paths])
+        else:
+            # 단일 파일 로드
+            kg = KnowledgeGraph.load_from_json(json_paths[0])
+        
+        # Neo4j에 주입
+        return self.load_knowledge_graph(kg)
 
 
 def load_kg_from_gemini_pdf(
     pdf_path: str,
     neo4j_uri: str = "bolt://localhost:7687",
     neo4j_user: str = "neo4j",
-    neo4j_password: str = "password",
-    clear_existing: bool = False
+    neo4j_password: str = "password"
 ) -> Dict[str, Any]:
     """
     PDF → Gemini 파싱 → Neo4j 주입 전체 파이프라인
+    
+    UPSERT 전략으로 기존 그래프에 데이터 누적
     
     Args:
         pdf_path: PDF 파일 경로
         neo4j_uri: Neo4j URI
         neo4j_user: Neo4j 사용자명
         neo4j_password: Neo4j 비밀번호
-        clear_existing: 기존 데이터 삭제 여부
     
     Returns:
         {
@@ -213,7 +226,7 @@ def load_kg_from_gemini_pdf(
     loader = Neo4jKGLoader(uri=neo4j_uri, user=neo4j_user, password=neo4j_password)
     
     try:
-        load_stats = loader.load_knowledge_graph(kg, clear_existing=clear_existing)
+        load_stats = loader.load_knowledge_graph(kg)
         graph_stats = loader.get_graph_stats()
     finally:
         loader.close()

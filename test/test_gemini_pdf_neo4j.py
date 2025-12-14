@@ -17,6 +17,7 @@ sys.path.insert(0, str(project_root))
 
 from src.dataflows.parsers.gemini_pdf import GeminiPDFParser
 from src.dataflows.neo4j_loader import Neo4jKGLoader, load_kg_from_gemini_pdf
+from src.models.nodes import KnowledgeGraph  # nodes.py 스키마 사용
 
 # 로깅 설정
 logging.basicConfig(
@@ -68,9 +69,9 @@ def test_gemini_pdf_parser():
             print(f"\n[Entity Samples (첫 5개)]:")
             for i, entity in enumerate(kg.entities[:5], 1):
                 print(f"\n  Entity {i}:")
-                print(f"    ID: {entity.id}")
-                print(f"    Label: {entity.label}")
                 print(f"    Name: {entity.name}")
+                print(f"    Type: {entity.type.value}")
+                print(f"    Confidence: {entity.confidence}")
                 if entity.properties:
                     print(f"    Properties: {json.dumps(entity.properties, ensure_ascii=False, indent=6)}")
         
@@ -79,23 +80,24 @@ def test_gemini_pdf_parser():
             print(f"\n[Relation Samples (첫 5개)]:")
             for i, rel in enumerate(kg.relations[:5], 1):
                 print(f"\n  Relation {i}:")
-                print(f"    {rel.source_id} -[{rel.type}]-> {rel.target_id}")
-                if rel.properties:
-                    print(f"    Properties: {json.dumps(rel.properties, ensure_ascii=False, indent=6)}")
+                print(f"    {rel.subject} -[{rel.predicate.value}]-> {rel.object}")
+                print(f"    Weight: {rel.weight}")
+                if rel.source:
+                    print(f"    Source: {rel.source}")
         
-        # JSON 파일로 저장
-        output_dir = project_root / "data" / "processed"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        output_file = output_dir / f"{sample_pdf.stem}_kg.json"
-        
-        print(f"\n💾 Saving Knowledge Graph to JSON...")
-        print(f"  Output: {output_file}")
-        
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(result["raw_json"], f, ensure_ascii=False, indent=2)
-        
-        print(f"  ✅ JSON file saved!")
+        # JSON 자동 저장 확인
+        json_path = result['metadata'].get('json_path')
+        if json_path:
+            print(f"\n💾 JSON Auto-saved to:")
+            print(f"  {json_path}")
+            
+            # JSON 파일 로드 테스트
+            kg_loaded = KnowledgeGraph.load_from_json(json_path)
+            print(f"\n  ✅ JSON file loaded successfully!")
+            print(f"     Entities: {len(kg_loaded.entities)}")
+            print(f"     Relations: {len(kg_loaded.relations)}")
+        else:
+            print(f"\n⚠️  Warning: JSON path not found in metadata")
         
         return result
         
