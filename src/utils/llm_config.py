@@ -39,7 +39,7 @@ BATCH_API_CONFIG = {
 # 작업 유형별 모델 매핑
 TASK_MODEL_MAPPING = {
     # Quick 모델 사용
-    "pdf_parsing": "quick",
+    "pdf_parsing": "quick", # PDF 파싱은 예외적으로 gemini-2.5-pro 사용
     "chart_description": "quick",
     "kg_construction": "quick",
     "entity_extraction": "quick",

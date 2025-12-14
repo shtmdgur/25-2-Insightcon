@@ -23,7 +23,46 @@ LangGraph 기반 멀티 에이전트 시스템을 금융 특화 Knowledge Graph 
 > - LLM 모델명 변경 (`gemini-2.5-flash-lite` → `gemini-2.5-flash`, `gemini-3-pro-preview` 추가)
 > - 노드 간 데이터 흐름 변경 (Debate 에이전트 추가)
 
-## Proposed Changes
+## Architecture Overview
+
+### Knowledge Graph 이중 레이어 설계
+
+본 시스템은 **정적 KG**와 **동적 KG**의 이중 구조로 데이터를 관리합니다.
+
+#### 핵심 분류 기준
+
+| 분류 | 정적 KG | 동적 KG |
+|------|---------|---------|
+| **노드 타입** | Company, Product, Technology, Person | Metric, Event, Trend, TimeSeries |
+| **시간 속성** | 불필요/생성일만 | **필수** (date, period) |
+| **변화 빈도** | 낮음 (연 1~2회) | 높음 (일/주/월) |
+| **주입 전략** | `MERGE` (UPSERT) | `CREATE` (시계열 생성) |
+
+#### 구현 위치
+
+- **분류 로직**: `src/dataflows/parsers/gemini_pdf.py::classify_entity_layer()`
+- **정적 주입**: `src/dataflows/neo4j_loader.py::_upsert_static_entity()`
+- **동적 주입**: `src/dataflows/neo4j_loader.py::_create_dynamic_entity()`
+- **Time-decay**: `src/utils/time_decay.py::calculate_time_decay()`
+
+#### 예시
+
+```python
+# 정적: Company 노드 (MERGE)
+MERGE (n:Company {id: "005930"})
+SET n.name = "삼성전자", n.updated_at = datetime()
+
+# 동적: Metric 노드 (CREATE, period 포함)
+CREATE (m:Metric {
+    id: "Revenue_005930_2024Q4",
+    period: "2024Q4",
+    value: 77780000000000
+})
+```
+
+**자세한 내용**: `docs/11_시스템_고도화_계획.md` - "Knowledge Graph 이중 레이어 아키텍처" 섹션 참조
+
+---
 
 ### Phase 0: Foundation (Parser & Ontology)
 

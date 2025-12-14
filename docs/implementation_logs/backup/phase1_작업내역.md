@@ -194,10 +194,43 @@ Neo4j (노드/관계 주입)
 **클래스**: `Neo4jKGLoader`
 
 **주요 메서드**:
-- `load_knowledge_graph(kg, clear_existing)`: KG 로드
+- `load_knowledge_graph(kg)`: KG 로드 (**UPSERT 전략**)
 - `_create_entity(session, entity)`: 노드 생성 (MERGE 전략)
-- `_create_relation(session, relation)`: 엣지 생성
+- `_create_relation(session, relation)`: 엣지 생성 (MERGE 전략)
 - `get_graph_stats()`: 통계 조회
+
+**UPSERT 전략** (중요 변경사항):
+```python
+# 이전 버전: 기존 데이터 삭제 후 재생성
+# if clear_existing:
+#     session.run("MATCH (n) DETACH DELETE n")
+
+# 현재 버전: MERGE를 통한 데이터 누적
+def _create_entity(session, entity):
+    query = f"""
+    MERGE (n:`{entity.label}` {{id: $id}})
+    SET n.name = $name
+    SET n += $properties
+    RETURN n
+    """
+    session.run(query, id=entity.id, name=entity.name, properties=props)
+
+def _create_relation(session, relation):
+    query = f"""
+    MATCH (source {{id: $source_id}})
+    MATCH (target {{id: $target_id}})
+    MERGE (source)-[r:`{relation.type}`]->(target)
+    SET r += $properties
+    RETURN r
+    """
+    session.run(query, source_id=..., target_id=..., properties=...)
+```
+
+**UPSERT 전략 장점**:
+- ✅ 동일한 PDF를 재파싱해도 중복 생성 방지
+- ✅ 기존 그래프에 새로운 정보 누적
+- ✅ 여러 소스의 데이터를 통합 관리
+- ✅ 점진적 KG 구축 가능
 
 **함수**: `load_kg_from_gemini_pdf()` - 전체 파이프라인
 
@@ -278,4 +311,94 @@ Phase 2: Intelligence Upgrade (Multi-Agent) 시작
 - [ ] 시계열 데이터 통합 (SAX-DM, Time-decay)
 - [ ] Multi-hop Retrieval (Graph Traversal)
 - [ ] Batch API 구현 (`use_batch=True`)
+
+---
+
+## E2E 데모 및 통합 테스트 ✓
+
+### 데모 스크립트 생성 (2025-12-14)
+
+#### 1. **`demo_e2e_pipeline.py`** - 통합 파이프라인 데모
+**파이프라인 옵션**:
+
+**옵션 1** (백로그): VLM Parser → KG Agent → Neo4j
+```
+PDF → VLM Parser (차트 분석) → KGConstructionAgent → Neo4j
+```
+- 용도: 차트 세부 분석이 필요한 연구 단계
+- 현재: 백로그 (GeminiPDFParser 우선 사용 권장)
+
+**옵션 2** (추천 ⭐): Gemini PDF Parser → Neo4j (Direct)
+```
+PDF → GeminiPDFParser (KG 직접 추출) → Neo4j
+```
+- 용도: **PDF에서 Knowledge Graph 구축 (Production)**
+- 장점: 빠르고 정확, Batch API 활용 가능
+
+#### 2. **`demo_phase1_agents.py`** - 개별 에이전트 테스트
+- **KGConstructionAgent**: 뉴스/텍스트 → KG 추출
+- **EventExtractor**: 뉴스 → 이벤트 노드 생성
+- **TimeSeriesProcessor**: 주가 → SAX 패턴 분석
+
+---
+
+### 데이터 분류 로직 정리
+
+**현재 (Phase 1)**: 수동 분류
+| 입력 타입 | 사용 컴포넌트 | 판단 기준 |
+|-----------|---------------|-----------|
+| PDF 리포트 | **GeminiPDFParser** ⭐ | Knowledge Graph 추출 |
+| 뉴스 기사 | **KGConstructionAgent** | 실시간 텍스트 데이터 |
+| 주가 시계열 | **TimeSeriesProcessor** | 수치 배열 + 시간 정보 |
+
+**Phase 2 예정**: LLM 기반 자동 라우터
+```python
+class DataRouter:
+    def classify_and_route(self, data):
+        # LLM이 자동으로 데이터 타입 판단
+        classification = self.llm.classify(data)
+        
+        if classification["type"] == "pdf":
+            return self.gemini_pdf_parser.parse(data)
+        elif classification["type"] == "news":
+            return self.kg_agent.process_document(data)
+        elif classification["type"] == "timeseries":
+            return self.ts_processor.process(data)
+```
+
+**판단 기준**:
+1. **구조적 특징**: 파일 형식, 문서 길이, 섹션 구조
+2. **키워드 분석**: "리포트", "실적", "분석" vs "속보", "발표"
+3. **시간성**: 정적(온톨로지) vs 동적(이벤트) vs 시계열(트렌드)
+
+---
+
+### 문서화
+
+1. **`docs/파서_선택_가이드.md`**
+   - GeminiPDFParser vs VLMParser vs KGConstructionAgent 비교
+   - 사용 시나리오별 추천 방식
+   - 비용 비교 및 의사결정 트리
+
+2. **README 업데이트 필요**
+   - E2E 파이프라인 실행 방법
+   - Phase 0/1 구현 현황
+
+---
+
+## Phase 1 완료! 🎉
+
+**최종 통계:**
+- 생성 파일: 7개 (models, agents, utils, loaders)
+- 수정 파일: 2개 (`kg_construction.py`, `neo4j_client.py`)
+- 컴파일 성공: 9/9 (100%)
+- 데모 스크립트: 2개
+- 문서: 1개 (파서 선택 가이드)
+
+**핵심 성과**:
+- ✅ Gemini PDF Parser 기반 원스텝 KG 구축
+- ✅ Pydantic 기반 타입 안정성 확보
+- ✅ Seed Ontology 강제화 (환각 방지)
+- ✅ Batch API 준비 (비용 50% 절감)
+- ✅ E2E 테스트 가능한 데모 제공
 
