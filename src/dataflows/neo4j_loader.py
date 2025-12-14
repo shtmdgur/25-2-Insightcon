@@ -1,7 +1,12 @@
 """
 Neo4j Knowledge Graph Loader
 
-Gemini PDF Parser가 추출한 Knowledge Graph를 Neo4j에 주입합니다.
+모든 Parser Agent(PDF, Price, DART, News, Macro, Fund)가 생성한 Knowledge Graph를 Neo4j에 주입합니다.
+
+주요 기능:
+- 이중 레이어 전략: 정적 엔티티(MERGE) / 동적 엔티티(CREATE)
+- JSON 파일 배치 로드 및 병합
+- UPSERT 전략으로 데이터 누적 관리
 """
 import logging
 from typing import Dict, Any, List, Optional
@@ -45,29 +50,50 @@ class Neo4jKGLoader:
     
     def load_knowledge_graph(
         self,
-        kg: KnowledgeGraph
+        kg: KnowledgeGraph,
+        use_dual_layer: bool = True
     ) -> Dict[str, int]:
         """
         Knowledge Graph를 Neo4j에 UPSERT 방식으로 로드
         
         전략:
-        - MERGE를 사용하여 기존 노드/관계가 있으면 업데이트, 없으면 생성
-        - 데이터 누적 방식으로 기존 그래프 보존
+        - use_dual_layer=True: 정적(MERGE)/동적(CREATE) 분리
+        - use_dual_layer=False: 모두 MERGE (기존 방식)
         
         Args:
             kg: KnowledgeGraph 객체
+            use_dual_layer: 이중 레이어 전략 사용 여부
         
         Returns:
-            {"nodes_created": N, "relationships_created": M}
+            {
+                "static_nodes": N,
+                "dynamic_nodes": M,
+                "relationships_created": K
+            }
         """
         with self.driver.session() as session:
-            stats = {"nodes_created": 0, "relationships_created": 0}
+            stats = {
+                "static_nodes": 0,
+                "dynamic_nodes": 0,
+                "relationships_created": 0
+            }
             
             # 1. 엔티티(노드) 생성
             logger.info(f"Loading {len(kg.entities)} entities...")
             for entity in kg.entities:
-                self._create_entity(session, entity)
-                stats["nodes_created"] += 1
+                if use_dual_layer:
+                    # 이중 레이어: 정적/동적 분리
+                    layer = self._classify_entity_layer(entity)
+                    if layer == 'static':
+                        self._upsert_static_entity(session, entity)
+                        stats["static_nodes"] += 1
+                    else:
+                        self._create_dynamic_entity(session, entity)
+                        stats["dynamic_nodes"] += 1
+                else:
+                    # 단일 레이어: 모두 MERGE
+                    self._create_entity(session, entity)
+                    stats["static_nodes"] += 1
             
             # 2. 관계(엣지) 생성
             logger.info(f"Loading {len(kg.relations)} relations...")
@@ -77,14 +103,31 @@ class Neo4jKGLoader:
             
             logger.info(
                 f"Graph loaded successfully: "
-                f"{stats['nodes_created']} nodes, "
+                f"{stats.get('static_nodes', 0)} static nodes, "
+                f"{stats.get('dynamic_nodes', 0)} dynamic nodes, "
                 f"{stats['relationships_created']} relationships"
             )
             
             return stats
     
+    def _classify_entity_layer(self, entity: Entity) -> str:
+        """
+        Entity를 정적/동적 레이어로 분류
+        
+        정적: Company, Product, Technology, Person (변화 빈도 낮음)
+        동적: Metric, Event, Trend, TimeSeries (시간 속성 필수)
+        
+        Args:
+            entity: Entity 객체
+        
+        Returns:
+            'static' 또는 'dynamic'
+        """
+        static_types = {'Company', 'Product', 'Technology', 'Person'}
+        return 'static' if entity.type.value in static_types else 'dynamic'
+    
     def _create_entity(self, session, entity: Entity):
-        """엔티티(노드) 생성"""
+        """엔티티(노드) 생성 (기존 방식 - MERGE)"""
         # properties는 이미 dict로 제공됨 (nodes.py Entity.properties)
         query = f"""
         MERGE (n:`{entity.type.value}` {{id: $id}})
@@ -100,6 +143,58 @@ class Neo4jKGLoader:
             name=entity.name,
             properties=entity.properties,
             confidence=entity.confidence
+        )
+    
+    def _upsert_static_entity(self, session, entity: Entity):
+        """
+        정적 Entity 주입
+        
+        전략: MERGE (중복 방지, 업데이트)
+        - Company, Product, Technology, Person
+        - 같은 id면 기존 노드 업데이트
+        """
+        query = f"""
+        MERGE (n:`{entity.type.value}` {{id: $id}})
+        SET n.name = $name
+        SET n += $properties
+        SET n.confidence = $confidence
+        SET n.last_updated = datetime()
+        RETURN n
+        """
+        
+        session.run(
+            query,
+            id=entity.name,
+            name=entity.name,
+            properties=entity.properties,
+            confidence=entity.confidence
+        )
+    
+    def _create_dynamic_entity(self, session, entity: Entity):
+        """
+        동적 Entity 주입
+        
+        전략: CREATE (시계열 누적)
+        - Metric, Event, Trend, TimeSeries
+        - 매번 새 노드 생성 (시간 속성 필수)
+        """
+        from datetime import datetime as dt
+        
+        query = f"""
+        CREATE (n:`{entity.type.value}`)
+        SET n.name = $name
+        SET n += $properties
+        SET n.confidence = $confidence
+        SET n.created_at = datetime($created_at)
+        RETURN n
+        """
+        
+        session.run(
+            query,
+            name=entity.name,
+            properties=entity.properties,
+            confidence=entity.confidence,
+            created_at=dt.now().isoformat()
         )
     
     def _create_relation(self, session, relation: Relation):
