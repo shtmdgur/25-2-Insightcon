@@ -1,0 +1,256 @@
+{
+  "entities": [
+    {
+      "name": "Samsung Electronics",
+      "type": "IDM",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "SK Hynix",
+      "type": "IDM",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Micron",
+      "type": "IDM",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Intel",
+      "type": "IDM",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Server DRAM",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "PC DRAM",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "NAND Flash",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Intel CPU Shortage",
+      "type": "MarketEnvironment",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "DRAM Price Increase Forecast",
+      "type": "MarketEnvironment",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Customer Inventory Buildup",
+      "type": "StrategicAction",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "2019-12",
+      "type": "TemporalRegion",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "2020Q1",
+      "type": "TemporalRegion",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Server DRAM 16GB RDIMM (DDR4 2666Mbps)",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Price_SvrDRAM_16GB_RDIMM_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Server DRAM 64GB LRDIMM (DDR4 2933Mbps)",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Price_SvrDRAM_64GB_LRDIMM_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "PC DRAM U-DIMM 8GB (DDR4 2400Mbps)",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Price_PCDRAM_U-DIMM_8GB_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "MLC NAND 128Gb",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Price_MLC_NAND_128Gb_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "TLC Wafer NAND 512Gb",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Price_TLC_NAND_512Gb_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 0.95
+    }
+  ],
+  "relations": [
+    {
+      "subject": "Samsung Electronics",
+      "predicate": "supplies",
+      "object": "Server DRAM",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "SK Hynix",
+      "predicate": "supplies",
+      "object": "Server DRAM",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Micron",
+      "predicate": "supplies",
+      "object": "PC DRAM",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Intel CPU Shortage",
+      "predicate": "affects",
+      "object": "PC DRAM",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "DRAM Price Increase Forecast",
+      "predicate": "occursDuring",
+      "object": "2020Q1",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Customer Inventory Buildup",
+      "predicate": "affects",
+      "object": "DRAM Price Increase Forecast",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_SvrDRAM_16GB_RDIMM_2019-12",
+      "predicate": "observes",
+      "object": "Server DRAM 16GB RDIMM (DDR4 2666Mbps)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_SvrDRAM_16GB_RDIMM_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_SvrDRAM_64GB_LRDIMM_2019-12",
+      "predicate": "observes",
+      "object": "Server DRAM 64GB LRDIMM (DDR4 2933Mbps)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_SvrDRAM_64GB_LRDIMM_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_PCDRAM_U-DIMM_8GB_2019-12",
+      "predicate": "observes",
+      "object": "PC DRAM U-DIMM 8GB (DDR4 2400Mbps)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_PCDRAM_U-DIMM_8GB_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_MLC_NAND_128Gb_2019-12",
+      "predicate": "observes",
+      "object": "MLC NAND 128Gb",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_MLC_NAND_128Gb_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_TLC_NAND_512Gb_2019-12",
+      "predicate": "observes",
+      "object": "TLC Wafer NAND 512Gb",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Price_TLC_NAND_512Gb_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    }
+  ],
+  "metadata": {
+    "source_file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\reports\\20200102_Semiconductor_미래에셋증권_12월 Memory 고정거래가격 Review.pdf",
+    "file_type": "pdf",
+    "parser": "PDFParserAgent",
+    "created_at": "2025-12-19T21:46:10.810848"
+  }
+}

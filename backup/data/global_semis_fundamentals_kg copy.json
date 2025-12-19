@@ -1,0 +1,109 @@
+{
+  "entities": [
+    {
+      "name": "NVDA",
+      "type": "Company",
+      "properties": {
+        "ticker": "NVDA",
+        "marketCap": 4503464574976.0,
+        "totalDebt": 10821999616.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "TSM",
+      "type": "Company",
+      "properties": {
+        "ticker": "TSM",
+        "marketCap": 1573637455872.0,
+        "totalDebt": 1029087035392.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "INTC",
+      "type": "Company",
+      "properties": {
+        "ticker": "INTC",
+        "marketCap": 193184989184.0,
+        "totalDebt": 46553001984.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "MU",
+      "type": "Company",
+      "properties": {
+        "ticker": "MU",
+        "marketCap": 284060778496.0,
+        "totalDebt": 15352000512.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "ASML",
+      "type": "Company",
+      "properties": {
+        "ticker": "ASML",
+        "marketCap": 431402844160.0,
+        "totalDebt": 2704699904.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "AMAT",
+      "type": "Company",
+      "properties": {
+        "ticker": "AMAT",
+        "marketCap": 212815069184.0,
+        "totalDebt": 6554999808.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "LRCX",
+      "type": "Company",
+      "properties": {
+        "ticker": "LRCX",
+        "marketCap": 209091772416.0,
+        "totalDebt": 4483942912.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "AVGO",
+      "type": "Company",
+      "properties": {
+        "ticker": "AVGO",
+        "marketCap": 1918649630720.0,
+        "totalDebt": 40456998912.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    }
+  ],
+  "relations": [],
+  "metadata": {
+    "source_file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\fund\\global_semis_fundamentals.csv",
+    "file_type": "fund_csv",
+    "num_companies": 8,
+    "save_mode": "property_update",
+    "parser": "FundParserAgent",
+    "created_at": "2025-12-19T21:47:31.772732"
+  }
+}

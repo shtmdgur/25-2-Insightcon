@@ -34,12 +34,12 @@ class PriceParserConfig:
 class NewsParserConfig:
     """뉴스 Parser 설정"""
     # 샘플링
-    sample_size: int = 100  # 최근 N건
+    sample_size: int = 200  # 최근 N건
     max_title_length: int = 200  # 제목 최대 길이
     max_desc_length: int = None  # 설명 최대 길이
     
     # 테스트 모드
-    test_mode_sample_size: int = 10  # 테스트: 10건만
+    test_mode_sample_size: int = 20  # 테스트: 10건만
     
     # Time-decay 가중치
     time_decay_halflife: int = 90  # 반감기 (일)
@@ -57,7 +57,7 @@ class MacroParserConfig:
     sample_per_series: int = 50  # 각 지표당 최근 N개
     
     # 테스트 모드
-    test_mode_sample_per_series: int = 10  # 테스트: 각 지표당 10개
+    test_mode_sample_per_series: int = 20  # 테스트: 각 지표당 10개
 
 
 @dataclass

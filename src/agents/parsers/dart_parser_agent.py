@@ -131,7 +131,8 @@ class DARTParserAgent(BaseParserAgent):
             return pd.DataFrame()
         
         try:
-            df = pd.read_csv(file_path)
+            # Ticker와 Corp Code는 문자열로 강제 변환하여 앞자리 0 유지
+            df = pd.read_csv(file_path, dtype={'ticker': str, 'corp_code': str})
             self.logger.info(f"Loaded {file_path.name}: {len(df)} rows")
             return df
         except Exception as e:
@@ -216,7 +217,8 @@ class DARTParserAgent(BaseParserAgent):
             return entities
         
         for idx, row in companies_df.iterrows():
-            ticker = str(row.get('ticker', '')).strip()
+            # Ticker 6자리 패딩 (000660 etc)
+            ticker = str(row.get('ticker', '')).strip().zfill(6)
             corp_name = str(row.get('corp_name', '')).strip()
             
             if not ticker or not corp_name:
@@ -268,14 +270,14 @@ class DARTParserAgent(BaseParserAgent):
         ticker_map = {}
         if not companies_df.empty:
             for idx, row in companies_df.iterrows():
-                ticker = str(row.get('ticker', '')).strip()
+                ticker = str(row.get('ticker', '')).strip().zfill(6)
                 corp_name = str(row.get('corp_name', '')).strip()
                 if ticker and corp_name:
                     norm_res = self.normalizer.normalize_entity(corp_name)
                     ticker_map[ticker] = norm_res["canonical_name"]
         
         for idx, row in disclosure_df.iterrows():
-            ticker = str(row.get('ticker', '')).strip()
+            ticker = str(row.get('ticker', '')).strip().zfill(6)
            
             if not ticker:
                 continue
@@ -294,8 +296,8 @@ class DARTParserAgent(BaseParserAgent):
                     "ticker": ticker,
                     "date": date,
                     "event_type": "공시",
-                    "title": str(row.get('title', ''))[:200],  # 제목 200자 제한
-                    "disclosure_type": str(row.get('type', '')),
+                    "title": str(row.get('report_nm', row.get('title', '')))[:200],  # 제목 매핑 수정 (report_nm)
+                    "disclosure_type": str(row.get('disclosure_type', row.get('type', ''))), # 타입 매핑 수정 (disclosure_type)
                 },
                 confidence=1.0
             )
@@ -341,14 +343,14 @@ class DARTParserAgent(BaseParserAgent):
         ticker_map = {}
         if not companies_df.empty:
             for idx, row in companies_df.iterrows():
-                ticker = str(row.get('ticker', '')).strip()
+                ticker = str(row.get('ticker', '')).strip().zfill(6)
                 corp_name = str(row.get('corp_name', '')).strip()
                 if ticker and corp_name:
                     norm_res = self.normalizer.normalize_entity(corp_name)
                     ticker_map[ticker] = norm_res["canonical_name"]
         
         for idx, row in financial_df.iterrows():
-            ticker = str(row.get('ticker', '')).strip()
+            ticker = str(row.get('ticker', '')).strip().zfill(6)
             period = str(row.get('period', '')).strip()
             
             if not ticker or not period:
@@ -388,17 +390,35 @@ class DARTParserAgent(BaseParserAgent):
         날짜 문자열 파싱
         
         Args:
-            date_str: 날짜 문자열
+            date_str: 날짜 문자열 (str, int, float)
         
         Returns:
             YYYY-MM-DD 형식 또는 None
         """
         if pd.isna(date_str):
             return None
-        
+            
         try:
-            # pandas로 파싱 시도
-            dt = pd.to_datetime(date_str)
+            # 1. 입력값을 문자열로 변환 (int, float 대응)
+            s = str(date_str).strip()
+            
+            # 1970-01-01 이슈 방지 (빈 문자열이나 0)
+            if not s or s == '0' or s == '0.0':
+                return None
+                
+            # 2. YYYYMMDD 형식 처리 (8자리 숫자)
+            if len(s) == 8 and s.isdigit():
+                return f"{s[:4]}-{s[4:6]}-{s[6:]}"
+                
+            # 3. pandas 파싱 시도
+            dt = pd.to_datetime(s)
+            
+            # 1970-01-01 (Epoch 0) 체크 - 입력이 1970-01-01이 아닌데 결과가 그렇다면 무시
+            if dt.year == 1970 and dt.month == 1 and dt.day == 1:
+                # 원본이 '19700101'이 아니었다면 파싱 실패로 간주
+                if '1970' not in s: 
+                    return None
+                    
             return dt.strftime('%Y-%m-%d')
-        except:
+        except Exception:
             return None

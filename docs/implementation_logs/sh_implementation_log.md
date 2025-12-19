@@ -1,7 +1,7 @@
 # 구현 작업 내역
 
-> **최종 업데이트**: 2025-12-15 (Import 구조 점검 + KG Orchestration 테스트 완료)  
-> **작업 범위**: Phase 0 (데이터 파싱) + Phase 1 (Parser Agents + Orchestrator 완성) + Testing
+> **최종 업데이트**: 2025-12-19 (KG Orchestration 안정화 + T-Box 2.0 온톨로지 고도화)  
+> **작업 범위**: Phase 0 (데이터 파싱) + Phase 1 (System Stabilization) + Phase 2 (Ontology & Time-Stitching)
 
 ---
 
@@ -933,6 +933,29 @@ sources['fund'] = list(fund_path.glob('*_fundamentals.csv'))  # 명시적 패턴
 
 ## 1.16 KG Orchestration 안정화 및 데이터 병합 성공 (완료 ✅)
 
+---
+
+## 1.16 문서 및 코드 정합성 점검 (완료 ✅)
+
+**작업 일시**: 2025-12-19 07:00-08:00
+
+**목적**: 구현된 코드와 시스템 설계 문서 간의 불일치 해소
+
+**작업 내용**:
+1. **문서 현행화**:
+   - `11_시스템_고도화_계획.md`: 실제 구현된 Parser Agent 구조(6개) 및 Orchestrator 로직 반영
+   - `12_시스템_설계_명세서.md`: KGConstructionAgent의 역할 변경(Orchestrator) 및 데이터 흐름 업데이트
+   - `implementation_plan.md`: 완료된 Phase 1 항목 체크 및 Phase 2 계획 구체화
+
+2. **주요 변경 사항**:
+   - **Data Scanning Logic**: 하드코딩된 파일명 패턴을 설정 기반(`parser_config.py`)으로 변경 명시
+   - **Test Mode Exclusion**: 문서에서 불필요한 테스트 모드 파라미터 설명 제외
+   - **Architecture Sync**: `GeminiPDFParser` 중심의 KG 추출 파이프라인으로 설계 문서 통일
+
+---
+
+## 1.17 KG Orchestration 안정화 및 데이터 병합 성공 (완료 ✅)
+
 **작업 일시**: 2025-12-19 16:40
 
 **해결된 이슈**:
@@ -948,3 +971,119 @@ sources['fund'] = list(fund_path.glob('*_fundamentals.csv'))  # 명시적 패턴
 
 **결론**: Knowledge Graph 구축 파이프라인이 안정화되었으며, 다양한 소스(Price, Macro, DART, PDF, News)로부터 데이터를 통합하여 일관된 스키마로 병합할 수 있음을 입증함.
 
+
+---
+
+## 2.1 반도체 온톨로지 고도화 (T-Box 2.0) ✅
+
+**작업 일시**: 2025-12-19 21:00-21:20
+**작업 내용**:
+
+### 구현 사항
+1. **Ontology Schema (Nodes.py)**
+   - `NodeType` Enum: 58개 클래스 전체 반영 (Observation, Risk 등 포함)
+   - `RelationType` Enum: 21개 관계 반영 (`recordedAt`, `observes` 등 Time-Stitching용 관계 추가)
+   - `ENTITY_TYPE_PROPERTIES`: 모든 클래스에 대한 필수 속성 정의 추가
+
+2. **Parsing Strategy (Prompts.yaml)**
+   - `gemini_pdf_parser` 프롬프트 전면 개편
+   - **Time-Stitching 전략**: Context-less Data → `Observation` + `TemporalRegion` 변환 지시
+   - **Anomaly 해결**: 2019년 데이터가 그래프 중앙에 뭉치는 현상(Isolated Nodes)을 `Observation` 노드로 캡슐화하고 시점(`recordedAt`)과 대상(`observes`)을 명시하여 해결.
+
+3. **Data Loading (Neo4jLoader)**
+   - Static Layer 전략 기본화: Idempotency(재실행 시 중복 방지) 확보
+   - `Observation`, `TemporalRegion` 등 신규 타입 처리 로직 추가
+
+### 검증 결과
+- **Schema Validation**: `test/unit/verify_semiconductor_schema.py` 성공 (58개 Node, 21개 Relation 확인)
+- **Integration Test**: `test_kg_orchestration.py` (Option 6) 성공
+  - **Graph Structure**: `Observation` 노드가 `TemporalRegion`("2019-12")과 `SemiconductorEntity`("DRAM")를 연결하는 구조 확인.
+  - **Cypher Validation**:
+    ```cypher
+    (:Observation {name: "Obs_Price_..."})-[:recordedAt]->(:TemporalRegion {name: "2019-12"})
+    (:Observation {name: "Obs_Price_..."})-[:observes]->(:MemorySemiconductor {name: "Server DRAM..."})
+    ```
+  - **통계**: Total Entities 305개, Relations 130개 생성 및 Neo4j 주입 성공.
+
+---
+
+## 1.18 DART Parser 데이터 정합성 개선 (완료 ✅)
+
+**작업 일시**: 2025-12-19 22:00
+
+**문제 상황**: User Feedback - DART 데이터(`Disclosure` 노드)의 품질 이상
+1. **Date Error**: `1970-01-01`로 잘못 파싱됨 (Epoch Default)
+2. **Ticker Error**: `660`과 같이 앞자리 0이 소실됨 (`000660`이어야 함)
+3. **Missing Data**: 제목(`title`)과 공시유형(`disclosure_type`)이 비어있음
+
+**원인 분석**:
+1. **Ticker Dtype**: pandas가 CSV 로드 시 Ticker를 `int64`로 추론하여 `000660` → `660`으로 변환됨.
+2. **Date Format**: 원본 데이터가 integer `20200330` 형식이어서 `pd.to_datetime`이 이를 나노초로 해석(Epoch 0 근처)하거나 파싱 실패.
+3. **Column Mismatch**: 코드상 `title`, `type` 컬럼을 찾으나 실제 CSV는 `report_nm`, `disclosure_type` 사용.
+
+**해결 방안 Refactoring (`dart_parser_agent.py`)**:
+1. **Dtype Enforcement**: `pd.read_csv(dtype={'ticker': str, 'corp_code': str})` 적용하여 로딩 시점부터 문자열 유지.
+2. **Robust Date Parsing**: `_parse_date` 메서드 개선 
+   - 입력값을 먼저 문자열로 변환
+   - 8자리 숫자(`YYYYMMDD`) 패턴 감지 및 포맷팅 (`YYYY-MM-DD`)
+   - 1970년도(Epoch Issue) 데이터 필터링
+3. **Column Mapping Correct**:
+   - `title` → `row.get('report_nm', row.get('title'))`
+   - `disclosure_type` → `row.get('disclosure_type', row.get('type'))`
+4. **Ticker Padding**: `zfill(6)`을 명시적으로 적용하여 이중 안전장치 마련.
+
+**검증**:
+- 코드 레벨에서 데이터 변환 로직이 정상 작동함을 확인.
+
+---
+
+## 1.19 Time-Scoped ID 전략 강제화 (Context Collapse 해결) ✅
+
+**작업 일시**: 2025-12-19 22:15
+
+**문제 상황**: 
+- `Trend`나 `MarketEnvironment`와 같은 동적 개념들(예: "연말 쇼핑시즌", "공급 과잉 해소")이 **시점 정보 없이 ID로 사용됨**.
+- 결과: 2019년의 "연말 쇼핑시즌"과 2024년의 "연말 쇼핑시즌"이 **하나의 노드로 병합**됨.
+- 현상: 그래프 시각화 시 2019년 데이터가 2024년 데이터 클러스터 중심에 뭉치는 **Context Collapse(맥락 붕괴)** 및 **Hairball Effect** 발생.
+
+**해결 방안**:
+1. **Ontology Design Update (`semiconductor_box_design.md`)**:
+   - `Event`, `Trend`, `RiskFactor` 등 시간에 종속적인(Dynamic) 노드들은 반드시 **`Name_Time` 형식의 ID** 사용을 의무화.
+   - 예: `StrategicAction` (감산 → **감산_2023Q2**)
+   - 예: `MarketEnvironment` (AI 붐 → **AI 붐_2023**)
+
+2. **Prompt Engineering Update (`prompts.yaml`)**:
+   - `gemini_pdf_parser` 섹션에 **Time-Scoping (CRITICAL)** 지침 추가.
+   - LLM에게 "Event, Trend, MarketEnvironment 생성 시 반드시 날짜(Date)를 ID에 접미사로 붙여라"라고 명시적 지시.
+   - **Bad Case**: "Year-end Shopping Season" (2019년/2024년 데이터 혼재)
+   - **Good Case**: "Year-end_Shopping_Season_2024Q4" (시점별 분리)
+
+**기대 효과**:
+- 동적인 사건들이 시점별로 분리되어 저장됨(Instantization).
+- 2019년 데이터가 2024년 그래프에 난입하는 현상 방지.
+- 시간 축(TemporalRegion)을 통한 명확한 인과관계 추적 가능.
+
+---
+
+## 1.20 Entity Naming Convention 및 Property Extraction 강화 (완료 ✅)
+
+**작업 일시**: 2025-12-19 22:30
+
+**요청 사항**:
+1. **Empty Properties**: 일부 JSON 결과(MarketEnvironment, Product 등)에서 `properties`가 비어있는 문제.
+2. **Ticker in Name**: "Samsung Electronics (005930)"와 같이 이름에 티커를 포함하지 말고, 속성으로 분리할 것.
+
+**수정 사항 (`prompts.yaml`)**:
+1. **Property Extraction 강제화**:
+   - `gemini_pdf_parser` 지침에 **"Properties Extraction (MANDATORY)"** 섹션 추가.
+   - 스키마에 정의된 속성(indicator, trend, spec 등)을 반드시 추출하도록 명시.
+   - `properties: {}`와 같은 빈 객체 반환을 금지함.
+
+2. **Company Naming Rule 변경**:
+   - **기존**: "Always include Ticker if available"
+   - **변경**: "Use the official company name ONLY. Ticker codes MUST be stored in the properties field."
+   - 예: Name="Samsung Electronics", Property `ticker`="005930"
+
+**기대 효과**:
+- 그래프 노드 이름이 깔끔해지고(Canonical Name), 티커 정보는 구조화된 속성으로 관리됨.
+- `MarketEnvironment`나 `Product` 노드의 상세 속성이 채워져 풍부한 컨텍스트 제공 가능.

@@ -311,6 +311,10 @@ gemini_pdf_parser:
       - 같은 엔티티는 반드시 같은 ID 사용
       
       ### 데이터 품질
+      - **Properties Extraction (MANDATORY)**: Never leave `properties` empty. Extract all relevant attributes defined in the schema.
+        - For `MarketEnvironment`: Extract `indicator`, `trend`.
+        - For `Product`: Extract `category`, `spec`, `launch_date`.
+        - For `Technology`: Extract `generation`, `status`.
       - 모든 숫자는 properties에 구조화하여 저장
       - 단위 명시 (US$, %, 원, 조원, GB 등)
       - 날짜/시점 정보 반드시 포함
@@ -453,8 +457,12 @@ gemini_pdf_parser:
           - `observes` -> `IDM` ("Samsung Electronics")
           - `hasValue` -> "70T KRW" (Literal stored in properties)
 
-      ### B. Entity Naming & Identification
-      - **Company**: Always include Ticker if available. (e.g., "Samsung Electronics (005930)")
+      ### B. Entity Naming & Identification (ID Construction)
+      - **Company**: Use the official company name ONLY. (e.g., "Samsung Electronics"). NOT "Samsung Electronics (005930)".
+        - Ticker codes MUST be stored in the `properties` field.
+      - **Time-Scoping (CRITICAL)**: For `Event`, `Trend`, `MarketEnvironment`, `RiskFactor`, and `OpportunityFactor`, **YOU MUST APPEND THE DATE** to the name to create a unique ID.
+        - BAD: "Year-end Shopping Season" (Merges 2019 and 2024 data!)
+        - GOOD: "Year-end_Shopping_Season_2024Q4"
       - **TemporalRegion**: Standardize format (YYYY-MM-DD, YYYY-QN, YYYY).
 
       # 3. Output Format

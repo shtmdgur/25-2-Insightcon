@@ -47,10 +47,11 @@
         - `FrontEndProcess` (전공정: 노광, 식각, 증착)
         - `BackEndProcess` (후공정: 본딩, 패키징, 테스트)
 - **Event** (이벤트)
-    - `StrategicAction` (전략: **감산**, M&A, 자사주매입, 투자발표)
-    - `CorporateEvent` (기업사건: 어닝서프라이즈/쇼크, 경영진교체)
-    - `MarketEnvironment` (시장환경: **AI 붐**, 원자재가격 변동, 금리)
-    - `PolicyEvent` (정책이벤트: 보조금 확정, 제재 리스트 등재)
+    - `StrategicAction` (전략: **감산_2023Q2**, M&A_2024, 자사주매입_2025H1)
+    - `CorporateEvent` (기업사건: 어닝서프라이즈_2024Q1, 경영진교체_202403)
+    - `MarketEnvironment` (시장환경: **AI 붐_2023**, 원자재가격 변동_2022Q1)
+    - `PolicyEvent` (정책이벤트: 보조금 확정_20240415)
+    - *Note: 모든 Event 계열 노드는 `Name_Time` 형식의 ID를 가져야 합니다.*
 - **Observation** (관측/측정) **[NEW]**
     - `Observation` (e.g., "2024Q1 삼성전자 매출 측정", "3월 5일 주가 급등 기록")
     - *Note: Context-less Data(재무제표, 주가 등)를 Reification(객체화)하여 시간 및 주체와 연결하는 허브 역할*
@@ -59,8 +60,9 @@
 
 ### 3. Risk & Opportunity (투자 분석 layer)
 - `RiskFactor` (**위험요인**)
-    - `GeopoliticalRisk` (지정학: 미중분쟁, 대만해협, 소부장 국산화 이슈)
-    - `SupplyChainRisk` (공급망: 재고과잉, 리드타임 증가, 원자재 수급)
+    - `GeopoliticalRisk` (지정학: 미중분쟁_2024, 대만해협_2025, 소부장 국산화 이슈_2020)
+    - `SupplyChainRisk` (공급망: 재고과잉_2023H1, 리드타임 증가_2021)
+    - *Note: RiskFactor 역시 시점에 따라 변하므로 `Name_Time` 형식을 권장합니다.*
 - `OpportunityFactor` (**기회요인**)
     - `OpportunityFactor` (e.g., AI 데이터센터 수요, 온디바이스 AI)
 
