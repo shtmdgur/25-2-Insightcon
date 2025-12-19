@@ -1,0 +1,225 @@
+{
+  "entities": [
+    {
+      "name": "NewsEvent_6900_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "반도체 팹리스 10배, 700조 쏟아붓는다… 민관 4.5조 합작 파운드리 구축",
+        "description": "국가 안보와 직결되는 국방 반도체의 국산화도 추진된다. 현재 99%에 달하는 수입 의존도를 낮추기 위해... 인력 양성과 소부장 기업 육성책도 포함됐다. 기업이 직접 운영에 참여하는 반도체 대학원대학을 신설해 연간... ",
+        "keyword": "반도체 소부장 국산화",
+        "link": "http://www.m-i.kr/news/articleView.html?idxno=1313732",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_3900_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "행동이 언어가 되는 시대, 한국 로봇의 기회는 어디에 있을까?",
+        "description": "엔비디아 젠슨 황이 GPU기술 콘퍼런스(GTC)에서 '피지컬 AI'를 언급하고, APEC에서 치킨 회동을 한 뒤 한국... AI 소프트웨어 연구자들이 선호하는 액추에이터 공급사. 논문을 보면 대부분 로보티즈 액추에이터를 사용한다.... ",
+        "keyword": "엔비디아 GPU 공급",
+        "link": "https://platum.kr/archives/276914",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_6600_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "‘칼바람’이 분다…2026 재계 인사 들여다보니",
+        "description": "미국 관세 폭탄, 중국발 공급 과잉, 고환율에 상법 개정안, 노란봉투법 등 규제 리스크까지 대내외 악재가... LS그룹의 새 먹거리가 ‘배전반(배터리·전기차·반도체)’인데, LS MnM은 2차전지 양극재 소재 사업을... ",
+        "keyword": "중국 반도체 규제",
+        "link": "https://www.mk.co.kr/article/11485129",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_0_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "[미리보는 이데일리 신문] 'S대 의사랬는데…' AI가짜광고, 5배 징벌적 ...",
+        "description": "합쳐야” -“반도체·데이터센터·SW 아우르는 ‘AI 3강’ 국가 액션플랜 이달 발표” △K반도체 육성 전략... AI 수출 생태계 구축한다 △Global -공급난에 연준 금리인하 덮친다…“내년에도 금·은·동 랠리” -CPI... ",
+        "keyword": "반도체 수출 데이터",
+        "link": "http://www.edaily.co.kr/news/newspath.asp?newsid=04929846642397208",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_6901_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "주권·역량·공급망·확장… ‘4S’로 앞선다",
+        "description": "정부 ‘반도체 육성 전략’ 내용은 700조원 이상 투입 클러스터 조성 NPU 등 AI 특화 기술에 집중 투자 국산화... 반도체 기술·생산 주권(Sovereignty)을 확립하고 시스템 반도체 역량(Strength)을 강화하며 반도체 소부장(소재... ",
+        "keyword": "반도체 소부장 국산화",
+        "link": "https://www.kyeongin.com/article/1756284",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_3901_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "정부, 국산 NPU 지표 ‘K퍼프’ 공개… AI반도체 성능표준",
+        "description": "다만 하드웨어 공급만큼 소프트웨어(SW) 생태계 구축의 중요성도 지적됐다. 마음AI 최홍섭 대표는 “엔비디아 GPU는 클릭 한 번으로 모델을 만들 수 있지만, NPU는 두 배 빠르더라도 소프트웨어가 따라주지 않으면... ",
+        "keyword": "엔비디아 GPU 공급",
+        "link": "https://biz.chosun.com/it-science/ict/2025/12/10/KWHEWP7BEZDAXOUWDIKQI7SHEM/?utm_source=naver&utm_medium=original&utm_campaign=biz",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_2700_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "취업난 속 …대전·충남·충북 고용지표 개선",
+        "description": "［동양일보 조창희 기자］ ▲ 대전·충남·충북의 고용지표가 개선되는 가운데 10일 오전 6시께 청주시 흥덕구 외북동 SK하이닉스 M15청주사업장 신축 현장에 근로자들이 출근하고 있다.[사진=조창희 기자]... ",
+        "keyword": "SK하이닉스 청주 M15",
+        "link": "http://www.dynews.co.kr/news/articleView.html?idxno=831017",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_1_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "[임지선의 틈]정부가 우승자를 선택하는 순간, 패배자가 생긴다",
+        "description": "일본도 수십조원을 투자해 반도체 공장을 지었다. 대만 TSMC를 키운 건 정부였다. 한국도 국가 간 경쟁에서 예외일 수 없다. 달러 벌기 위해 닥치고 수출 대기업엔 규제 풀고, 세제 혜택 독점·수도권 고착화 구조 형성... ",
+        "keyword": "반도체 수출 데이터",
+        "link": "https://www.khan.co.kr/article/202512102006025",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_6601_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "[임지선의 틈]정부가 우승자를 선택하는 순간, 패배자가 생긴다",
+        "description": "무장한 중국은 예산을 퍼붓는다. 일본도 수십조원을 투자해 반도체 공장을 지었다. 대만 TSMC를 키운 건 정부였다. 한국도 국가 간 경쟁에서 예외일 수 없다. 달러 벌기 위해 닥치고 수출 대기업엔 규제 풀고, 세제 혜택... ",
+        "keyword": "중국 반도체 규제",
+        "link": "https://www.khan.co.kr/article/202512102006025",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    },
+    {
+      "name": "NewsEvent_3902_2025-12-10",
+      "type": "Event",
+      "properties": {
+        "date": "2025-12-10",
+        "event_type": "뉴스",
+        "title": "지금이 구매 적기…램 이어 GPU 가격도 줄줄이 폭등",
+        "description": "엔비디아도 최근 보드 파트너들에게 그래픽카드용 VRAM 공급을 중단할 것이라고 통보한 것으로 알려졌다. AMD RDNA [사진: AMD] 메모리 부족 사태와는 별개로, 엔비디아와 AMD 모두 당분간 새로운 GPU를 출시할... ",
+        "keyword": "엔비디아 GPU 공급",
+        "link": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=611873",
+        "time_decay_weight": 0.9048374180359595
+      },
+      "confidence": 0.8
+    }
+  ],
+  "relations": [
+    {
+      "subject": "반도체 소부장 국산화",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_6900_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "엔비디아 GPU 공급",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_3900_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "중국 반도체 규제",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_6600_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "반도체 수출 데이터",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_0_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "반도체 소부장 국산화",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_6901_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "엔비디아 GPU 공급",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_3901_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "SK하이닉스 청주 M15",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_2700_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "반도체 수출 데이터",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_1_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "중국 반도체 규제",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_6601_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    },
+    {
+      "subject": "엔비디아 GPU 공급",
+      "predicate": "AFFECTED_BY",
+      "object": "NewsEvent_3902_2025-12-10",
+      "weight": 0.9048374180359595,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv"
+    }
+  ],
+  "metadata": {
+    "source_file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\news\\Semiconductor_News_Raw_20251210.csv",
+    "file_type": "news_csv",
+    "total_news": 7500,
+    "sampled_news": 10,
+    "date_range": "2010-10-05 ~ 2025-12-10",
+    "parser": "NewsParserAgent",
+    "created_at": "2025-12-19T20:40:15.678709"
+  }
+}

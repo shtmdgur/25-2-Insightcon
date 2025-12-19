@@ -114,17 +114,23 @@ class Neo4jKGLoader:
         """
         Entity를 정적/동적 레이어로 분류
         
-        정적: Company, Product, Technology, Person (변화 빈도 낮음)
-        동적: Metric, Event, Trend, TimeSeries (시간 속성 필수)
+        T-Box 2.0 업데이트: 
+        대부분의 온톨로지 엔티티는 고유 ID를 가지므로 'static' (MERGE)으로 처리하여 
+        재실행 시 중복을 방지합니다. (Idempotency 보장)
         
         Args:
             entity: Entity 객체
         
         Returns:
-            'static' 또는 'dynamic'
+            'static' (MERGE) 또는 'dynamic' (CREATE)
         """
-        static_types = {'Company', 'Product', 'Technology', 'Person'}
-        return 'static' if entity.type.value in static_types else 'dynamic'
+        # 기본적으로 모든 정의된 Node Type은 Static으로 처리하여 중복 방지
+        # Dynamic은 ID가 없거나 단순 로그성 데이터인 경우에만 사용
+        
+        # dynamic_types = {'SomeLogType'} 
+        # return 'dynamic' if entity.type.value in dynamic_types else 'static'
+        
+        return 'static'
     
     def _create_entity(self, session, entity: Entity):
         """엔티티(노드) 생성 (기존 방식 - MERGE)"""

@@ -1,0 +1,25 @@
+{
+  "entities": [
+    {
+      "name": "005930.KS",
+      "type": "Company",
+      "properties": {
+        "ticker": "005930.KS",
+        "marketCap": 724771436232704.0,
+        "totalDebt": 16672279756800.0,
+        "profitMargins": null,
+        "ROE": null
+      },
+      "confidence": 1.0
+    }
+  ],
+  "relations": [],
+  "metadata": {
+    "source_file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\fund\\005930_fundamentals.csv",
+    "file_type": "fund_csv",
+    "num_companies": 1,
+    "save_mode": "property_update",
+    "parser": "FundParserAgent",
+    "created_at": "2025-12-19T20:40:15.784438"
+  }
+}

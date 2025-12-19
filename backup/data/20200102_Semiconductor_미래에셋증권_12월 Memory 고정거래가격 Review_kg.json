@@ -1,0 +1,244 @@
+{
+  "entities": [
+    {
+      "name": "삼성전자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "SK하이닉스",
+      "type": "Company",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Micron",
+      "type": "Company",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Intel",
+      "type": "Company",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "DRAMeXchange",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Server DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "PC DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Intel CPU",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "NAND Flash [MLC]",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "1Xnm B급 Server DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM 가격 인상 예상 [1Q20]",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "수요자 재고 축적",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Intel CPU shortage",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "DRAM 현물가격 상승",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Memory 고정거래가격 [2019년 12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Server DRAM 가격 인상 [1Q20]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "삼성전자 정전 [12/31-1/1]",
+      "type": "Event",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "SK하이닉스 주가",
+      "type": "Financial",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "김영건 (Analyst)",
+      "type": "Person",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "미래에셋대우",
+      "type": "Company",
+      "properties": {},
+      "confidence": 1.0
+    }
+  ],
+  "relations": [
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "Server DRAM",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "Server DRAM",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "COMPETES_WITH",
+      "object": "SK하이닉스",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "COMPETES_WITH",
+      "object": "Micron",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Intel",
+      "predicate": "PRODUCES",
+      "object": "Intel CPU",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "Intel CPU shortage",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM 현물가격 상승",
+      "predicate": "AFFECTED_BY",
+      "object": "삼성전자 정전 [12/31-1/1]",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "Memory 고정거래가격 [2019년 12월]",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM 가격 인상 [1Q20]",
+      "predicate": "AFFECTED_BY",
+      "object": "수요자 재고 축적",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "DRAM 가격 인상 예상 [1Q20]",
+      "predicate": "AFFECTED_BY",
+      "object": "수요자 재고 축적",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "DRAMeXchange",
+      "predicate": "RELATED_TO",
+      "object": "Memory 고정거래가격 [2019년 12월]",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "1Xnm B급 Server DRAM",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "1Xnm B급 Server DRAM",
+      "predicate": "AFFECTS",
+      "object": "DRAM 현물가격 상승",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "HAS_FINANCIAL",
+      "object": "SK하이닉스 주가",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스 주가",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM 현물가격 상승",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "김영건 (Analyst)",
+      "predicate": "RELATED_TO",
+      "object": "미래에셋대우",
+      "weight": 1.0,
+      "source": null
+    }
+  ],
+  "metadata": {
+    "source_file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\reports\\20200102_Semiconductor_미래에셋증권_12월 Memory 고정거래가격 Review.pdf",
+    "file_type": "pdf",
+    "parser": "PDFParserAgent",
+    "created_at": "2025-12-19T20:39:28.393971"
+  }
+}

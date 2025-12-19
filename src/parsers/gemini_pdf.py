@@ -18,9 +18,9 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
-from ..parser_interface import ParserInterface
-from ...utils.gemini_files import get_gemini_files_client
-from ...models.nodes import KnowledgeGraph, get_kg_json_schema
+from src.dataflows.parser_interface import ParserInterface
+from src.utils.gemini_files import get_gemini_files_client
+from src.models.nodes import KnowledgeGraph, get_kg_json_schema
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Prompts YAML 로드
-PROMPTS_FILE = Path(__file__).parent.parent.parent / "templates" / "prompts.yaml"
+PROMPTS_FILE = Path(__file__).parent.parent / "templates" / "prompts.yaml"
 with open(PROMPTS_FILE, 'r', encoding='utf-8') as f:
     PROMPTS = yaml.safe_load(f)
 
@@ -54,19 +54,16 @@ class GeminiPDFParser(ParserInterface):
         self.use_batch = use_batch
         self.files_client = get_gemini_files_client()
     
+    def parse_pdf_to_kg(self, file_path: str) -> KnowledgeGraph:
+        """
+        PDF를 Knowledge Graph 객체로 파싱 (PDFParserAgent 호환용)
+        """
+        result = self.parse(file_path)
+        return KnowledgeGraph.from_gemini_dict(result)
+
     def parse(self, file_path: str) -> Dict[str, Any]:
         """
         PDF를 Knowledge Graph로 파싱
-        
-        Args:
-            file_path: PDF 파일 경로
-        
-        Returns:
-            {
-                "knowledge_graph": KnowledgeGraph,  # Pydantic 모델
-                "raw_json": dict,  # 원본 JSON
-                "metadata": {...}
-            }
         """
         try:
             logger.info(f"Uploading PDF to Gemini: {file_path}")
@@ -79,10 +76,7 @@ class GeminiPDFParser(ParserInterface):
             
             kg_json = self._extract_knowledge_graph(file_uri)
             
-            # 3. Pydantic 모델로 파싱 (Gemini API 출력을 nodes.KnowledgeGraph로 변환)
-            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
-            
-            # 4. JSON 파일로 저장 (data/processed/)
+            # 3. JSON 파일로 저장 (data/processed/)
             import os
             from datetime import datetime
             from pathlib import Path
@@ -96,8 +90,11 @@ class GeminiPDFParser(ParserInterface):
             processed_dir = project_root / "data" / "processed"
             json_path = processed_dir / f"{file_id}_{timestamp}.json"
             
-            # JSON 저장
+            # KnowledgeGraph 객체 생성 (저장용)
+            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
             knowledge_graph.save_to_json(str(json_path))
+            
+            return kg_json  # Dict 반환
             
             logger.info(f"Saved KG to: {json_path}")
             

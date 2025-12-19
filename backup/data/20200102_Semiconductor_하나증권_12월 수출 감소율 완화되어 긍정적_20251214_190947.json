@@ -1,0 +1,511 @@
+{
+  "entities": [
+    {
+      "name": "하나금융투자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "산업통상자원부",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "한국무역통계진흥원",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "삼성전자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "SK하이닉스",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "김경민",
+      "type": "Person",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "반도체",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MCP",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Flash",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Wafer",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "카메라 모듈",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "이미지 센서",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "반도체 수출금액 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "반도체 수출물량 YoY 2019-10",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 수출물량 YoY 2019-11",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 수출물량 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "DRAM 수출금액 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MCP 수출금액 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Flash 수출금액 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD 수출금액 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Wafer 수출금액 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM 수출중량 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MCP 수출중량 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Flash 수출중량 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD 수출중량 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Wafer 수출중량 YoY 2019-12",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 2020년 5% YoY 이상 성장 전망",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "미중 무역분쟁 1단계 합의",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "연말 쇼핑시즌",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "수출 감소율 완화",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "수출물량 지속 증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "스마트폰용 메모리 고용량화",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD 가격탄력성 효과",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "Wafer 수출중량 플러스 전환",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "5G 본격 전환",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "데이터센터 수요 증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "메모리 반도체 공급 과잉 해소",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체수출금액 역성장률 개선",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체업종 투자심리 긍정적",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "5G",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.9
+    }
+  ],
+  "relations": [
+    {
+      "subject": "김경민",
+      "predicate": "LEADS",
+      "object": "하나금융투자",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출금액 YoY 2019-12",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출물량 YoY 2019-10",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출물량 YoY 2019-11",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출물량 YoY 2019-12",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM 수출금액 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "MCP",
+      "predicate": "HAS_METRIC",
+      "object": "MCP 수출금액 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Flash",
+      "predicate": "HAS_METRIC",
+      "object": "Flash 수출금액 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "HAS_METRIC",
+      "object": "SSD 수출금액 YoY 2019-12",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer 수출금액 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM 수출중량 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "MCP",
+      "predicate": "HAS_METRIC",
+      "object": "MCP 수출중량 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Flash",
+      "predicate": "HAS_METRIC",
+      "object": "Flash 수출중량 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "HAS_METRIC",
+      "object": "SSD 수출중량 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer 수출중량 YoY 2019-12",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 2020년 5% YoY 이상 성장 전망",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "수출 감소율 완화",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "수출물량 지속 증가",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "미중 무역분쟁 1단계 합의",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "연말 쇼핑시즌",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "MCP",
+      "predicate": "AFFECTED_BY",
+      "object": "스마트폰용 메모리 고용량화",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "스마트폰용 메모리 고용량화",
+      "predicate": "RELATED_TO",
+      "object": "카메라 모듈",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "스마트폰용 메모리 고용량화",
+      "predicate": "RELATED_TO",
+      "object": "이미지 센서",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "AFFECTED_BY",
+      "object": "SSD 가격탄력성 효과",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "AFFECTED_BY",
+      "object": "Wafer 수출중량 플러스 전환",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "5G 본격 전환",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "데이터센터 수요 증가",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "메모리 반도체 공급 과잉 해소",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체수출금액 역성장률 개선",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체업종 투자심리 긍정적",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "COMPETES_WITH",
+      "object": "SK하이닉스",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "Flash",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "Flash",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "5G 본격 전환",
+      "predicate": "RELATED_TO",
+      "object": "5G",
+      "weight": 0.9,
+      "source": null
+    }
+  ],
+  "metadata": {}
+}

@@ -22,35 +22,24 @@ class KGMerger:
     def __init__(self):
         pass
     
-    def merge_knowledge_graphs(self, json_files: List[Path]) -> KnowledgeGraph:
+    def merge_knowledge_graphs(self, kgs: List[KnowledgeGraph]) -> KnowledgeGraph:
         """
-        여러 JSON 파일의 Knowledge Graph를 병합하고 중복 제거
-        
-        병합 전략:
-        - Entity: (name, type) 기준으로 중복 제거
-          - properties는 병합 (나중 파일이 우선)
-          - confidence는 최대값 선택
-        - Relation: (subject, predicate, object) 기준으로 중복 제거
-          - weight는 최대값 선택
-          - source는 쉼표로 연결
+        여러 Knowledge Graph 객체를 병합하고 중복 제거
         
         Args:
-            json_files: 병합할 JSON 파일 경로 리스트
+            kgs: 병합할 KnowledgeGraph 객체 리스트
         
         Returns:
             병합된 KnowledgeGraph 객체
         """
-        all_entities: Dict[tuple, Entity] = {}  # (name, type) -> Entity
-        all_relations: Dict[tuple, Relation] = {}  # (subject, predicate, object) -> Relation
+        all_entities: Dict[tuple, Entity] = {}  # (name, NodeType) -> Entity
+        all_relations: Dict[tuple, Relation] = {}  # (subject, RelationType, object) -> Relation
         all_metadata: List[Dict[str, Any]] = []
         
-        logger.info(f"Merging {len(json_files)} KG JSON files...")
+        logger.info(f"Merging {len(kgs)} Knowledge Graphs...")
         
-        for json_file in json_files:
+        for kg in kgs:
             try:
-                # JSON 로드
-                kg = KnowledgeGraph.load_from_json(str(json_file))
-                
                 # 엔티티 병합
                 for entity in kg.entities:
                     key = (entity.name, entity.type)
@@ -85,10 +74,8 @@ class KGMerger:
                 # 메타데이터 수집
                 all_metadata.append(kg.metadata)
                 
-                logger.info(f"Merged {json_file.name}: {len(kg.entities)} entities, {len(kg.relations)} relations")
-                
             except Exception as e:
-                logger.error(f"Failed to load {json_file}: {str(e)}")
+                logger.error(f"Failed to merge a KG: {str(e)}", exc_info=True)
                 continue
         
         # 병합 결과 생성
@@ -96,8 +83,8 @@ class KGMerger:
             entities=list(all_entities.values()),
             relations=list(all_relations.values()),
             metadata={
-                "merged_from": [str(f) for f in json_files],
-                "source_count": len(json_files),
+                "merged_from": [kg.metadata.get("source_file", "unknown") for kg in kgs],
+                "source_count": len(kgs),
                 "total_entities": len(all_entities),
                 "total_relations": len(all_relations),
                 "source_metadata": all_metadata
@@ -117,20 +104,19 @@ class KGMerger:
         output_path: Path
     ) -> KnowledgeGraph:
         """
-        병합 후 결과를 JSON 파일로 저장
-        
-        Args:
-            json_files: 병합할 JSON 파일들
-            output_path: 출력 파일 경로
-        
-        Returns:
-            병합된 KnowledgeGraph
+        여러 JSON 파일을 로드하여 병합 후 저장
         """
-        merged_kg = self.merge_knowledge_graphs(json_files)
+        kgs = []
+        for f in json_files:
+            try:
+                kgs.append(KnowledgeGraph.load_from_json(str(f)))
+            except Exception as e:
+                logger.error(f"Failed to load {f}: {e}")
+        
+        merged_kg = self.merge_knowledge_graphs(kgs)
         merged_kg.save_to_json(str(output_path))
         
         logger.info(f"Merged KG saved to: {output_path}")
-        
         return merged_kg
 
 
