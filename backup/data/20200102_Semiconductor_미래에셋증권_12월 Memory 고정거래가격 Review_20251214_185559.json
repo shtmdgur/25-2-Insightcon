@@ -1,0 +1,604 @@
+{
+  "entities": [
+    {
+      "name": "미래에셋대우",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "삼성전자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.98
+    },
+    {
+      "name": "SK하이닉스",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.98
+    },
+    {
+      "name": "Micron",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Intel",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "김영건",
+      "type": "Person",
+      "properties": {},
+      "confidence": 0.98
+    },
+    {
+      "name": "DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "NAND Flash",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Server DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "PC DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "CPU",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "1Xnm Process",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "삼성전자 정전",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "2016-2018 Supercycle",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "DRAM 가격 인상 예상",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM 현물가격 상승",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM 수요자 재고 축적",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "DRAM 공급자 재고 감소",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "Server DRAM 1Q20 가격 인상 전망",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "64GB DDR4 Module 수요 증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "1Xnm+ Server DRAM Shortage",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "2933Mbps DRAM 수요 증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "DRAM 현물 가격 급등",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "OEM 고객 재고 축적",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM 공급 과잉 균형화",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "PC DRAM 1Q20 가격 유지 전망",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "NAND Flash 가격 인상 지속 전망",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MLC chip 가격 인상",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "8GB RDIMM Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "16GB RDIMM Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "32GB RDIMM (DDR4 2666Mbps) Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "64GB LRDIMM (DDR4 2933Mbps) Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Server DRAM 1Q20 Price Increase Outlook",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "SO-DIMM 8GB Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "1G*8 Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "16Gb NAND Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "64Gb MLC Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "512Gb TLC Fixed Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "SK하이닉스 시가총액",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DDR4 8Gb 1Gbx8 Spot Price",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    }
+  ],
+  "relations": [
+    {
+      "subject": "김영건",
+      "predicate": "LEADS",
+      "object": "미래에셋대우",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "COMPETES_WITH",
+      "object": "SK하이닉스",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "COMPETES_WITH",
+      "object": "Micron",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "COMPETES_WITH",
+      "object": "Micron",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Micron",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "Intel",
+      "predicate": "PRODUCES",
+      "object": "CPU",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM 가격 인상 예상",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM 현물가격 상승",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM 수요자 재고 축적",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "삼성전자 정전",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "Server DRAM 1Q20 Price Increase Outlook",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM 공급자 재고 감소",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "Server DRAM 1Q20 가격 인상 전망",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "64GB DDR4 Module 수요 증가",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "1Xnm+ Server DRAM Shortage",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "2933Mbps DRAM 수요 증가",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "DEVELOPS",
+      "object": "1Xnm Process",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM 현물 가격 급등",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "OEM 고객 재고 축적",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM 공급 과잉 균형화",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "PC DRAM 1Q20 가격 유지 전망",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "NAND Flash",
+      "predicate": "AFFECTED_BY",
+      "object": "NAND Flash 가격 인상 지속 전망",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "NAND Flash",
+      "predicate": "AFFECTED_BY",
+      "object": "MLC chip 가격 인상",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "2016-2018 Supercycle",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_TREND",
+      "object": "DRAM 가격 인상 예상",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_TREND",
+      "object": "DRAM 현물가격 상승",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_TREND",
+      "object": "DRAM 수요자 재고 축적",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_TREND",
+      "object": "DRAM 공급자 재고 감소",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_TREND",
+      "object": "Server DRAM 1Q20 가격 인상 전망",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_TREND",
+      "object": "64GB DDR4 Module 수요 증가",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_TREND",
+      "object": "1Xnm+ Server DRAM Shortage",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_TREND",
+      "object": "2933Mbps DRAM 수요 증가",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "HAS_TREND",
+      "object": "DRAM 현물 가격 급등",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "HAS_TREND",
+      "object": "OEM 고객 재고 축적",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_TREND",
+      "object": "DRAM 공급 과잉 균형화",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "HAS_TREND",
+      "object": "PC DRAM 1Q20 가격 유지 전망",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "NAND Flash",
+      "predicate": "HAS_TREND",
+      "object": "NAND Flash 가격 인상 지속 전망",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "NAND Flash",
+      "predicate": "HAS_TREND",
+      "object": "MLC chip 가격 인상",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "8GB RDIMM Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "16GB RDIMM Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "32GB RDIMM (DDR4 2666Mbps) Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "Server DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "64GB LRDIMM (DDR4 2933Mbps) Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "SO-DIMM 8GB Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "PC DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "1G*8 Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "NAND Flash",
+      "predicate": "HAS_METRIC",
+      "object": "16Gb NAND Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "NAND Flash",
+      "predicate": "HAS_METRIC",
+      "object": "64Gb MLC Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "NAND Flash",
+      "predicate": "HAS_METRIC",
+      "object": "512Gb TLC Fixed Price",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "HAS_METRIC",
+      "object": "SK하이닉스 시가총액",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DDR4 8Gb 1Gbx8 Spot Price",
+      "weight": 0.9,
+      "source": null
+    }
+  ],
+  "metadata": {}
+}

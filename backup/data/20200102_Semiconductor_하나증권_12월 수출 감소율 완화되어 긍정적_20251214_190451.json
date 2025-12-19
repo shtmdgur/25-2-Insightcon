@@ -1,0 +1,599 @@
+{
+  "entities": [
+    {
+      "name": "하나금융투자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "산업통상자원부",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "한국무역통계진흥원",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "삼성전자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "SK하이닉스",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.7
+    },
+    {
+      "name": "반도체",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "MCP (DRAM+NAND 복합제품)",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Flash",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "SSD",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Wafer",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "카메라 모듈",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "이미지 센서",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 수출금액 YoY -17.7% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "반도체 수출물량 YoY 35.9% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "DRAM 수출금액 YoY -26.5% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "MCP 수출금액 YoY 22.6% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Flash 수출금액 YoY -38.2% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "SSD 수출금액 YoY 94.0% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Wafer 수출금액 YoY -42.8% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "DRAM 수출중량 YoY 24.6% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "MCP 수출중량 YoY 102.0% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Flash 수출중량 YoY 25.9% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "SSD 수출중량 YoY 74.1% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Wafer 수출중량 YoY 13.4% (201912)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "반도체 수출금액 YoY -30.8% (201911)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "반도체 수출물량 YoY 18.2% (201911)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "반도체 수출물량 YoY 11.2% (201910)",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "반도체 수출금액 발표 (201912, 주체: 산업통상자원부, 한국무역통계진흥원)",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "미중 무역분쟁 1단계 합의",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "연말 쇼핑시즌",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "산업통상자원부 2020년 업종별 기상도 제시",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 수출 감소율 완화 (201912)",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "반도체 수출물량 지속 증가 (201910-201912)",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "5G 본격 전환 (영향: MCP 고용량화)",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "데이터센터 수요 증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "메모리 반도체 공급 과잉 해소",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "스마트폰용 메모리 고용량화 견인",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD 가격탄력성 효과 발생",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Wafer 업황 회복 시그널",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 수출금액 플러스 국면 전환 가능성 (2020년 2월 전망)",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체업종 투자심리 긍정적",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "5G",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "고용량화",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "김경민 (애널리스트, 소속: 하나금융투자)",
+      "type": "Person",
+      "properties": {},
+      "confidence": 1.0
+    }
+  ],
+  "relations": [
+    {
+      "subject": "김경민 (애널리스트, 소속: 하나금융투자)",
+      "predicate": "LEADS",
+      "object": "하나금융투자",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출금액 YoY -17.7% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출물량 YoY 35.9% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM 수출금액 YoY -26.5% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "MCP (DRAM+NAND 복합제품)",
+      "predicate": "HAS_METRIC",
+      "object": "MCP 수출금액 YoY 22.6% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Flash",
+      "predicate": "HAS_METRIC",
+      "object": "Flash 수출금액 YoY -38.2% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "HAS_METRIC",
+      "object": "SSD 수출금액 YoY 94.0% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer 수출금액 YoY -42.8% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM 수출중량 YoY 24.6% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "MCP (DRAM+NAND 복합제품)",
+      "predicate": "HAS_METRIC",
+      "object": "MCP 수출중량 YoY 102.0% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Flash",
+      "predicate": "HAS_METRIC",
+      "object": "Flash 수출중량 YoY 25.9% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "HAS_METRIC",
+      "object": "SSD 수출중량 YoY 74.1% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer 수출중량 YoY 13.4% (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출금액 YoY -30.8% (201911)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출물량 YoY 18.2% (201911)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체 수출물량 YoY 11.2% (201910)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "미중 무역분쟁 1단계 합의",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "연말 쇼핑시즌",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "MCP (DRAM+NAND 복합제품)",
+      "predicate": "AFFECTED_BY",
+      "object": "5G 본격 전환 (영향: MCP 고용량화)",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "MCP (DRAM+NAND 복합제품)",
+      "predicate": "AFFECTED_BY",
+      "object": "스마트폰용 메모리 고용량화 견인",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "AFFECTED_BY",
+      "object": "미중 무역분쟁 1단계 합의",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "AFFECTED_BY",
+      "object": "SSD 가격탄력성 효과 발생",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "AFFECTED_BY",
+      "object": "Wafer 업황 회복 시그널",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체 수출 감소율 완화 (201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체 수출물량 지속 증가 (201910-201912)",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "5G 본격 전환 (영향: MCP 고용량화)",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "데이터센터 수요 증가",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "메모리 반도체 공급 과잉 해소",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체 수출금액 플러스 국면 전환 가능성 (2020년 2월 전망)",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "하나금융투자",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체업종 투자심리 긍정적",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "반도체",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "MCP (DRAM+NAND 복합제품)",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "Flash",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "SSD",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "Wafer",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "반도체",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "MCP (DRAM+NAND 복합제품)",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "Flash",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "SSD",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "PRODUCES",
+      "object": "Wafer",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "COMPETES_WITH",
+      "object": "SK하이닉스",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "COMPETES_WITH",
+      "object": "삼성전자",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "DEVELOPS",
+      "object": "고용량화",
+      "weight": 0.7,
+      "source": null
+    },
+    {
+      "subject": "SK하이닉스",
+      "predicate": "DEVELOPS",
+      "object": "고용량화",
+      "weight": 0.7,
+      "source": null
+    }
+  ],
+  "metadata": {}
+}

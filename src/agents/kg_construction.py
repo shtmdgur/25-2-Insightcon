@@ -50,6 +50,10 @@ class KGConstructionAgent:
             neo4j_uri: Neo4j 연결 URI
             llm: LLM 모델 (NewsParser용, PDFParser는 독립적으로 LLM 생성)
         """
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+
         self.data_dir = data_dir or Path("data")
         self.raw_dir = self.data_dir / "raw"
         self.processed_dir = self.data_dir / "processed"
@@ -66,7 +70,13 @@ class KGConstructionAgent:
         # 유틸리티
         self.merger = KGMerger()
         self.normalizer = get_entity_normalizer()
-        self.loader = Neo4jKGLoader(uri=neo4j_uri) if neo4j_uri else None
+        
+        if neo4j_uri:
+            user = os.getenv("NEO4J_USERNAME") or os.getenv("NEO4J_USER", "neo4j")
+            password = os.getenv("NEO4J_PASSWORD", "password")
+            self.loader = Neo4jKGLoader(uri=neo4j_uri, user=user, password=password)
+        else:
+            self.loader = None
         
         logger.info(f"KGConstructionAgent initialized (data_dir={self.data_dir}, llm={'provided' if llm else 'None'})")
     
@@ -170,10 +180,10 @@ class KGConstructionAgent:
                 # **/*.pdf: 모든 하위 폴더 재귀 검색
                 sources['pdf'].extend(list(pdf_path.glob('**/*.pdf')))
         
-        # 주가 CSV
+        # 주가 CSV (모든 CSV 파일, 다양한 티커 형식 지원)
         price_path = self.raw_dir / 'price'
         if price_path.exists():
-            sources['price'] = list(price_path.glob('*_prices.csv'))
+            sources['price'] = list(price_path.glob('*.csv'))
         
         # DART (디렉토리 전체)
         dart_path = self.raw_dir / 'DART'
@@ -190,10 +200,10 @@ class KGConstructionAgent:
         if macro_path.exists():
             sources['macro'] = list(macro_path.glob('*.csv'))
         
-        # 펀더멘탈
+        # 펀더멘탈 (*_fundamentals.csv 패턴)
         fund_path = self.raw_dir / 'fund'
         if fund_path.exists():
-            sources['fund'] = list(fund_path.glob('*.csv'))
+            sources['fund'] = list(fund_path.glob('*_fundamentals.csv'))
         
         # 통계 출력
         for source_type, files in sources.items():
@@ -338,15 +348,26 @@ class KGConstructionAgent:
         
         # Entity 이름 정규화
         for entity in kg.entities:
-            normalized_name = self.normalizer.normalize_entity(entity.name)
+            # normalize_entity returns Dict: {'canonical_name': ..., 'ticker': ..., ...}
+            normalization_result = self.normalizer.normalize_entity(entity.name)
+            normalized_name = normalization_result.get('canonical_name', entity.name)
+            
             if normalized_name != entity.name:
                 logger.debug(f"Normalized: {entity.name} -> {normalized_name}")
                 entity.name = normalized_name
+                # 정규화된 정보(ticker 등)를 속성에 추가
+                if normalization_result.get('ticker'):
+                    entity.properties['ticker'] = normalization_result['ticker']
         
         # Relation subject/object 정규화
         for relation in kg.relations:
-            relation.subject = self.normalizer.normalize_entity(relation.subject)
-            relation.object = self.normalizer.normalize_entity(relation.object)
+            # Subject
+            subj_norm = self.normalizer.normalize_entity(relation.subject)
+            relation.subject = subj_norm.get('canonical_name', relation.subject)
+            
+            # Object
+            obj_norm = self.normalizer.normalize_entity(relation.object)
+            relation.object = obj_norm.get('canonical_name', relation.object)
         
         return kg
     
@@ -371,7 +392,7 @@ class KGConstructionAgent:
         logger.info(
             f"Neo4j loaded: {stats.get('static_nodes', 0)} static nodes, "
             f"{stats.get('dynamic_nodes', 0)} dynamic nodes, "
-            f"{stats.get('relations', 0)} relations"
+            f"{stats.get('relationships_created', 0)} relations"
         )
         
         return stats
@@ -396,13 +417,15 @@ class KGConstructionAgent:
             종합 리포트
         """
         report = {
-            'parsers': parser_results,
-            'json_files': len(json_files),
-            'merged_kg': {
+            'parser_results': parser_results,
+            'json_files': [str(f) for f in json_files],  # 개수 대신 파일 목록 반환
+            'json_files_count': len(json_files),
+            'merged_kg_summary': {
                 'entities': len(merged_kg.entities),
                 'relations': len(merged_kg.relations)
             },
-            'neo4j': neo4j_stats if neo4j_stats else None
+            'merged_kg': merged_kg,  # 객체 자체도 포함 (테스트 코드에서 필요)
+            'neo4j_stats': neo4j_stats if neo4j_stats else None
         }
         
         # 레이어별 통계
@@ -417,7 +440,10 @@ class KGConstructionAgent:
             'dynamic': dynamic_count
         }
         
-        logger.info(f"Report: {json.dumps(report, indent=2)}")
+        # 로깅용으로는 JSON 포맷만 (객체 제외)
+        log_report = report.copy()
+        log_report.pop('merged_kg') 
+        logger.info(f"Report: {json.dumps(log_report, indent=2, ensure_ascii=False)}")
         
         # 리포트 저장 (타임스탬프 포함)
         from datetime import datetime
@@ -426,7 +452,7 @@ class KGConstructionAgent:
         
         try:
             with open(report_path, 'w', encoding='utf-8') as f:
-                json.dump(report, f, indent=2, ensure_ascii=False)
+                json.dump(log_report, f, indent=2, ensure_ascii=False)
             logger.info(f"Report saved to {report_path}")
         except Exception as e:
             logger.warning(f"Failed to save report: {str(e)}")

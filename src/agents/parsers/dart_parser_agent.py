@@ -223,7 +223,8 @@ class DARTParserAgent(BaseParserAgent):
                 continue
             
             # Entity 정규화
-            normalized_name = self.normalizer.normalize_entity(corp_name)
+            normalized_name_dict = self.normalizer.normalize_entity(corp_name)
+            normalized_name = normalized_name_dict["canonical_name"]
             
             entity = Entity(
                 name=normalized_name,
@@ -270,7 +271,8 @@ class DARTParserAgent(BaseParserAgent):
                 ticker = str(row.get('ticker', '')).strip()
                 corp_name = str(row.get('corp_name', '')).strip()
                 if ticker and corp_name:
-                    ticker_map[ticker] = self.normalizer.normalize_entity(corp_name)
+                    norm_res = self.normalizer.normalize_entity(corp_name)
+                    ticker_map[ticker] = norm_res["canonical_name"]
         
         for idx, row in disclosure_df.iterrows():
             ticker = str(row.get('ticker', '')).strip()
@@ -342,7 +344,8 @@ class DARTParserAgent(BaseParserAgent):
                 ticker = str(row.get('ticker', '')).strip()
                 corp_name = str(row.get('corp_name', '')).strip()
                 if ticker and corp_name:
-                    ticker_map[ticker] = self.normalizer.normalize_entity(corp_name)
+                    norm_res = self.normalizer.normalize_entity(corp_name)
+                    ticker_map[ticker] = norm_res["canonical_name"]
         
         for idx, row in financial_df.iterrows():
             ticker = str(row.get('ticker', '')).strip()

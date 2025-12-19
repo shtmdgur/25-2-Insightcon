@@ -1,0 +1,320 @@
+{
+  "entities": [
+    {
+      "name": "Mirae_Asset_Daewoo",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Samsung_Electronics",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SK_Hynix",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Micron",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Intel",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Kim_Young_Geon_Analyst",
+      "type": "Person",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Server_DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "PC_DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "CPU",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "NAND_Flash",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MLC_Chip",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SLC_Chip",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DDR4_2666Mbps_8GB_RDIMM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DDR4_2400Mbps_SO_DIMM_8GB",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "NAND_16Gb",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Dec_Memory_Fixed_Price_Release_201912",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Intel_CPU_Shortage_Event",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Samsung_Power_Outage_Effect_20191231",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM_Price_Increase_Expectation_Trend_2020Q1",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM_Spot_Price_Reversal_Up_Trend_201912",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Server_DRAM_1Xnm_Shortage_Trend_2019Q4",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "NAND_Price_Increase_Future_Trend",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "1Xnm_Advanced_Process",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "1Xnm_B_Server_DRAM",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM_Server_Fixed_Price_8GB_RDIMM_DDR4_2666Mbps_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SK_Hynix_MarketCap_20171023",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Server_DRAM_Price_Increase_Rate_2020Q1",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "NAND_Flash_Fixed_Price_16Gb_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM_PC_Fixed_Price_SO_DIMM_8GB_DDR4_2400Mbps_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    }
+  ],
+  "relations": [
+    {
+      "subject": "Kim_Young_Geon_Analyst",
+      "predicate": "LEADS",
+      "object": "Mirae_Asset_Daewoo",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Samsung_Electronics",
+      "predicate": "COMPETES_WITH",
+      "object": "SK_Hynix",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SK_Hynix",
+      "predicate": "COMPETES_WITH",
+      "object": "Micron",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Intel",
+      "predicate": "PRODUCES",
+      "object": "CPU",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Samsung_Electronics",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SK_Hynix",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "Intel_CPU_Shortage_Event",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM_Price_Increase_Expectation_Trend_2020Q1",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "DRAM_Spot_Price_Reversal_Up_Trend_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "Samsung_Power_Outage_Effect_20191231",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "Server_DRAM",
+      "predicate": "AFFECTED_BY",
+      "object": "Server_DRAM_1Xnm_Shortage_Trend_2019Q4",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Samsung_Electronics",
+      "predicate": "DEVELOPS",
+      "object": "1Xnm_Advanced_Process",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "Samsung_Electronics",
+      "predicate": "PRODUCES",
+      "object": "1Xnm_B_Server_DRAM",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "NAND_Flash",
+      "predicate": "AFFECTED_BY",
+      "object": "NAND_Price_Increase_Future_Trend",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DDR4_2666Mbps_8GB_RDIMM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM_Server_Fixed_Price_8GB_RDIMM_DDR4_2666Mbps_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SK_Hynix",
+      "predicate": "HAS_METRIC",
+      "object": "SK_Hynix_MarketCap_20171023",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Server_DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "Server_DRAM_Price_Increase_Rate_2020Q1",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "NAND_16Gb",
+      "predicate": "HAS_METRIC",
+      "object": "NAND_Flash_Fixed_Price_16Gb_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DDR4_2400Mbps_SO_DIMM_8GB",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM_PC_Fixed_Price_SO_DIMM_8GB_DDR4_2400Mbps_201912",
+      "weight": 0.9,
+      "source": null
+    }
+  ],
+  "metadata": {}
+}

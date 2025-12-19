@@ -1,0 +1,603 @@
+{
+  "entities": [
+    {
+      "name": "하나금융투자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "산업통상자원부",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "한국무역통계진흥원",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "삼성전자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MCP_DRAM+NAND_복합제품",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Flash",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Wafer",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "2차전지",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "카메라_모듈",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "이미지_센서",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "스마트폰용_메모리",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "메모리_반도체",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체수출금액_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체수출금액_201911",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체수출물량_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체수출물량_201911",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체수출물량_201910",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM_수출금액_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MCP_수출금액_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Flash_수출금액_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD_수출금액_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Wafer_수출금액_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "DRAM_수출중량_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MCP_수출중량_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Flash_수출중량_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD_수출중량_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Wafer_수출중량_201912",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "미중_무역분쟁_1단계_합의",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "연말_쇼핑시즌",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "2020년_반도체업종_전망자료_발간",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "수출_감소율_완화_반도체",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "수출_물량_지속_증가_반도체",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "수요_회복_반도체",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "카메라_모듈_수요_증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "스마트폰용_메모리_고용량화_트렌드",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "SSD_가격_하락_트렌드",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "Wafer_수출중량_플러스_전환",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "Wafer_업황_회복",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.7
+    },
+    {
+      "name": "IT_품목_수출_성장_2020",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "데이터센터_수요_증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "메모리_반도체_공급_과잉_해소",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "반도체수출금액_감소율_개선_202002",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "반도체수출금액_플러스_국면_전환",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "5G",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "김경민_애널리스트",
+      "type": "Person",
+      "properties": {},
+      "confidence": 0.9
+    }
+  ],
+  "relations": [
+    {
+      "subject": "김경민_애널리스트",
+      "predicate": "LEADS",
+      "object": "하나금융투자",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체수출금액_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체수출금액_201911",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체수출물량_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체수출물량_201911",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "HAS_METRIC",
+      "object": "반도체수출물량_201910",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM_수출금액_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "MCP_DRAM+NAND_복합제품",
+      "predicate": "HAS_METRIC",
+      "object": "MCP_수출금액_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Flash",
+      "predicate": "HAS_METRIC",
+      "object": "Flash_수출금액_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "HAS_METRIC",
+      "object": "SSD_수출금액_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer_수출금액_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM_수출중량_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "MCP_DRAM+NAND_복합제품",
+      "predicate": "HAS_METRIC",
+      "object": "MCP_수출중량_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Flash",
+      "predicate": "HAS_METRIC",
+      "object": "Flash_수출중량_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "HAS_METRIC",
+      "object": "SSD_수출중량_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer_수출중량_201912",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "수출_감소율_완화_반도체",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "수출_물량_지속_증가_반도체",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "미중_무역분쟁_1단계_합의",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "연말_쇼핑시즌",
+      "weight": 0.7,
+      "source": null
+    },
+    {
+      "subject": "MCP_DRAM+NAND_복합제품",
+      "predicate": "AFFECTED_BY",
+      "object": "카메라_모듈_수요_증가",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "MCP_DRAM+NAND_복합제품",
+      "predicate": "AFFECTED_BY",
+      "object": "스마트폰용_메모리_고용량화_트렌드",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "AFFECTED_BY",
+      "object": "미중_무역분쟁_1단계_합의",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "AFFECTED_BY",
+      "object": "SSD_가격_하락_트렌드",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "AFFECTED_BY",
+      "object": "Wafer_수출중량_플러스_전환",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "AFFECTED_BY",
+      "object": "Wafer_업황_회복",
+      "weight": 0.7,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "5G",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "데이터센터_수요_증가",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "메모리_반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "메모리_반도체_공급_과잉_해소",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체수출금액_감소율_개선_202002",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "AFFECTED_BY",
+      "object": "반도체수출금액_플러스_국면_전환",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "산업통상자원부",
+      "predicate": "RELATED_TO",
+      "object": "반도체",
+      "weight": 0.7,
+      "source": null
+    },
+    {
+      "subject": "한국무역통계진흥원",
+      "predicate": "RELATED_TO",
+      "object": "반도체",
+      "weight": 0.7,
+      "source": null
+    },
+    {
+      "subject": "하나금융투자",
+      "predicate": "RELATED_TO",
+      "object": "2020년_반도체업종_전망자료_발간",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "RELATED_TO",
+      "object": "2020년_반도체업종_전망자료_발간",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "카메라_모듈",
+      "predicate": "RELATED_TO",
+      "object": "이미지_센서",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "MCP_DRAM+NAND_복합제품",
+      "predicate": "RELATED_TO",
+      "object": "스마트폰용_메모리",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체",
+      "predicate": "RELATED_TO",
+      "object": "IT_품목_수출_성장_2020",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "2차전지",
+      "predicate": "RELATED_TO",
+      "object": "IT_품목_수출_성장_2020",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "반도체",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "메모리_반도체",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "DRAM",
+      "weight": 0.7,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "Flash",
+      "weight": 0.7,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "PRODUCES",
+      "object": "SSD",
+      "weight": 0.7,
+      "source": null
+    }
+  ],
+  "metadata": {}
+}

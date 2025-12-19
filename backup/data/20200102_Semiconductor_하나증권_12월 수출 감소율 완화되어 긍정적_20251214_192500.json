@@ -1,0 +1,401 @@
+{
+  "entities": [
+    {
+      "name": "김경민 (애널리스트)",
+      "type": "Person",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "하나금융그룹",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "산업통상자원부",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "한국무역통계진흥원",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "삼성전자",
+      "type": "Company",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "DRAM",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "MCP",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Flash",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "SSD",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Wafer",
+      "type": "Product",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "5G",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "데이터센터",
+      "type": "Technology",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "Equity Research [2020년 1월 2일]",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "미중 무역분쟁 1단계 합의",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "연말 쇼핑시즌",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "반도체업종 전망자료 [2020년]",
+      "type": "Event",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "반도체 수출금액 [12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "반도체 수출물량 [12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "DRAM 수출금액 [2019년 12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "MCP 수출금액 [2019년 12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Flash 수출금액 [2019년 12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "SSD 수출금액 [2019년 12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Wafer 수출금액 [2019년 12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "Wafer 수출중량 [2019년 12월]",
+      "type": "Metric",
+      "properties": {},
+      "confidence": 0.95
+    },
+    {
+      "name": "반도체 수출 감소율 완화",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 수출물량 지속 증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "수요 회복",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "5G 전환",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "데이터센터 수요 증가",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "메모리 반도체 공급 과잉 해소",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "Wafer 업황 회복",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.85
+    },
+    {
+      "name": "스마트폰 메모리 고용량화",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    },
+    {
+      "name": "투자심리 긍정적",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.8
+    }
+  ],
+  "relations": [
+    {
+      "subject": "김경민 (애널리스트)",
+      "predicate": "LEADS",
+      "object": "하나금융그룹",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "하나금융그룹",
+      "predicate": "PRODUCES",
+      "object": "Equity Research [2020년 1월 2일]",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "산업통상자원부",
+      "predicate": "RELATED_TO",
+      "object": "반도체 수출금액 [12월]",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "한국무역통계진흥원",
+      "predicate": "RELATED_TO",
+      "object": "반도체 수출금액 [12월]",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "반도체 수출금액 [12월]",
+      "predicate": "HAS_TREND",
+      "object": "반도체 수출 감소율 완화",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "반도체 수출물량 [12월]",
+      "predicate": "HAS_TREND",
+      "object": "반도체 수출물량 지속 증가",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "미중 무역분쟁 1단계 합의",
+      "predicate": "AFFECTS",
+      "object": "수요 회복",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "연말 쇼핑시즌",
+      "predicate": "AFFECTS",
+      "object": "반도체 수출물량 지속 증가",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "DRAM",
+      "predicate": "HAS_METRIC",
+      "object": "DRAM 수출금액 [2019년 12월]",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "MCP",
+      "predicate": "HAS_METRIC",
+      "object": "MCP 수출금액 [2019년 12월]",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "Flash",
+      "predicate": "HAS_METRIC",
+      "object": "Flash 수출금액 [2019년 12월]",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "HAS_METRIC",
+      "object": "SSD 수출금액 [2019년 12월]",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer 수출금액 [2019년 12월]",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "Wafer",
+      "predicate": "HAS_METRIC",
+      "object": "Wafer 수출중량 [2019년 12월]",
+      "weight": 0.95,
+      "source": null
+    },
+    {
+      "subject": "5G 전환",
+      "predicate": "AFFECTS",
+      "object": "MCP",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "5G",
+      "predicate": "RELATED_TO",
+      "object": "5G 전환",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "5G 전환",
+      "predicate": "AFFECTS",
+      "object": "반도체 수출금액 [12월]",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "데이터센터 수요 증가",
+      "predicate": "AFFECTS",
+      "object": "반도체 수출금액 [12월]",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "메모리 반도체 공급 과잉 해소",
+      "predicate": "AFFECTS",
+      "object": "반도체 수출금액 [12월]",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "데이터센터",
+      "predicate": "RELATED_TO",
+      "object": "데이터센터 수요 증가",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "Wafer 업황 회복",
+      "predicate": "AFFECTS",
+      "object": "Wafer 수출금액 [2019년 12월]",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "하나금융그룹",
+      "predicate": "PRODUCES",
+      "object": "반도체업종 전망자료 [2020년]",
+      "weight": 0.9,
+      "source": null
+    },
+    {
+      "subject": "삼성전자",
+      "predicate": "RELATED_TO",
+      "object": "반도체업종 전망자료 [2020년]",
+      "weight": 0.75,
+      "source": null
+    },
+    {
+      "subject": "반도체 수출 감소율 완화",
+      "predicate": "AFFECTS",
+      "object": "투자심리 긍정적",
+      "weight": 0.85,
+      "source": null
+    },
+    {
+      "subject": "반도체 수출물량 지속 증가",
+      "predicate": "AFFECTS",
+      "object": "반도체 수출 감소율 완화",
+      "weight": 0.8,
+      "source": null
+    },
+    {
+      "subject": "MCP",
+      "predicate": "RELATED_TO",
+      "object": "스마트폰 메모리 고용량화",
+      "weight": 0.75,
+      "source": null
+    },
+    {
+      "subject": "SSD",
+      "predicate": "AFFECTED_BY",
+      "object": "미중 무역분쟁 1단계 합의",
+      "weight": 0.75,
+      "source": null
+    },
+    {
+      "subject": "하나금융그룹",
+      "predicate": "HAS_TREND",
+      "object": "투자심리 긍정적",
+      "weight": 0.8,
+      "source": null
+    }
+  ],
+  "metadata": {}
+}

@@ -16,6 +16,9 @@ class PriceParserConfig:
     min_samples: int = 10  # 최소 샘플 수
     sample_ratio: float = 0.1  # 전체의 10%
     
+    # 테스트 모드 (빠른 테스트용)
+    test_mode_sample_size: int = 10  # 테스트: 최근 10일만
+    
     # SAX 변환
     sax_window_size: int = 5  # 윈도우 크기
     sax_paa_size: int = 3  # PAA 세그먼트 수
@@ -33,7 +36,10 @@ class NewsParserConfig:
     # 샘플링
     sample_size: int = 100  # 최근 N건
     max_title_length: int = 200  # 제목 최대 길이
-    max_desc_length: int = 500  # 설명 최대 길이
+    max_desc_length: int = None  # 설명 최대 길이
+    
+    # 테스트 모드
+    test_mode_sample_size: int = 10  # 테스트: 10건만
     
     # Time-decay 가중치
     time_decay_halflife: int = 90  # 반감기 (일)
@@ -49,6 +55,9 @@ class NewsParserConfig:
 class MacroParserConfig:
     """거시경제 Parser 설정"""
     sample_per_series: int = 50  # 각 지표당 최근 N개
+    
+    # 테스트 모드
+    test_mode_sample_per_series: int = 10  # 테스트: 각 지표당 10개
 
 
 @dataclass

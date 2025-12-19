@@ -1,0 +1,70 @@
+{
+  "parser_results": {
+    "pdf": {
+      "total": 2,
+      "success": 0,
+      "failed": 2,
+      "errors": [
+        {
+          "file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\reports\\20200102_Semiconductor_미래에셋증권_12월 Memory 고정거래가격 Review.pdf",
+          "error": "PDF parsing failed: 'GeminiPDFParser' object has no attribute 'parse_pdf_to_kg'"
+        },
+        {
+          "file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\reports\\20200102_Semiconductor_하나증권_12월 수출 감소율 완화되어 긍정적.pdf",
+          "error": "PDF parsing failed: 'GeminiPDFParser' object has no attribute 'parse_pdf_to_kg'"
+        }
+      ]
+    },
+    "price": {
+      "total": 3,
+      "success": 3,
+      "failed": 0,
+      "errors": []
+    },
+    "dart": {
+      "total": 1,
+      "success": 0,
+      "failed": 1,
+      "errors": [
+        "DART parsing failed: 1 validation error for Entity\nname\n  Input should be a valid string [type=string_type, input_value={'canonical_name': '삼...: [], 'confidence': 0.5}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/string_type"
+      ]
+    },
+    "news": {
+      "total": 1,
+      "success": 1,
+      "failed": 0,
+      "errors": []
+    },
+    "macro": {
+      "total": 1,
+      "success": 1,
+      "failed": 0,
+      "errors": []
+    },
+    "fund": {
+      "total": 2,
+      "success": 2,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "json_files": [
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\000660.KS_prices_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\000990.KS_prices_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\005930.KS_prices_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\005930_fundamentals_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\fred_rates_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\global_semis_fundamentals_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\Semiconductor_News_Raw_20251210_kg.json"
+  ],
+  "json_files_count": 7,
+  "merged_kg_summary": {
+    "entities": 0,
+    "relations": 0
+  },
+  "neo4j_stats": null,
+  "layers": {
+    "static": 0,
+    "dynamic": 0
+  }
+}

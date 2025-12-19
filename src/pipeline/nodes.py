@@ -15,12 +15,12 @@ _DEBUG_LOG_PATH = Path(__file__).parent.parent.parent.parent / ".cursor" / "debu
 _DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 from ..agents.kg_construction import KGConstructionAgent
 from ..agents.quality_check import QualityCheckAgent
-from ..agents.ontology_architect import OntologyArchitectAgent
+# from ..agents.ontology_architect import OntologyArchitectAgent  # TODO: 구현 필요
 from ..agents.sector_analyst import SectorAnalystAgent
 from ..agents.company_analyst import CompanyAnalystAgent
 from ..utils.neo4j_client import Neo4jClient
 from ..utils.llm_client import LLMSelector
-from ..utils.document_loader import load_document
+# from ..utils.document_loader import load_document  # TODO: 구현 필요
 
 
 # 전역 클라이언트 인스턴스 (실제로는 의존성 주입 사용 권장)
@@ -151,15 +151,21 @@ def kg_construction_node(state: ReportState) -> ReportState:
             }
         
         # 문서 로드 (파일 경로인 경우 파일을 읽어서 텍스트로 변환)
-        try:
-            document = load_document(document_input)
-        except Exception as e:
-            error_msg = f"문서 로드 실패: {str(e)}"
-            return {
-                'errors': [error_msg],
-                'execution_trace': [error_msg],
-                'kg_data': None
-            }
+        # TODO: document_loader 구현 후 사용
+        if isinstance(document_input, (str, Path)):
+            # 간단한 파일 로드 로직
+            try:
+                with open(document_input, 'r', encoding='utf-8') as f:
+                    document = f.read()
+            except Exception as e:
+                error_msg = f"문서 로드 실패: {str(e)}"
+                return {
+                    'errors': [error_msg],
+                    'execution_trace': [error_msg],
+                    'kg_data': None
+                }
+        else:
+            document = document_input
         
         # 문서가 없으면 스킵
         if not document:
@@ -252,36 +258,45 @@ def ontology_architect_node(state: ReportState) -> ReportState:
     """
     Ontology Architect Agent 실행 노드
     
+    TODO: OntologyArchitectAgent 구현 후 활성화
+    
     Args:
         state: 워크플로우 상태
     
     Returns:
         업데이트된 상태
     """
-    try:
-        neo4j_client = _get_neo4j_client()
-        llm_selector = _get_llm_selector()
-        llm = llm_selector.get_llm("deep")
-        
-        agent = OntologyArchitectAgent(llm, neo4j_client)
-        
-        # 템플릿 문서 로드 (실제로는 파일이나 데이터베이스에서 로드)
-        templates = _load_report_templates()
-        
-        # 스키마 생성
-        schema_result = agent.generate_schema(templates)
-        return {
-            'ontology_schema': schema_result,
-            'schema_issues': [],  # 스키마 이슈 해결됨
-            'execution_trace': ["Ontology schema generated"]
-        }
-        
-    except Exception as e:
-        error_msg = f"Ontology Architect error: {str(e)}"
-        return {
-            'errors': [error_msg],
-            'execution_trace': [error_msg]
-        }
+    # TODO: OntologyArchitectAgent 구현 필요
+    return {
+        'ontology_schema': None,
+        'schema_issues': [],
+        'execution_trace': ["Ontology Architect skipped (not implemented)"]
+    }
+    
+    # try:
+    #     neo4j_client = _get_neo4j_client()
+    #     llm_selector = _get_llm_selector()
+    #     llm = llm_selector.get_llm("deep")
+    #     
+    #     agent = OntologyArchitectAgent(llm, neo4j_client)
+    #     
+    #     # 템플릿 문서 로드 (실제로는 파일이나 데이터베이스에서 로드)
+    #     templates = _load_report_templates()
+    #     
+    #     # 스키마 생성
+    #     schema_result = agent.generate_schema(templates)
+    #     return {
+    #         'ontology_schema': schema_result,
+    #         'schema_issues': [],  # 스키마 이슈 해결됨
+    #         'execution_trace': ["Ontology schema generated"]
+    #     }
+    #     
+    # except Exception as e:
+    #     error_msg = f"Ontology Architect error: {str(e)}"
+    #     return {
+    #         'errors': [error_msg],
+    #         'execution_trace': [error_msg]
+    #     }
 
 
 @track_execution_time("graphrag_query")
