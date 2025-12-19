@@ -412,96 +412,70 @@ gemini_pdf_parser:
 
 gemini_pdf_parser:
   kg_extraction:
-    role: "Knowledge Graph Extraction Specialist"
-    goal: "PDF 문서에서 엔티티와 관계를 추출하여 Knowledge Graph 구축"
+    role: "Semiconductor Knowledge Graph Specialist"
+    goal: "Extract structured Knowledge Graph (T-Box 2.0) from PDF, focusing on Time-Stitching and Observation modeling."
     instruction: |
-      다음 PDF 문서를 분석하여 Knowledge Graph를 추출하세요.
+      You are a domain expert in Semiconductor Industry and Finance.
+      Your task is to extract a Knowledge Graph from the provided document following the **Semiconductor Ontology T-Box 2.0**.
+
+      # 1. Ontology Schema (Strictly Follow)
+
+      ## Node Types (Entities)
+      Identify entities and classify them into one of these types:
       
-      # 엔티티 추출 규칙
+      **[Continuant - Independent]**
+      - **Agent**: `IDM` (Samsung, SK Hynix), `Fabless` (Nvidia), `Foundry` (TSMC), `OSAT`, `SupplierOrganization` (ASML)
+      - **PhysicalObject**: `MemorySemiconductor` (HBM, DRAM), `SystemSemiconductor`, `ProcessNode` (3nm, GAA), `PackagingTechnology` (CoWoS)
+      - **Location**: `Location` (Pyeongtaek Campus)
+      - **Quality**: `FinancialMetric` (Revenue, OP), `TechnicalMetric` (Yield), `MarketMetric` (P/E, Market Share)
       
-      엔티티를 추출할 때 **식별 정보를 이름에 포함**하세요:
+      **[Occurrent - Time-Bound]**
+      - **Event**: `StrategicAction` (Capex Plan), `CorporateEvent` (Earnings Shock), `MarketEnvironment` (AI Boom)
+      - **Observation**: `Observation` (Context-less data points like specific revenue figures at a specific time)
+      - **TemporalRegion**: `TemporalRegion` (e.g., "2024Q1", "2025-03-05")
       
-      1. **회사 (Company)**
-         - 형식: "회사명 (티커)" 
-         - 예시: "삼성전자 (005930)", "SK하이닉스 (000660)"
-         - 티커 정보가 있으면 반드시 포함
-      
-      2. **제품 (Product)**
-         - 형식: "제품명 [세대/규격]"
-         - 예시: "DRAM [DDR5 8Gb]", "NAND [3D 176단]", "HBM [HBM3E]"
-         - 세대, 용량, 규격 정보가 있으면 포함
-      
-      3. **기술 (Technology)**
-         - 형식: "기술명 [공정/세부사항]"
-         - 예시: "EUV [7nm]", "Gate-All-Around [3nm]"
-         - 공정 정보가 있으면 포함
-      
-      4. **지표 (Metric)**
-         - 형식: "지표명 [기간]"
-         - 예시: "매출액 [2024Q1]", "영업이익률 [2023]"
-         - 기간 정보를 포함하여 명확하게
-      
-      5. **이벤트 (Event)**
-         - 형식: "이벤트명 [날짜/기간]"
-         - 예시: "가격 인상 [2024년 1월]", "공장 증설 [2024H2]"
-      
-      6. **인물 (Person)**
-         - 형식: "이름 (직책)"
-         - 예시: "김철수 (CEO)", "이영희 (CFO)"
-      
-      # 관계 추출 규칙
-      
-      - 엔티티 간의 의미 있는 관계를 추출하세요
-      - 가능한 관계 타입:
-        * PRODUCES (생산): 회사 → 제품
-        * COMPETES_WITH (경쟁): 회사 ↔ 회사
-        * SUPPLIES_TO (공급): 회사 → 회사
-        * HAS_METRIC (지표 보유): 회사/제품 → 지표
-        * AFFECTED_BY (영향받음): 엔티티 → 이벤트/트렌드
-        * DEVELOPS (개발): 회사 → 기술
-        * LEADS (리드): 인물 → 회사/프로젝트
-      
-      # 출력 예시
-      
+      ## Relation Types
+      - **Participation**: `participatesIn`, `hasRole`, `realizedBy`
+      - **Production**: `manufactures`, `supplies`, `dependsOn`, `producedBy`
+      - **Temporal/Causal**: `affects`, `occursDuring`, `precededBy`
+      - **Observation (Key)**: `recordedAt`, `observes`, `hasValue`
+
+      # 2. Key Extraction Rules
+
+      ### A. Time-Stitching Strategy (CRITICAL)
+      - **Temporal Hub**: Every event or observation MUST be connected to a `TemporalRegion`.
+      - **Context-less Data as Observation**:
+        - If you see a table row: "2024 Q1 Revenue: 70T KRW"
+        - DO NOT create a simple property on the Company.
+        - **DO CREATE an Observation Node**:
+          - `Observation` ("Obs_Samsung_Rev_2024Q1")
+          - `recordedAt` -> `TemporalRegion` ("2024Q1")
+          - `observes` -> `IDM` ("Samsung Electronics")
+          - `hasValue` -> "70T KRW" (Literal stored in properties)
+
+      ### B. Entity Naming & Identification
+      - **Company**: Always include Ticker if available. (e.g., "Samsung Electronics (005930)")
+      - **TemporalRegion**: Standardize format (YYYY-MM-DD, YYYY-QN, YYYY).
+
+      # 3. Output Format
+      Return a JSON object conforming to the schema:
       ```json
       {
         "entities": [
-          {
-            "name": "삼성전자 (005930)",
-            "type": "Company",
-            "confidence": 0.95
-          },
-          {
-            "name": "DRAM [DDR5 8Gb]",
-            "type": "Product",
-            "confidence": 0.9
-          },
-          {
-            "name": "매출액 [2024Q1]",
-            "type": "Metric",
-            "confidence": 1.0
-          }
+          {"name": "Samsung Electronics (005930)", "type": "IDM", "confidence": 1.0},
+          {"name": "2024Q1", "type": "TemporalRegion", "confidence": 1.0},
+          {"name": "Obs_Rev_Samsung_2024Q1", "type": "Observation", "properties": {"value": "70T", "unit": "KRW"}, "confidence": 0.9}
         ],
         "relations": [
-          {
-            "subject": "삼성전자 (005930)",
-            "predicate": "PRODUCES",
-            "object": "DRAM [DDR5 8Gb]",
-            "weight": 1.0
-          },
-          {
-            "subject": "삼성전자 (005930)",
-            "predicate": "HAS_METRIC",
-            "object": "매출액 [2024Q1]",
-            "weight": 0.9
-          }
+          {"subject": "Obs_Rev_Samsung_2024Q1", "predicate": "observes", "object": "Samsung Electronics (005930)"},
+          {"subject": "Obs_Rev_Samsung_2024Q1", "predicate": "recordedAt", "object": "2024Q1"}
         ]
       }
       ```
       
-      **핵심 원칙**:
-      - 식별 정보를 최대한 포함하여 엔티티를 명확하게 구분
-      - 엔티티와 관계의 균형을 맞추세요 (엔티티 10개 → 관계 최소 10개)
-      - 문서에서 명시적으로 언급된 내용만 추출
-      - 애매한 경우 confidence를 낮게 설정
+      **Important**:
+      - Separate "Facts" (Observation) from "Trends" (MarketMetric which might be a general concept).
+      - Use `Observation` for specific data points found in tables/texts.
+      - Ensure `Observation` nodes act as bridges between Agents and Time.
+
 

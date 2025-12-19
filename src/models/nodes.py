@@ -9,38 +9,126 @@ from enum import Enum
 
 
 class NodeType(str, Enum):
-    """허용된 노드 타입 (Unified Schema - YAML prompts 동기화)"""
-    COMPANY = "Company"
-    PRODUCT = "Product"
+    """허용된 노드 타입 (Semiconductor Ontology T-Box 2.0 based)"""
+    # 0. Root
+    SEMICONDUCTOR_ENTITY = "SemiconductorEntity"
+
+    # 1. Continuant - IndependentContinuant
+    # Agent
+    AGENT = "Agent"
+    ORGANIZATION_TYPE = "OrganizationType"
+    FABLESS = "Fabless"
+    IDM = "IDM"
+    FOUNDRY = "Foundry"
+    OSAT = "OSAT"
+    SUPPLIER_ORGANIZATION = "SupplierOrganization"
+    # PhysicalObject
+    PHYSICAL_OBJECT = "PhysicalObject"
+    SEMICONDUCTOR = "Semiconductor"
+    MEMORY_SEMICONDUCTOR = "MemorySemiconductor"
+    SYSTEM_SEMICONDUCTOR = "SystemSemiconductor"
+    ANALOG_DEVICE = "AnalogDevice"
+    PROCESS_NODE = "ProcessNode"
+    PACKAGING_TECHNOLOGY = "PackagingTechnology"
+    # Location
+    LOCATION = "Location"
+    
+    # 1. Continuant - Quality
+    QUALITY = "Quality"
+    FINANCIAL_METRIC = "FinancialMetric"
+    TECHNICAL_METRIC = "TechnicalMetric"
+    MARKET_METRIC = "MarketMetric"
+    
+    # 1. Continuant - Role & Info
+    ROLE = "Role"
+    VALUE_CHAIN_STAGE = "ValueChainStage"
+    INFORMATION_OBJECT = "InformationObject"
+    FINANCIAL_REPORT = "FinancialReport"
+    PATENT = "Patent"
+    POLICY = "Policy"
+    TECHNICAL_SPECIFICATION = "TechnicalSpecification"
+    
+    # 2. Occurrent
+    OCCURRENT = "Occurrent"
+    PROCESS = "Process"
+    MANUFACTURING_PROCESS = "ManufacturingProcess"
+    FRONT_END_PROCESS = "FrontEndProcess"
+    BACK_END_PROCESS = "BackEndProcess"
+    
     EVENT = "Event"
-    METRIC = "Metric"
-    TREND = "Trend"
-    FINANCIAL = "Financial"
-    TECHNOLOGY = "Technology"  # graph_schema에서 추가
-    PERSON = "Person"          # graph_schema에서 추가
+    STRATEGIC_ACTION = "StrategicAction"
+    CORPORATE_EVENT = "CorporateEvent"
+    MARKET_ENVIRONMENT = "MarketEnvironment"
+    POLICY_EVENT = "PolicyEvent"
+    
+    OBSERVATION = "Observation"  # [NEW] Context-less Data Hub
+    TEMPORAL_REGION = "TemporalRegion"
+    
+    # 3. Risk & Opportunity
+    RISK_FACTOR = "RiskFactor"
+    GEOPOLITICAL_RISK = "GeopoliticalRisk"
+    SUPPLY_CHAIN_RISK = "SupplyChainRisk"
+    OPPORTUNITY_FACTOR = "OpportunityFactor"
+    
+    # 4. Other
+    PERSON = "Person"
+    TECHNOLOGY = "Technology"  # Compatibility
+    COMPANY = "Company"        # Compatibility (mapped to IDM/Fabless/etc ideally)
+    PRODUCT = "Product"        # Compatibility (mapped to Semiconductor/PhysicalObject)
+    METRIC = "Metric"          # Compatibility (mapped to Financial/Technical/MarketMetric)
+    TREND = "Trend"            # Compatibility (mapped to Pattern if needed)
 
 
 class RelationType(str, Enum):
-    """허용된 관계 타입 (Unified Schema - YAML prompts 동기화)"""
-    # 기존 nodes.py 관계
-    COMPETITOR_OF = "COMPETITOR_OF"
-    SUPPLIER_OF = "SUPPLIER_OF"
-    CUSTOMER_OF = "CUSTOMER_OF"
-    MANUFACTURES = "MANUFACTURES"
-    AFFECTS = "AFFECTS"
-    HAS_METRIC = "HAS_METRIC"
-    HAS_FINANCIAL = "HAS_FINANCIAL"
-    HAS_TREND = "HAS_TREND"
-    OCCURRED_AT = "OCCURRED_AT"
-    RELATED_TO = "RELATED_TO"
+    """허용된 관계 타입 (Semiconductor Ontology R-Box 2.0 based)"""
+    # A. Participation & Role
+    PARTICIPATES_IN = "participatesIn"
+    HAS_ROLE = "hasRole"
+    REALIZED_BY = "realizedBy"
     
-    # graph_schema 및 YAML prompts에서 추가
-    PRODUCES = "PRODUCES"              # Company -> Product
-    COMPETES_WITH = "COMPETES_WITH"    # Company <-> Company
-    SUPPLIES_TO = "SUPPLIES_TO"        # Company -> Company
-    AFFECTED_BY = "AFFECTED_BY"        # Entity -> Event/Trend
-    DEVELOPS = "DEVELOPS"              # Company -> Technology
-    LEADS = "LEADS"                    # Person -> Company
+    # B. Production & Supply
+    PRODUCED_BY = "producedBy"
+    MANUFACTURES = "manufactures"
+    SUPPLIES = "supplies"
+    DEPENDS_ON = "dependsOn"
+    IN_VALUE_CHAIN_STAGE = "inValueChainStage"
+    
+    # C. Structure & Quality
+    HAS_PART = "hasPart"
+    PART_OF = "partOf"
+    HAS_QUALITY = "hasQuality"
+    LOCATED_AT = "locatedAt"
+    
+    # D. Temporal & Causal
+    PRECEDED_BY = "precededBy"
+    OCCURS_DURING = "occursDuring"
+    AFFECTS = "affects"
+    
+    # E. Info & Risk
+    IS_ABOUT = "isAbout"
+    EXPOSED_TO = "exposedTo"
+    BENEFITS_FROM = "benefitsFrom"
+    
+    # F. Observation & Measurement [NEW]
+    RECORDED_AT = "recordedAt"
+    OBSERVES = "observes"
+    HAS_VALUE = "hasValue"
+
+    # G. Legacy/Compatibility (For existing code/parsers)
+    COMPETITOR_OF = "COMPETITOR_OF"  # -> competesWith (if not in R-Box, maybe treat as symmetric dependsOn?) - Keeping for now
+    SUPPLIER_OF = "SUPPLIER_OF"      # -> supplies
+    CUSTOMER_OF = "CUSTOMER_OF"      # -> supplies (inverse)
+    HAS_METRIC = "HAS_METRIC"        # -> hasQuality
+    HAS_FINANCIAL = "HAS_FINANCIAL"  # -> hasQuality
+    HAS_TREND = "HAS_TREND"          # -> hasQuality or affects
+    OCCURRED_AT = "OCCURRED_AT"      # -> occursDuring
+    RELATED_TO = "RELATED_TO"        # Generic fallback
+    PRODUCES = "PRODUCES"            # -> manufactures
+    COMPETES_WITH = "COMPETES_WITH"  # -> competesWith logic (will map to dependsOn or new relation?)
+    SUPPLIES_TO = "SUPPLIES_TO"      # -> supplies
+    AFFECTED_BY = "AFFECTED_BY"      # -> affects (inverse)
+    DEVELOPS = "DEVELOPS"            # -> manufactures or participatesIn
+    LEADS = "LEADS"                  # -> participatesIn or hasRole
 
 
 class Entity(BaseModel):
@@ -248,14 +336,77 @@ class KnowledgeGraph(BaseModel):
         )
 
 
-# 엔티티 타입별 기본 속성 정의
+# 엔티티 타입별 기본 속성 정의 (Updated for T-Box 2.0)
 ENTITY_TYPE_PROPERTIES = {
+    # 1. IndependentContinuant - Agent
+    NodeType.FABLESS: ["ticker", "major_products", "customer"],
+    NodeType.IDM: ["ticker", "fab_capacity", "memory_types"],
+    NodeType.FOUNDRY: ["process_nodes", "capacity", "major_clients"],
+    NodeType.OSAT: ["packaging_tech", "capacity"],
+    NodeType.SUPPLIER_ORGANIZATION: ["equipment_type", "materials"],
+    NodeType.AGENT: ["type", "role"],
+    
+    # 1. IndependentContinuant - PhysicalObject
+    NodeType.MEMORY_SEMICONDUCTOR: ["density", "speed", "generation"],
+    NodeType.SYSTEM_SEMICONDUCTOR: ["architecture", "node", "application"],
+    NodeType.ANALOG_DEVICE: ["application", "voltage"],
+    NodeType.PROCESS_NODE: ["nm_size", "transistor_type"],
+    NodeType.PACKAGING_TECHNOLOGY: ["stack_height", "interposer"],
+    NodeType.SEMICONDUCTOR: ["category", "tech_node"],
+    
+    # 1. IndependentContinuant - Location
+    NodeType.LOCATION: ["country", "region", "function"],
+    
+    # 1. IndependentContinuant - Quality
+    NodeType.FINANCIAL_METRIC: ["value", "unit", "period", "yoy_growth"],
+    NodeType.TECHNICAL_METRIC: ["value", "unit", "spec_name"],
+    NodeType.MARKET_METRIC: ["value", "unit", "period", "consensus_gap"],
+    
+    # 1. IndependentContinuant - Role & Info
+    NodeType.VALUE_CHAIN_STAGE: ["stage_name", "description"],
+    NodeType.FINANCIAL_REPORT: ["period", "report_type", "date"],
+    NodeType.PATENT: ["patent_number", "assignee", "filing_date"],
+    NodeType.POLICY: ["country", "status", "effective_date"],
+    
+    # 2. Occurrent - Process
+    NodeType.MANUFACTURING_PROCESS: ["yield_rate", "throughput"],
+    
+    # 2. Occurrent - Event
+    NodeType.STRATEGIC_ACTION: ["investment_size", "purpose"],
+    NodeType.CORPORATE_EVENT: ["date", "impact_level"],
+    NodeType.MARKET_ENVIRONMENT: ["indicator", "trend"],
+    NodeType.POLICY_EVENT: ["impact_scope", "severity"],
+    
+    # 2. Occurrent - Observation [NEW]
+    NodeType.OBSERVATION: ["value", "unit", "date", "confidence", "source_text"],
+    
+    # 2. Occurrent - TemporalRegion
+    NodeType.TEMPORAL_REGION: ["date", "quarter", "year"],
+    
+    # 3. Risk & Opportunity
+    NodeType.RISK_FACTOR: ["risk_level", "probability"],
+    NodeType.GEOPOLITICAL_RISK: ["region", "impact_severity", "event_reference"],
+    NodeType.SUPPLY_CHAIN_RISK: ["component", "delay_time", "alternative"],
+    NodeType.OPPORTUNITY_FACTOR: ["potential_size", "timeframe"],
+    
+    # Missing Types (Abstract & Others)
+    NodeType.SEMICONDUCTOR_ENTITY: ["description"],
+    NodeType.ORGANIZATION_TYPE: ["type_name"],
+    NodeType.INFORMATION_OBJECT: ["title", "source"],
+    NodeType.OCCURRENT: ["date"],
+    NodeType.PROCESS: ["status"],
+    NodeType.FRONT_END_PROCESS: ["step_name", "equipment"],
+    NodeType.BACK_END_PROCESS: ["packaging_type", "test_result"],
+    NodeType.QUALITY: ["value"],
+    NodeType.ROLE: ["role_name"],
+    NodeType.PHYSICAL_OBJECT: ["material"],
+    
+    # Legacy/Compatibility
     NodeType.COMPANY: ["ticker", "industry", "country"],
     NodeType.PRODUCT: ["category", "launch_date"],
     NodeType.EVENT: ["date", "event_type", "importance"],
     NodeType.METRIC: ["value", "unit", "period"],
     NodeType.TREND: ["pattern", "period", "trend_type"],
-    NodeType.FINANCIAL: ["period", "revenue", "profit", "debt"],
     NodeType.TECHNOLOGY: ["generation", "status", "description"],
     NodeType.PERSON: ["role", "company", "expertise"]
 }
