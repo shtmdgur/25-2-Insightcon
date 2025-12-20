@@ -12,7 +12,7 @@ from datetime import datetime
 
 from .base_parser_agent import BaseParserAgent
 from src.models.nodes import KnowledgeGraph, Entity, Relation, NodeType, RelationType
-from src.utils.time_series_processor import TimeSeriesProcessor
+from src.dataflows.time_series_processor import TimeSeriesProcessor
 from src.utils.neo4j_client import Neo4jClient
 
 logger = logging.getLogger(__name__)

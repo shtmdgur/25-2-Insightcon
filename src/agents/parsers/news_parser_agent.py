@@ -12,7 +12,7 @@ from datetime import datetime
 
 from .base_parser_agent import BaseParserAgent
 from src.models.nodes import KnowledgeGraph, Entity, Relation, NodeType, RelationType
-from src.utils.event_extractor import EventExtractor
+from src.dataflows.event_extractor import EventExtractor
 
 logger = logging.getLogger(__name__)
 

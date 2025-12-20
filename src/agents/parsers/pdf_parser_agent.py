@@ -1,96 +1,168 @@
 """
-PDF Parser Agent
+Gemini PDF Native Parser
 
-GeminiPDFParser를 래핑하여 PDF 파일을 Knowledge Graph로 변환합니다.
+PDF를 Gemini API에 직접 업로드하여 Structured Output으로
+Knowledge Graph(엔티티/관계)를 추출합니다.
+
+특징:
+- PDF 전체를 문맥으로 이해
+- Structured JSON Schema로 일관된 출력
+- Neo4j 바로 주입 가능
+- Batch API 지원 (비용 절감)
 """
-
-from pathlib import Path
-from typing import Dict, Any
+import os
 import logging
+import yaml
+from typing import Dict, Any, Optional
+from pathlib import Path
+from google import genai
+from google.genai import types
 
-from .base_parser_agent import BaseParserAgent
-from src.models.nodes import KnowledgeGraph
-from src.parsers.gemini_pdf import GeminiPDFParser
+from src.dataflows.parser_interface import ParserInterface
+from src.utils.gemini_files import get_gemini_files_client
+from src.models.nodes import KnowledgeGraph, get_kg_json_schema
 
 logger = logging.getLogger(__name__)
 
+# Gemini Client 초기화
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-class PDFParserAgent(BaseParserAgent):
+# Prompts YAML 로드
+PROMPTS_FILE = Path(__file__).parent.parent / "templates" / "prompts.yaml"
+with open(PROMPTS_FILE, 'r', encoding='utf-8') as f:
+    PROMPTS = yaml.safe_load(f)
+
+
+class GeminiPDFParser(ParserInterface):
     """
-    PDF 파싱 전담 Sub-Agent
+    Gemini PDF Native Parser
     
-    GeminiPDFParser를 사용하여 PDF에서 Knowledge Graph를 추출합니다.
+    PDF를 Gemini에 직접 분석시켜 Knowledge Graph JSON 추출
     """
     
-    def __init__(self, use_batch: bool = False):
+    def __init__(
+        self,
+        model_name: str = "gemini-2.5-pro",
+        use_batch: bool = False # 테스트 단계에서는 False, 향후 True로 변경
+    ):
         """
         Args:
-            use_batch: Batch API 사용 여부 (대량 PDF 처리 시)
+            model_name: Gemini 모델 이름 (기본: gemini-2.5-pro)
+            use_batch: Batch API 사용 여부 (비용 50% 절감)
         """
-        super().__init__(name="PDFParserAgent")
+        self.model_name = model_name
         self.use_batch = use_batch
-        self.parser = GeminiPDFParser(use_batch=use_batch)
+        self.files_client = get_gemini_files_client()
     
-    def parse(self, file_path: Path) -> KnowledgeGraph:
+    def parse_pdf_to_kg(self, file_path: str) -> KnowledgeGraph:
         """
-        PDF 파일을 파싱하여 Knowledge Graph 추출
-        
-        Args:
-            file_path: PDF 파일 경로
-        
-        Returns:
-            KnowledgeGraph 객체
-        
-        Raises:
-            ValueError: PDF 파싱 실패 시
+        PDF를 Knowledge Graph 객체로 파싱 (PDFParserAgent 호환용)
         """
-        if not file_path.exists():
-            raise ValueError(f"File not found: {file_path}")
-        
-        if file_path.suffix.lower() != '.pdf':
-            raise ValueError(f"Not a PDF file: {file_path}")
-        
+        result = self.parse(file_path)
+        return KnowledgeGraph.from_gemini_dict(result)
+
+    def parse(self, file_path: str) -> Dict[str, Any]:
+        """
+        PDF를 Knowledge Graph로 파싱
+        """
         try:
-            self.logger.info(f"Parsing PDF: {file_path}")
+            logger.info(f"Uploading PDF to Gemini: {file_path}")
             
-            # GeminiPDFParser 호출
-            kg = self.parser.parse_pdf_to_kg(str(file_path))
+            # 1. PDF 업로드
+            file_uri = self.files_client.upload_file(file_path)
             
-            # 메타데이터 추가
-            kg.metadata.update({
-                "source_file": str(file_path),
-                "file_type": "pdf"
-            })
+            # 2. Structured Output으로 Knowledge Graph 추출
+            logger.info("Extracting Knowledge Graph with Gemini Structured Output...")
             
-            self.logger.info(
-                f"PDF parsed successfully: {len(kg.entities)} entities, "
-                f"{len(kg.relations)} relations"
+            kg_json = self._extract_knowledge_graph(file_uri)
+            
+            # 3. JSON 파일로 저장 (data/processed/)
+            import os
+            from datetime import datetime
+            from pathlib import Path
+            
+            # 파일명 생성: {file_id}_{timestamp}.json
+            file_id = Path(file_path).stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # 프로젝트 루트 기준 경로
+            project_root = Path(__file__).parent.parent.parent.parent
+            processed_dir = project_root / "data" / "processed"
+            json_path = processed_dir / f"{file_id}_{timestamp}.json"
+            
+            # KnowledgeGraph 객체 생성 (저장용)
+            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
+            knowledge_graph.save_to_json(str(json_path))
+            
+            return kg_json  # Dict 반환
+            
+            logger.info(f"Saved KG to: {json_path}")
+            
+            logger.info(
+                f"Extracted {len(knowledge_graph.entities)} entities "
+                f"and {len(knowledge_graph.relations)} relations"
             )
             
-            return kg
+            return {
+                "knowledge_graph": knowledge_graph,
+                "raw_json": kg_json,
+                "metadata": {
+                    "parser": "Gemini-PDF-Native",
+                    "model": self.model_name,
+                    "entity_count": len(knowledge_graph.entities),
+                    "relation_count": len(knowledge_graph.relations),
+                    "file_path": file_path,
+                    "json_path": str(json_path)  # JSON 저장 경로 추가
+                }
+            }
             
         except Exception as e:
-            self.logger.error(f"Failed to parse PDF {file_path}: {str(e)}")
-            raise ValueError(f"PDF parsing failed: {str(e)}")
+            logger.error(f"Gemini PDF parsing failed: {str(e)}")
+            raise RuntimeError(f"Gemini PDF parsing failed: {str(e)}")
     
-    def validate(self, data: Dict[str, Any]) -> bool:
+    def _extract_knowledge_graph(self, file_uri: str) -> dict:
         """
-        파싱된 데이터 검증
+        Gemini Structured Output으로 Knowledge Graph 추출
         
         Args:
-            data: 검증할 데이터
+            file_uri: Gemini Files API URI
         
         Returns:
-            검증 성공 여부
+            Knowledge Graph JSON
         """
-        # 기본 검증: entities와 relations 키 존재 여부
-        if "entities" not in data or "relations" not in data:
-            self.logger.warning("Missing entities or relations in data")
-            return False
+        # YAML에서 프롬프트 로드
+        prompt = PROMPTS.get('gemini_pdf_parser', {}).get('kg_extraction', {}).get('instruction', '')
         
-        # 최소 엔티티 수 확인
-        if len(data["entities"]) == 0:
-            self.logger.warning("No entities extracted from PDF")
-            return False
+        # Fallback: YAML에 없으면 에러 발생 (명시적 실패)
+        if not prompt:
+            raise RuntimeError(
+                "Prompt not found in prompts.yaml at 'gemini_pdf_parser.kg_extraction.instruction'. "
+                "Please check the YAML file configuration."
+            )
         
-        return True
+        # Gemini API 호출 (Structured Output)
+        response = client.models.generate_content(
+            model=self.model_name,
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "fileData": {
+                                "fileUri": file_uri,
+                                "mimeType": "application/pdf"
+                            }
+                        }
+                    ]
+                }
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=get_kg_json_schema()
+            )
+        )
+        
+        # JSON 파싱
+        import json
+        return json.loads(response.text)
