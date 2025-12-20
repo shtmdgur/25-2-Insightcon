@@ -19,7 +19,7 @@ from src.agents.parsers.fund_parser_agent import FundParserAgent
 
 from src.models.nodes import KnowledgeGraph
 from src.dataflows.kg_merger import KGMerger
-from src.utils.entity_normalizer import get_entity_normalizer
+from src.dataflows.entity_normalizer import get_entity_normalizer
 from src.dataflows.neo4j_loader import Neo4jKGLoader
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class KGConstructionAgent:
         Args:
             data_dir: 데이터 루트 디렉토리 (기본: ./data)
             neo4j_uri: Neo4j 연결 URI
-            llm: LLM 모델 (NewsParser용, PDFParser는 독립적으로 LLM 생성)
+            llm: LLM 모델 (NewsParser용)
         """
         import os
         from dotenv import load_dotenv
@@ -60,10 +60,10 @@ class KGConstructionAgent:
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         
         # Parser Agents 초기화
-        self.pdf_parser = PDFParserAgent()  # 내부에서 독립적으로 LLM 생성
+        self.pdf_parser = PDFParserAgent(use_batch=False)
         self.price_parser = PriceParserAgent()
         self.dart_parser = DARTParserAgent()
-        self.news_parser = NewsParserAgent(llm=llm) if llm else NewsParserAgent()  # LLM 전달
+        self.news_parser = NewsParserAgent(llm=llm) if llm else NewsParserAgent()
         self.macro_parser = MacroParserAgent()
         self.fund_parser = FundParserAgent()
         
@@ -233,10 +233,7 @@ class KGConstructionAgent:
         # PDF Parser
         if data_sources.get('pdf'):
             logger.info(f"Running PDFParserAgent ({len(data_sources['pdf'])} files)")
-            results['pdf'] = self.pdf_parser.batch_parse(
-                data_sources['pdf'],
-                self.processed_dir
-            )
+            results['pdf'] = self.pdf_parser.batch_parse(data_sources['pdf'])
         
         # Price Parser
         if data_sources.get('price'):
@@ -285,6 +282,64 @@ class KGConstructionAgent:
             )
         
         return results
+    
+    def _batch_parse_pdfs(self, pdf_files: List[Path]) -> Dict[str, Any]:
+        """
+        PDF 파일 배치 파싱
+        
+        Args:
+            pdf_files: PDF 파일 경로 리스트
+        
+        Returns:
+            파싱 결과 통계
+        """
+        total = len(pdf_files)
+        success = 0
+        failed = 0
+        errors = []
+        
+        for pdf_file in pdf_files:
+            try:
+                # 파일 검증
+                if not pdf_file.exists():
+                    raise ValueError(f"File not found: {pdf_file}")
+                if pdf_file.suffix.lower() != '.pdf':
+                    raise ValueError(f"Not a PDF file: {pdf_file}")
+                
+                # PDFParserAgent로 파싱
+                logger.info(f"Parsing PDF: {pdf_file}")
+                kg = self.pdf_parser.parse_pdf_to_kg(str(pdf_file))
+                
+                # 메타데이터 추가
+                kg.metadata.update({
+                    "source_file": str(pdf_file),
+                    "file_type": "pdf"
+                })
+                
+                # JSON 저장
+                output_file = self.processed_dir / f"{pdf_file.stem}_kg.json"
+                kg.save_to_json(str(output_file))
+                
+                logger.info(
+                    f"PDF parsed: {pdf_file.name} → "
+                    f"{len(kg.entities)} entities, {len(kg.relations)} relations"
+                )
+                success += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to parse {pdf_file}: {str(e)}")
+                errors.append(f"{pdf_file.name}: {str(e)}")
+                failed += 1
+        
+        result = {
+            'total': total,
+            'success': success,
+            'failed': failed
+        }
+        if errors:
+            result['errors'] = errors
+        
+        return result
     
     def _collect_json_files(self) -> List[Path]:
         """

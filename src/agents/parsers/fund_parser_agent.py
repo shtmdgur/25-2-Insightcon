@@ -11,7 +11,7 @@ import pandas as pd
 
 from .base_parser_agent import BaseParserAgent
 from src.models.nodes import KnowledgeGraph, Entity, Relation, NodeType, RelationType
-from src.utils.entity_normalizer import get_entity_normalizer
+from src.dataflows.entity_normalizer import get_entity_normalizer
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,15 @@ from typing import List, Dict, Any
 from datetime import datetime
 import numpy as np
 
+import yaml
+from pathlib import Path
+
 logger = logging.getLogger(__name__)
+
+# Prompts YAML 로드
+PROMPTS_FILE = Path(__file__).parent.parent / "templates" / "prompts.yaml"
+with open(PROMPTS_FILE, 'r', encoding='utf-8') as f:
+    PROMPTS = yaml.safe_load(f)
 
 
 class EventExtractor:
@@ -42,23 +50,17 @@ class EventExtractor:
         Returns:
             추출된 이벤트 정보
         """
-        prompt = f"""
-다음 뉴스에서 중요한 경제/기업 이벤트를 추출하세요.
-
-뉴스:
-{news_text}
-
-이벤트 형식 (JSON):
-{{
-    "event_type": "금리 변경 | 실적 발표 | M&A | 제품 출시 | 규제 변경",
-    "description": "이벤트 설명 (1-2문장)",
-    "affected_entities": ["영향받는 기업 또는 제품"],
-    "importance": 1-10,
-    "impact": "positive | negative | neutral"
-}}
-
-이벤트가 없으면 빈 리스트 반환: []
-"""
+        # YAML에서 프롬프트 로드
+        prompt_template = PROMPTS.get('event_extractor', {}).get('news_extraction', {}).get('instruction', '')
+        
+        if not prompt_template:
+            raise RuntimeError(
+                "Prompt not found in prompts.yaml at 'event_extractor.news_extraction.instruction'. "
+                "Please check the YAML file configuration."
+            )
+        
+        # 템플릿에 news_text 삽입
+        prompt = prompt_template.replace('{news_text}', news_text)
         
         try:
             response = self.llm.invoke(prompt)
