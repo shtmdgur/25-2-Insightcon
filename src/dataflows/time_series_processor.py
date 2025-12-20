@@ -7,6 +7,8 @@ import logging
 from typing import List, Dict, Any
 import numpy as np
 
+from ..models.nodes import NodeType
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,19 +72,24 @@ class TimeSeriesProcessor:
         # 트렌드 분류
         trend_type = self._classify_trend(sax_string, prices)
         
-        # Neo4j에 Trend 노드 생성
+        # Neo4j에 Trend 노드 생성 (NodeType Enum 사용)
         try:
-            self.neo4j_client.run("""
-                MATCH (c:Company {ticker: $ticker})
-                MERGE (t:Trend {
+            company_type_label = NodeType.COMPANY.value
+            trend_type_label = NodeType.TREND.value
+            
+            query = f"""
+                MATCH (c:{company_type_label} {{ticker: $ticker}})
+                MERGE (t:{trend_type_label} {{
                     period: $period,
                     company_ticker: $ticker
-                })
+                }})
                 SET t.pattern = $sax_string,
                     t.trend_type = $trend_type,
                     t.last_updated = datetime()
                 MERGE (c)-[:HAS_TREND]->(t)
-            """, {
+            """
+            
+            self.neo4j_client.run(query, {
                 "ticker": company_ticker,
                 "period": period,
                 "sax_string": str(sax_string),

@@ -11,6 +11,8 @@ import numpy as np
 import yaml
 from pathlib import Path
 
+from ..models.nodes import NodeType
+
 logger = logging.getLogger(__name__)
 
 # Prompts YAML 로드
@@ -109,9 +111,12 @@ class EventExtractor:
             # Time decay 가중치 계산
             weight = self._calculate_time_decay(date)
             
-            # Event 노드 생성
-            self.neo4j_client.run("""
-                CREATE (e:Event {
+            # Event 노드 생성 (NodeType Enum 사용)
+            event_type_label = NodeType.EVENT.value
+            company_type_label = NodeType.COMPANY.value
+            
+            query = f"""
+                CREATE (e:{event_type_label} {{
                     type: $event_type,
                     description: $description,
                     date: date($date),
@@ -120,12 +125,14 @@ class EventExtractor:
                     source: $source,
                     weight: $weight,
                     created_at: datetime()
-                })
+                }})
                 WITH e
                 UNWIND $affected_entities AS entity_name
-                MATCH (c:Company {name: entity_name})
-                MERGE (e)-[:AFFECTS {weight: $weight}]->(c)
-            """, {
+                MATCH (c:{company_type_label} {{name: entity_name}})
+                MERGE (e)-[:AFFECTS {{weight: $weight}}]->(c)
+            """
+            
+            self.neo4j_client.run(query, {
                 "event_type": event.get("event_type", "Unknown"),
                 "description": event.get("description", ""),
                 "date": date,

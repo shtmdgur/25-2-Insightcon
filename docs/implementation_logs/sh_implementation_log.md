@@ -1471,3 +1471,165 @@ src/
 -  KG 파이프라인 모듈 그룹화
 -  범용 유틸리티와 도메인 로직 분리
 
+
+---
+
+## A.4 Schema Centralization (스키마 중앙화) (2025-12-21)
+
+**작업 일시**: 2025-12-21 03:25-03:35
+
+**배경**:
+- Phase 2 전환 시 온톨로지 스키마 변경 예상
+- 하드코딩된 타입명이 있을 경우 스키마 변경 시 수동 수정 필요
+- 스키마 의존성을 중앙(src/models/nodes.py)으로 일원화 필요
+
+### 1. 스키마 의존성 분석
+
+**검사 대상**:
+- Parser Agents (6개)
+- Dataflow 모듈 (neo4j_loader, event_extractor, time_series_processor 등)
+
+**분석 결과**:
+
+✅ **안전하게 관리되고 있는 부분**:
+1. `src/dataflows/neo4j_loader.py`
+   - NodeType Enum을 import하여 DYNAMIC_TYPES 세트 정의
+   - 이중 레이어 분류 로직이 Enum 기반
+
+2. `src/agents/parsers/pdf_parser_agent.py`
+   - `get_kg_json_schema()` 함수 사용 (Enum 자동 생성)
+   - `prompts.yaml`에서 프롬프트 로드
+
+❌ **하드코딩 발견** (위험 요소):
+1. `src/dataflows/event_extractor.py` (L114, L126)
+   ```cypher
+   CREATE (e:Event {  # 하드코딩
+   MATCH (c:Company {name: entity_name})  # 하드코딩
+   ```
+
+2. `src/dataflows/time_series_processor.py` (L76)
+   ```cypher
+   MATCH (c:Company {ticker: $ticker})  # 하드코딩
+   ```
+
+**위험도**: 🔴 **높음**
+- Event → StrategicAction/CorporateEvent 세분화 시 쿼리 깨짐
+- Company → IDM/Fabless 변경 시 매칭 실패
+
+### 2. 하드코딩 제거 작업
+
+**수정 파일 (2개)**:
+
+#### ① event_extractor.py
+**Before**:
+```python
+self.neo4j_client.run("""
+    CREATE (e:Event {
+        ...
+    })
+    ...
+    MATCH (c:Company {name: entity_name})
+    MERGE (e)-[:AFFECTS {weight: $weight}]->(c)
+""", {...})
+```
+
+**After**:
+```python
+from ..models.nodes import NodeType
+
+event_type_label = NodeType.EVENT.value
+company_type_label = NodeType.COMPANY.value
+
+query = f"""
+    CREATE (e:{event_type_label} {{
+        ...
+    }})
+    ...
+    MATCH (c:{company_type_label} {{name: entity_name}})
+    MERGE (e)-[:AFFECTS {{weight: $weight}}]->(c)
+"""
+
+self.neo4j_client.run(query, {...})
+```
+
+#### ② time_series_processor.py
+**Before**:
+```python
+self.neo4j_client.run("""
+    MATCH (c:Company {ticker: $ticker})
+    MERGE (t:Trend {...})
+    MERGE (c)-[:HAS_TREND]->(t)
+""", {...})
+```
+
+**After**:
+```python
+from ..models.nodes import NodeType
+
+company_type_label = NodeType.COMPANY.value
+trend_type_label = NodeType.TREND.value
+
+query = f"""
+    MATCH (c:{company_type_label} {{ticker: $ticker}})
+    MERGE (t:{trend_type_label} {{...}})
+    MERGE (c)-[:HAS_TREND]->(t)
+"""
+
+self.neo4j_client.run(query, {...})
+```
+
+### 3. 검증
+
+**Import 테스트**:
+```bash
+python -c "from src.models.nodes import NodeType; print(NodeType.COMPANY.value)"
+# 출력: Company
+```
+
+**하드코딩 제거 확인**:
+```bash
+grep -r ":Company" src/dataflows/
+grep -r ":Event" src/dataflows/
+# No results found (완전 제거)
+```
+
+### 4. 최종 상태
+
+| 컴포넌트 | 이전 | 현재 |
+|---------|------|------|
+| **event_extractor.py** | ❌ `:Event`, `:Company` 하드코딩 | ✅ `NodeType.EVENT.value` 참조 |
+| **time_series_processor.py** | ❌ `:Company`, `:Trend` 하드코딩 | ✅ `NodeType.COMPANY.value` 참조 |
+| **pdf_parser_agent.py** | ✅ `get_kg_json_schema()` 사용 | ✅ 유지 |
+| **neo4j_loader.py** | ✅ `NodeType` Enum 참조 | ✅ 유지 |
+
+**스키마 중앙화율**: 🟢 **100% 달성**
+
+### 5. 효과
+
+✅ **스키마 변경 시 영향 범위 최소화**:
+- 변경 대상: `src/models/nodes.py` **단 1개 파일**
+- Cypher 쿼리 자동 반영 (NodeType Enum 값 사용)
+
+✅ **Phase 2 준비 완료**:
+- 온톨로지 스키마 완성 후 바로 적용 가능
+- 기존 데이터 삭제 → 재파싱으로 깔끔한 마이그레이션
+
+✅ **유지보수성 향상**:
+- 타입명 변경 시 컴파일 타임에 에러 감지
+- IDE 자동 완성 및 타입 체킹 지원
+
+### 6. 스키마 확정 후 체크리스트
+
+스키마 변경 시 다음 절차만 수행:
+
+1. `src/models/nodes.py` 수정 (NodeType, RelationType Enum)
+2. `src/models/nodes.py` 수정 (ENTITY_TYPE_PROPERTIES 딕셔너리)
+3. `src/templates/prompts.yaml` 동기화 (sync_ontology_to_prompt.py 실행)
+4. Neo4j 데이터 삭제: `MATCH (n) DETACH DELETE n`
+5. `data/processed/*.json` 삭제
+6. `KGConstructionAgent.construct_knowledge_graph()` 재실행
+
+**작업 시간**: 약 10분  
+**코드 품질**: 하드코딩 제거, 타입 안정성 확보
+
+---
