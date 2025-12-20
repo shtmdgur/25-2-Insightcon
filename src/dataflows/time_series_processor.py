@@ -1,5 +1,5 @@
 """
-시계열 데이터 처리 (SAX 패턴 변환)
+시계열 데이터 처리 (SAX-DM 패턴 변환)
 
 주가 데이터를 패턴으로 변환하여 Neo4j에 저장합니다.
 """
@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 class TimeSeriesProcessor:
     """
-    시계열 데이터를 SAX 패턴으로 변환
+    시계열 데이터를 SAX-DM 패턴으로 변환
     
-    SAX (Symbolic Aggregate approXimation)를 사용하여
+    SAX-DM (Symbolic Aggregate approXimation - Direction & Magnitude)를 사용하여
     시계열 데이터를 문자열 패턴으로 변환합니다.
     """
     
@@ -33,7 +33,7 @@ class TimeSeriesProcessor:
         window_size: int = 5
     ) -> Dict[str, Any]:
         """
-        주가 시계열을 SAX로 변환하여 Neo4j에 저장
+        주가 시계열을 SAX-DM으로 변환하여 Neo4j에 저장
         
         Args:
             company_ticker: 기업 종목 코드
@@ -49,7 +49,7 @@ class TimeSeriesProcessor:
             return {"error": "insufficient_data"}
         
         try:
-            # SAX 패턴 변환
+            # SAX-DM 패턴 변환
             from saxpy.sax import sax_via_window
             
             sax_string = sax_via_window(
@@ -64,7 +64,7 @@ class TimeSeriesProcessor:
             logger.warning("saxpy not installed. Using simple trend classification.")
             sax_string = self._simple_trend_classification(prices)
         except Exception as e:
-            logger.error(f"SAX conversion failed: {str(e)}")
+            logger.error(f"SAX-DM conversion failed: {str(e)}")
             sax_string = "unknown"
         
         # 트렌드 분류
@@ -104,7 +104,7 @@ class TimeSeriesProcessor:
     
     def _simple_trend_classification(self, prices: List[float]) -> str:
         """
-        SAX 없이 간단한 트렌드 분류
+        SAX-DM 없이 간단한 트렌드 분류
         
         Args:
             prices: 주가 리스트
@@ -125,10 +125,10 @@ class TimeSeriesProcessor:
     
     def _classify_trend(self, sax_string: str, prices: List[float]) -> str:
         """
-        SAX 패턴 기반 트렌드 분류
+        SAX-DM 패턴 기반 트렌드 분류
         
         Args:
-            sax_string: SAX 패턴
+            sax_string: SAX-DM 패턴
             prices: 원본 주가 데이터
         
         Returns:

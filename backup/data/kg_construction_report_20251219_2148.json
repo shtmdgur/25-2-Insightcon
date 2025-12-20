@@ -1,0 +1,65 @@
+{
+  "parser_results": {
+    "pdf": {
+      "total": 2,
+      "success": 2,
+      "failed": 0,
+      "errors": []
+    },
+    "price": {
+      "total": 3,
+      "success": 3,
+      "failed": 0,
+      "errors": []
+    },
+    "dart": {
+      "total": 1,
+      "success": 1,
+      "failed": 0
+    },
+    "news": {
+      "total": 1,
+      "success": 1,
+      "failed": 0,
+      "errors": []
+    },
+    "macro": {
+      "total": 1,
+      "success": 1,
+      "failed": 0,
+      "errors": []
+    },
+    "fund": {
+      "total": 2,
+      "success": 2,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "json_files": [
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\000660.KS_prices_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\000990.KS_prices_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\005930.KS_prices_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\005930_fundamentals_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\20200102_Semiconductor_미래에셋증권_12월 Memory 고정거래가격 Review_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\20200102_Semiconductor_하나증권_12월 수출 감소율 완화되어 긍정적_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\dart_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\fred_rates_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\global_semis_fundamentals_kg.json",
+    "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\processed\\Semiconductor_News_Raw_20251210_kg.json"
+  ],
+  "json_files_count": 10,
+  "merged_kg_summary": {
+    "entities": 297,
+    "relations": 101
+  },
+  "neo4j_stats": {
+    "static_nodes": 297,
+    "dynamic_nodes": 0,
+    "relationships_created": 101
+  },
+  "layers": {
+    "static": 14,
+    "dynamic": 283
+  }
+}

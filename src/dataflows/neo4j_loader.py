@@ -114,9 +114,9 @@ class Neo4jKGLoader:
         """
         Entity를 정적/동적 레이어로 분류
         
-        T-Box 2.0 업데이트: 
-        대부분의 온톨로지 엔티티는 고유 ID를 가지므로 'static' (MERGE)으로 처리하여 
-        재실행 시 중복을 방지합니다. (Idempotency 보장)
+        T-Box 2.0 기반 분류:
+        - **Dynamic (CREATE)**: 시간 종속적 노드 (Observation, Event, Metric 등)
+        - **Static (MERGE)**: 시간 불변 노드 (Company, Product, Technology 등)
         
         Args:
             entity: Entity 객체
@@ -124,13 +124,33 @@ class Neo4jKGLoader:
         Returns:
             'static' (MERGE) 또는 'dynamic' (CREATE)
         """
-        # 기본적으로 모든 정의된 Node Type은 Static으로 처리하여 중복 방지
-        # Dynamic은 ID가 없거나 단순 로그성 데이터인 경우에만 사용
+        from ..models.nodes import NodeType
         
-        # dynamic_types = {'SomeLogType'} 
-        # return 'dynamic' if entity.type.value in dynamic_types else 'static'
+        # 동적 타입: 시간 종속적 노드 (T-Box 2.0 기준)
+        DYNAMIC_TYPES = {
+            # Occurrent (시간 종속)
+            NodeType.OBSERVATION,
+            NodeType.TEMPORAL_REGION,
+            
+            # Event 계층
+            NodeType.EVENT,
+            NodeType.STRATEGIC_ACTION,
+            NodeType.CORPORATE_EVENT,
+            NodeType.MARKET_ENVIRONMENT,
+            NodeType.POLICY_EVENT,
+            
+            # Quality - Metric 계층 (시계열 데이터)
+            NodeType.FINANCIAL_METRIC,
+            NodeType.TECHNICAL_METRIC,
+            NodeType.MARKET_METRIC,
+            NodeType.METRIC,  # Generic
+            
+            # Trend
+            NodeType.TREND,
+        }
         
-        return 'static'
+        # 동적 타입이면 'dynamic', 아니면 'static'
+        return 'dynamic' if entity.type in DYNAMIC_TYPES else 'static'
     
     def _create_entity(self, session, entity: Entity):
         """엔티티(노드) 생성 (기존 방식 - MERGE)"""
@@ -181,8 +201,12 @@ class Neo4jKGLoader:
         동적 Entity 주입
         
         전략: CREATE (시계열 누적)
-        - Metric, Event, Trend, TimeSeries
-        - 매번 새 노드 생성 (시간 속성 필수)
+        - Observation, TemporalRegion
+        - Event, StrategicAction, CorporateEvent, MarketEnvironment
+        - FinancialMetric, TechnicalMetric, MarketMetric
+        - Trend
+        
+        매번 새 노드 생성 (시간 속성 필수)
         """
         from datetime import datetime as dt
         

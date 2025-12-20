@@ -1,0 +1,482 @@
+{
+  "entities": [
+    {
+      "name": "반도체",
+      "type": "Semiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "DRAM",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "MCP",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Flash",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "SSD",
+      "type": "MemorySemiconductor",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Wafer",
+      "type": "PhysicalObject",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "IT 품목",
+      "type": "Product",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "2019-10",
+      "type": "TemporalRegion",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "2019-11",
+      "type": "TemporalRegion",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "2019-12",
+      "type": "TemporalRegion",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "2020",
+      "type": "TemporalRegion",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "미중 무역분쟁 1단계 합의",
+      "type": "MarketEnvironment",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "연말 쇼핑시즌",
+      "type": "MarketEnvironment",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "5G 전환",
+      "type": "MarketEnvironment",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "데이터센터 수요 증가",
+      "type": "MarketEnvironment",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "메모리 반도체 공급 과잉 해소",
+      "type": "MarketEnvironment",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "반도체 수출 물량 회복",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "반도체 수출 금액 성장",
+      "type": "Trend",
+      "properties": {},
+      "confidence": 0.9
+    },
+    {
+      "name": "Obs_Semicon_Export_Value_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Semicon_Export_Value_YoY_2019-11",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Semicon_Export_Volume_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Semicon_Export_Volume_YoY_2019-11",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Semicon_Export_Volume_YoY_2019-10",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_DRAM_Export_Value_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_DRAM_Export_Volume_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_MCP_Export_Value_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_MCP_Export_Volume_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Flash_Export_Value_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Flash_Export_Volume_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_SSD_Export_Value_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_SSD_Export_Volume_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Wafer_Export_Value_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_Wafer_Export_Volume_YoY_2019-12",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    },
+    {
+      "name": "Obs_IT_Export_Forecast_YoY_2020",
+      "type": "Observation",
+      "properties": {},
+      "confidence": 1.0
+    }
+  ],
+  "relations": [
+    {
+      "subject": "Obs_Semicon_Export_Value_YoY_2019-12",
+      "predicate": "observes",
+      "object": "반도체",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Value_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Value_YoY_2019-11",
+      "predicate": "observes",
+      "object": "반도체",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Value_YoY_2019-11",
+      "predicate": "recordedAt",
+      "object": "2019-11",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Volume_YoY_2019-12",
+      "predicate": "observes",
+      "object": "반도체",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Volume_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Volume_YoY_2019-11",
+      "predicate": "observes",
+      "object": "반도체",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Volume_YoY_2019-11",
+      "predicate": "recordedAt",
+      "object": "2019-11",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Volume_YoY_2019-10",
+      "predicate": "observes",
+      "object": "반도체",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Semicon_Export_Volume_YoY_2019-10",
+      "predicate": "recordedAt",
+      "object": "2019-10",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_DRAM_Export_Value_YoY_2019-12",
+      "predicate": "observes",
+      "object": "DRAM",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_DRAM_Export_Value_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_DRAM_Export_Volume_YoY_2019-12",
+      "predicate": "observes",
+      "object": "DRAM",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_DRAM_Export_Volume_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_MCP_Export_Value_YoY_2019-12",
+      "predicate": "observes",
+      "object": "MCP",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_MCP_Export_Value_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_MCP_Export_Volume_YoY_2019-12",
+      "predicate": "observes",
+      "object": "MCP",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_MCP_Export_Volume_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Flash_Export_Value_YoY_2019-12",
+      "predicate": "observes",
+      "object": "Flash",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Flash_Export_Value_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Flash_Export_Volume_YoY_2019-12",
+      "predicate": "observes",
+      "object": "Flash",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Flash_Export_Volume_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_SSD_Export_Value_YoY_2019-12",
+      "predicate": "observes",
+      "object": "SSD",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_SSD_Export_Value_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_SSD_Export_Volume_YoY_2019-12",
+      "predicate": "observes",
+      "object": "SSD",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_SSD_Export_Volume_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Wafer_Export_Value_YoY_2019-12",
+      "predicate": "observes",
+      "object": "Wafer",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Wafer_Export_Value_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Wafer_Export_Volume_YoY_2019-12",
+      "predicate": "observes",
+      "object": "Wafer",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_Wafer_Export_Volume_YoY_2019-12",
+      "predicate": "recordedAt",
+      "object": "2019-12",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_IT_Export_Forecast_YoY_2020",
+      "predicate": "observes",
+      "object": "IT 품목",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "Obs_IT_Export_Forecast_YoY_2020",
+      "predicate": "recordedAt",
+      "object": "2020",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "미중 무역분쟁 1단계 합의",
+      "predicate": "affects",
+      "object": "반도체 수출 물량 회복",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "연말 쇼핑시즌",
+      "predicate": "affects",
+      "object": "반도체 수출 물량 회복",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "5G 전환",
+      "predicate": "affects",
+      "object": "반도체 수출 금액 성장",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "데이터센터 수요 증가",
+      "predicate": "affects",
+      "object": "반도체 수출 금액 성장",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "메모리 반도체 공급 과잉 해소",
+      "predicate": "affects",
+      "object": "반도체 수출 금액 성장",
+      "weight": 1.0,
+      "source": null
+    },
+    {
+      "subject": "반도체 수출 물량 회복",
+      "predicate": "realizedBy",
+      "object": "Obs_Semicon_Export_Volume_YoY_2019-12",
+      "weight": 1.0,
+      "source": null
+    }
+  ],
+  "metadata": {
+    "source_file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\reports\\20200102_Semiconductor_하나증권_12월 수출 감소율 완화되어 긍정적.pdf",
+    "file_type": "pdf",
+    "parser": "PDFParserAgent",
+    "created_at": "2025-12-19T21:47:30.571483"
+  }
+}

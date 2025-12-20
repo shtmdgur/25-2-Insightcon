@@ -219,195 +219,32 @@ vlm_parser:
       - 이미지에 텍스트만 있다면 extracted_text에 모두 기록하세요
 
 # ==========================================
-# 5. Gemini PDF Native Parser (PDF → Knowledge Graph)
+# 5. Event Extractor (뉴스 이벤트 추출)
 # ==========================================
 
-gemini_pdf_parser:
-  kg_extraction:
-    role: "금융 도메인 Knowledge Graph 전문가"
-    goal: "PDF 문서에서 엔티티와 관계를 추출하여 Neo4j에 주입 가능한 그래프로 변환"
+event_extractor:
+  news_extraction:
+    role: "Event-Driven Analyst"
+    goal: "Extract important economic and corporate events from news articles"
     instruction: |
-      # Role
-      당신은 금융/반도체 도메인 Knowledge Graph 전문가입니다. 
-      PDF 문서를 분석하여 구조화된 그래프 데이터를 추출하는 것이 목표입니다.
+      다음 뉴스에서 중요한 경제/기업 이벤트를 추출하세요.
       
-      # Task
-      이 PDF 문서를 분석하여 다음을 추출하세요:
+      뉴스:
+      {news_text}
       
-      ## 1. 엔티티(Entities) 추출
-      다음 7가지 타입의 엔티티를 식별하세요:
+      이벤트 형식 (JSON):
+      {{
+          "event_type": "금리 변경 | 실적 발표 | M&A | 제품 출시 | 규제 변경",
+          "description": "이벤트 설명 (1-2문장)",
+          "affected_entities": ["영향받는 기업 또는 제품"],
+          "importance": 1-10,
+          "impact": "positive | negative | neutral"
+      }}
       
-      ### Company (기업)
-      - id: 기업명 (예: "삼성전자", "SK하이닉스")
-      - name: 정식 기업명
-      - properties: 시가총액, 본사 위치, 산업 분류 등
-      
-      ### Product (제품)
-      - id: 제품명_카테고리 (예: "DRAM_DDR4", "NAND_TLC")
-      - name: 제품명
-      - properties: 카테고리, 사양, 출시일 등
-      
-      ### Metric (지표)
-      - id: 지표명_시점 (예: "Revenue_2024Q1", "MarketShare_2024")
-      - name: 지표 이름
-      - properties: **반드시 포함** - value(숫자), unit(단위), period(기간)
-      
-      ### Event (이벤트)
-      - id: 이벤트명_날짜 (예: "Product_Launch_20240315")
-      - name: 이벤트 설명
-      - properties: date(날짜), impact(영향), participants(참여자)
-      
-      ### Trend (트렌드)
-      - id: 트렌드_분야 (예: "Price_Decline_DRAM")
-      - name: 트렌드 설명
-      - properties: direction(상승/하락), magnitude(크기), timeframe(기간)
-      
-      ### Technology (기술)
-      - id: 기술명 (예: "1Xnm_Process", "AI_Chip")
-      - name: 기술 이름
-      - properties: generation(세대), status(개발상태)
-      
-      ### Person (인물)
-      - id: 이름_직책 (예: "김영건_애널리스트")
-      - name: 이름
-      - properties: role(역할), company(소속)
-      
-      ## 2. 관계(Relations) 추출
-      다음 관계 타입을 사용하세요.
-      
-      - **PRODUCES**: (Company) -[PRODUCES]-> (Product)
-        - 예: "삼성전자" -[PRODUCES]-> "DRAM_DDR4"
-      
-      - **COMPETES_WITH**: (Company) -[COMPETES_WITH]-> (Company)
-        - 예: "삼성전자" -[COMPETES_WITH]-> "SK하이닉스"
-      
-      - **SUPPLIES_TO**: (Company) -[SUPPLIES_TO]-> (Company)
-        - 예: "SK하이닉스" -[SUPPLIES_TO]-> "Dell"
-      
-      - **HAS_METRIC**: (Company/Product) -[HAS_METRIC]-> (Metric)
-        - 예: "삼성전자" -[HAS_METRIC]-> "Revenue_2024Q1"
-        - 예: "DRAM" -[HAS_METRIC]-> "Price_2024Q1"
-      
-      - **AFFECTED_BY**: (Company/Product) -[AFFECTED_BY]-> (Event/Trend)
-        - 예: "DRAM" -[AFFECTED_BY]-> "Price_Decline_2024"
-      
-      - **DEVELOPS**: (Company) -[DEVELOPS]-> (Technology)
-        - 예: "삼성전자" -[DEVELOPS]-> "10nm_Process"
-      
-      - **LEADS**: (Person) -[LEADS]-> (Company)
-        - 예: "김영건_애널리스트" -[LEADS]-> "미래에셋증권"
-      
-      **중요**: 
-      - 반드시 엔티티 간의 관계를 찾아서 생성하세요
-      - 최소 5개 이상의 관계를 만드세요
-      - 모든 Metric은 Company 또는 Product와 HAS_METRIC 관계를 가져야 합니다
-      - 문서에 언급된 회사들은 COMPETES_WITH로 연결하세요
-      
-      ## 3. 중요 지침
-      
-      ### ID 생성 규칙
-      - 한글/영어 사용 가능, 공백은 언더스코어(_)로
-      - 날짜 형식: YYYYMMDD 또는 YYYY-QN
-      - 같은 엔티티는 반드시 같은 ID 사용
-      
-      ### 데이터 품질
-      - 모든 숫자는 properties에 구조화하여 저장
-      - 단위 명시 (US$, %, 원, 조원, GB 등)
-      - 날짜/시점 정보 반드시 포함
-      - 불확실한 정보는 제외
-      
-      ### Metric 전용 규칙
-      - value: 숫자 (float 또는 int)
-      - unit: 단위 문자열
-      - period: 시간 정보 (예: "2024Q1", "2024-01", "2024")
-      - change_rate: MoM, YoY 등 변화율 (있을 경우)
-      
-      ### 관계 properties
-      - since: 관계 시작 시점 (날짜/연도)
-      - strength: 관계 강도 (0.0~1.0, 옵션)
-      - note: 추가 설명 (옵션)
-      
-      ## 4. 출력 형식
-      반드시 정의된 JSON Schema를 따라야 합니다:
-      - entities: Entity 객체 배열
-      - relations: Relation 객체 배열  
-      - metadata: 문서 출처, 날짜, 저자 등 (옵션)
-      
-      ## 5. 예시
-      ```json
-      {
-        "entities": [
-          {
-            "id": "삼성전자",
-            "label": "Company",
-            "name": "삼성전자",
-            "properties": "{\"industry\": \"반도체\"}"
-          },
-          {
-            "id": "SK하이닉스",
-            "label": "Company",
-            "name": "SK하이닉스",
-            "properties": "{\"industry\": \"반도체\"}"
-          },
-          {
-            "id": "DRAM",
-            "label": "Product",
-            "name": "DRAM",
-            "properties": "{\"category\": \"메모리\"}"
-          },
-          {
-            "id": "DRAM_Revenue_2024Q1",
-            "label": "Metric",
-            "name": "DRAM 매출",
-            "properties": "{\"value\": 15000000000, \"unit\": \"USD\", \"period\": \"2024Q1\"}"
-          },
-          {
-            "id": "Price_Decline_2024",
-            "label": "Trend",
-            "name": "가격 하락 추세",
-            "properties": "{\"direction\": \"하락\", \"timeframe\": \"2024\"}"
-          }
-        ],
-        "relations": [
-          {
-            "source_id": "삼성전자",
-            "target_id": "DRAM",
-            "type": "PRODUCES",
-            "properties": "{\"since\": \"2000\"}"
-          },
-          {
-            "source_id": "SK하이닉스",
-            "target_id": "DRAM",
-            "type": "PRODUCES",
-            "properties": null
-          },
-          {
-            "source_id": "삼성전자",
-            "target_id": "SK하이닉스",
-            "type": "COMPETES_WITH",
-            "properties": "{\"market\": \"DRAM\"}"
-          },
-          {
-            "source_id": "삼성전자",
-            "target_id": "DRAM_Revenue_2024Q1",
-            "type": "HAS_METRIC",
-            "properties": "{\"note\": \"분기 실적\"}"
-          },
-          {
-            "source_id": "DRAM",
-            "target_id": "Price_Decline_2024",
-            "type": "AFFECTED_BY",
-            "properties": null
-          }
-        ]
-      }
-      ```
-      
-      **중요**: 엔티티와 관계의 균형을 맞추세요. 엔티티 10개라면 관계도 최소 10개 이상 만드세요.
-
+      이벤트가 없으면 빈 리스트 반환: []
 
 # ==========================================
-# 5. Gemini PDF Parser (Knowledge Graph 추출)
+# 6. Gemini PDF Parser (Knowledge Graph 추출) - T-Box 2.0
 # ==========================================
 
 gemini_pdf_parser:
@@ -453,8 +290,12 @@ gemini_pdf_parser:
           - `observes` -> `IDM` ("Samsung Electronics")
           - `hasValue` -> "70T KRW" (Literal stored in properties)
 
-      ### B. Entity Naming & Identification
-      - **Company**: Always include Ticker if available. (e.g., "Samsung Electronics (005930)")
+      ### B. Entity Naming & Identification (ID Construction)
+      - **Company**: Use the official company name ONLY. (e.g., "Samsung Electronics"). NOT "Samsung Electronics (005930)".
+        - Ticker codes MUST be stored in the `properties` field.
+      - **Time-Scoping (CRITICAL)**: For `Event`, `Trend`, `MarketEnvironment`, `RiskFactor`, and `OpportunityFactor`, **YOU MUST APPEND THE DATE** to the name to create a unique ID.
+        - BAD: "Year-end Shopping Season" (Merges 2019 and 2024 data!)
+        - GOOD: "Year-end_Shopping_Season_2024Q4"
       - **TemporalRegion**: Standardize format (YYYY-MM-DD, YYYY-QN, YYYY).
 
       # 3. Output Format

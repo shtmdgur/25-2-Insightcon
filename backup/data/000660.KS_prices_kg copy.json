@@ -1,0 +1,246 @@
+{
+  "entities": [
+    {
+      "name": "Trend_000660",
+      "type": "Trend",
+      "properties": {
+        "ticker": "000660",
+        "period": "2020-01-02_2025-09-12",
+        "pattern": "unknown",
+        "trend_type": "Unknown",
+        "data_points": 1400
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250901",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-01",
+        "close": 256000.0,
+        "volume": 1837054,
+        "open": 259500.0,
+        "high": 261000.0,
+        "low": 255000.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250902",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-02",
+        "close": 260500.0,
+        "volume": 1584710,
+        "open": 256000.0,
+        "high": 261500.0,
+        "low": 256000.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250903",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-03",
+        "close": 262500.0,
+        "volume": 2437896,
+        "open": 259500.0,
+        "high": 265500.0,
+        "low": 257750.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250904",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-04",
+        "close": 265500.0,
+        "volume": 2189959,
+        "open": 267000.0,
+        "high": 271000.0,
+        "low": 264500.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250905",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-05",
+        "close": 273500.0,
+        "volume": 3103427,
+        "open": 273000.0,
+        "high": 275000.0,
+        "low": 272000.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250908",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-08",
+        "close": 277000.0,
+        "volume": 2018299,
+        "open": 278500.0,
+        "high": 279000.0,
+        "low": 274000.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250909",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-09",
+        "close": 288000.0,
+        "volume": 4158342,
+        "open": 278000.0,
+        "high": 288500.0,
+        "low": 277000.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250910",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-10",
+        "close": 304000.0,
+        "volume": 5265553,
+        "open": 294500.0,
+        "high": 305000.0,
+        "low": 293000.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250911",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-11",
+        "close": 307000.0,
+        "volume": 5148088,
+        "open": 310000.0,
+        "high": 315000.0,
+        "low": 305500.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "name": "StockPrice_000660_20250912",
+      "type": "Metric",
+      "properties": {
+        "ticker": "000660",
+        "date": "2025-09-12",
+        "close": 328500.0,
+        "volume": 4242516,
+        "open": 322000.0,
+        "high": 329500.0,
+        "low": 319000.0
+      },
+      "confidence": 1.0
+    }
+  ],
+  "relations": [
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250901",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250902",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250903",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250904",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250905",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250908",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250909",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250910",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250911",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_METRIC",
+      "object": "StockPrice_000660_20250912",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    },
+    {
+      "subject": "000660",
+      "predicate": "HAS_TREND",
+      "object": "Trend_000660",
+      "weight": 1.0,
+      "source": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv"
+    }
+  ],
+  "metadata": {
+    "source_file": "D:\\0.Sogang\\동아리 및 학회\\Insight\\2025-2\\2차 인사이콘\\25-2-Insightcon\\data\\raw\\price\\000660.KS_prices.csv",
+    "file_type": "price_csv",
+    "ticker": "000660",
+    "start_date": "2020-01-02",
+    "end_date": "2025-09-12",
+    "total_data_points": 1400,
+    "sampled_data_points": 10,
+    "parser": "PriceParserAgent",
+    "created_at": "2025-12-19T21:47:30.638320"
+  }
+}
