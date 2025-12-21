@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Prompts YAML 로드
-PROMPTS_FILE = Path(__file__).parent.parent / "templates" / "prompts.yaml"
+PROMPTS_FILE = Path(__file__).parent.parent.parent / "templates" / "prompts.yaml"
 with open(PROMPTS_FILE, 'r', encoding='utf-8') as f:
     PROMPTS = yaml.safe_load(f)
 
