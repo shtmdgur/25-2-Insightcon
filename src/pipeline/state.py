@@ -5,6 +5,23 @@ import operator
 from typing import TypedDict, List, Dict, Optional, Annotated, Literal, Any
 
 
+class DebateState(TypedDict):
+    """변증법 토론 상태 (TradingAgents InvestDebateState 참고)"""
+    
+    # 토론 이력
+    bull_history: str  # Bull 주장 누적 (Markdown)
+    bear_history: str  # Bear 주장 누적
+    full_history: str  # 전체 토론 흐름 (타임라인)
+    
+    # 현재 라운드
+    current_bull_arg: Optional[str]  # 현재 라운드 Bull 주장
+    current_bear_arg: Optional[str]  # 현재 라운드 Bear 주장
+    
+    # 제어
+    debate_count: int  # 토론 라운드 (max 3)
+    should_continue: bool  # 토론 계속 여부
+
+
 class ReportState(TypedDict):
     """리포트 생성 워크플로우의 중앙 상태 객체"""
     
@@ -41,15 +58,15 @@ class ReportState(TypedDict):
     # 5. Analyst 분석 결과 (Phase 2 - Parallel)
     # ========================================
     fundamental_analysis: Optional[str]  # 재무 분석 결과
-    trend_analysis: Optional[str]  # 트렌드(SAX) 분석 결과
+    trend_analysis: Optional[str]  # 트렌드(SAX-DM) 분석 결과
     event_analysis: Optional[str]  # 이벤트 임팩트 분석 결과
+    analyst_reports: Optional[Dict[str, str]]  # 통합된 Analyst 리포트 (확장성 고려)
     
     # ========================================
     # 6. Debate 에이전트 결과 (Phase 2 - Sequential)
     # ========================================
-    bull_argument: Optional[str]  # Bull 에이전트 논리
-    bear_argument: Optional[str]  # Bear 에이전트 논리
-    synthesis_verdict: Optional[str]  # Synthesizer 종합 판단
+    debate_state: Optional[DebateState]  # 토론 상태 (통합 관리)
+    synthesis_report: Optional[str]  # Synthesizer 최종 리포트 및 판단
     
     # ========================================
     # 7. 분석 결과 (기존 필드 유지)
@@ -66,7 +83,6 @@ class ReportState(TypedDict):
     # 9. 메타데이터 및 제어
     # ========================================
     retry_count: int  # 재시도 횟수 (Infinite Loop 방지)
-    debate_turn_count: int  # 토론 라운드 카운트 (Max 3)
     critical_paths: Optional[List[str]]  # 근거로 사용된 핵심 경로 (Provenance)
     
     errors: Annotated[List[str], operator.add]  # 에러 목록 (병렬 노드에서 추가 가능)
