@@ -46,7 +46,6 @@ class SynthesizerAgent(BaseDebateAgent):
         # 5. LLM 실행
         response = self.llm.invoke(prompt)
         
-        # 6. 콘텐츠 반환 (Markdown 리포트)
-        if hasattr(response, "content"):
-            return response.content
-        return str(response)
+        # 6. 응답 파싱 (signature 제거)
+        result = self._parse_response(response)
+        return result["argument"]

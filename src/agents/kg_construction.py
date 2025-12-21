@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 import json
 
 from src.agents.parsers.base_parser_agent import BaseParserAgent
-from src.agents.parsers.pdf_parser_agent import PDFParserAgent
+from src.agents.parsers.pdf_parser_agent import GeminiPDFParser
 from src.agents.parsers.price_parser_agent import PriceParserAgent
 from src.agents.parsers.dart_parser_agent import DARTParserAgent
 from src.agents.parsers.news_parser_agent import NewsParserAgent
@@ -60,7 +60,7 @@ class KGConstructionAgent:
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         
         # Parser Agents 초기화
-        self.pdf_parser = PDFParserAgent(use_batch=False)
+        self.pdf_parser = GeminiPDFParser(use_batch=False)
         self.price_parser = PriceParserAgent()
         self.dart_parser = DARTParserAgent()
         self.news_parser = NewsParserAgent(llm=llm) if llm else NewsParserAgent()

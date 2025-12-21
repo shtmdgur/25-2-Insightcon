@@ -171,7 +171,7 @@ class BaseDebateAgent(ABC):
                         "text": chain_text,
                         "nodes": nodes,
                         "relationships": rels,
-                        "hop_depth": new_hop  # 디버깅용
+                        "hop_depth": target_hops  # 디버깅용 (수정: new_hop -> target_hops)
                     })
         except Exception as e:
             print(f"[경고] 인과 경로 탐색 실패: {e}")
@@ -299,5 +299,17 @@ class BaseDebateAgent(ABC):
     def _parse_response(self, response: Any) -> Dict[str, str]:
         """LLM 응답 처리 (단순 텍스트 반환)"""
         if hasattr(response, "content"):
-             return {"argument": response.content}
+            content = response.content
+            # Gemini API의 content가 리스트일 경우 (content_parts)
+            if isinstance(content, list):
+                # 각 파트에서 'text' 필드만 추출하여 결합
+                text_parts = []
+                for part in content:
+                    if isinstance(part, dict) and 'text' in part:
+                        text_parts.append(part['text'])
+                    elif isinstance(part, str):
+                        text_parts.append(part)
+                return {"argument": "\n".join(text_parts)}
+            # content가 문자열인 경우
+            return {"argument": content}
         return {"argument": str(response)}

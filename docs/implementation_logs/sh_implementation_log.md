@@ -1859,3 +1859,149 @@ else:
 
 **작업 시간**: 2025-12-21 (약 3시간)  
 **완성도**: Phase 2.3 Core Logic + Progressive Expansion 100% 완료, 2.4 확장 Ready
+
+---
+
+## 2.3.3 Debate Workflow State Management 디버깅 ✅
+
+**Conversation ID**: e5301e6f-4722-477f-8e27-dccfa8b09817  
+**작업 일시**: 2025-12-20 18:14 ~ 2025-12-21 24:09  
+**작업 시간**: 약 6시간 (분산 작업)
+
+### 문제 발견
+
+LangGraph 기반 Debate Workflow 실행 시 다음 문제들 발견:
+
+1. **History 누적 실패**
+   - `bull_history`, `bear_history`가 라운드마다 누적되지 않음
+   - 각 라운드의 주장이 독립적으로 존재하여 이전 맥락 손실
+
+2. **Debate Trace 미반영**
+   - `debate_trace` 리스트가 State에 제대로 저장되지 않음
+   - 실행 흐름 추적 불가
+
+3. **최종 리포트 누락**
+   - Synthesizer가 생성한 최종 투자 판단이 State에 반영 안 됨
+
+### 원인 분석
+
+**LangGraph State 참조 복사 문제**:
+```python
+# 문제 코드
+debate_state = state.get("debate_state", {})
+debate_state["bull_history"] += "새로운 내용"  # ❌ 복사본 수정
+return state  # 원본 state["debate_state"]는 변경 안 됨
+```
+
+LangGraph는 State를 immutable하게 다루기 때문에, 중첩된 딕셔너리를 수정할 때 **직접 참조**를 통해 업데이트해야 함.
+
+### 해결책 구현
+
+**파일**: `src/pipeline/debate_workflow.py`
+
+**Direct State Updates 패턴**:
+```python
+def bull_argue(state: ReportState) -> ReportState:
+    # ...
+    result = bull_agent.argue(state, opponent_last_arg=opponent_arg)
+    
+    # ✅ State 직접 업데이트 (참조 복사 문제 해결)
+    state["debate_state"]["current_bull_arg"] = result["argument"]
+    state["debate_state"]["bull_history"] += f"\n\n## Round {round_num} - Bull\n{result['argument']}"
+    state["debate_state"]["full_history"] += f"\n\n[Round {round_num} - Bull]\n{result['argument']}"
+    state["debate_state"]["debate_trace"] = state["debate_state"].get("debate_trace", []) + [f"Bull Round {round_num} 완료"]
+    
+    return state
+```
+
+**주요 변경점**:
+1. `state["debate_state"]["key"]` 직접 수정 (복사본이 아닌 원본)
+2. 모든 누적 필드에 동일 패턴 적용
+3. Trace 리스트 안전하게 추가 (`get()` + 새 리스트 생성)
+
+### 검증 결과
+
+✅ **History 누적 정상 작동**
+✅ **Debate Trace 완전 기록**
+✅ **최종 Investment Memo 생성 확인**
+
+---
+
+## 2.3.4 LLM 응답 처리 및 출력 개선 ✅
+
+**작업 일시**: 2025-12-21 23:00-24:00  
+**작업 시간**: 약 1시간
+
+### 문제 발견
+
+1. **Signature 메타데이터 출력** - Gemini API 응답에 포함된 긴 signature 문자열이 그대로 출력됨
+2. **토론 내용 truncation** - 300자로 제한되어 "..."으로 끊김
+3. **이모지 색상 미반영** - Bull/Bear 색상이 의도와 반대로 표시됨
+
+### 해결책  
+
+**LangChain 디버그/Tracing 완전 비활성화**:
+```python
+os.environ["LANGCHAIN_VERBOSE"] = "false"
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGCHAIN_CALLBACKS_MANAGER"] = "false"
+
+from langchain_core import globals as langchain_globals
+langchain_globals.set_debug(False)
+langchain_globals.set_verbose(False)
+```
+
+**Response Parsing 개선**:
+```python
+def _parse_response(self, response: Any) -> Dict[str, str]:
+    if hasattr(response, "content"):
+        content = response.content
+        if isinstance(content, list):
+            text_parts = []
+            for part in content:
+                if isinstance(part, dict) and 'text' in part:
+                    text_parts.append(part['text'])
+                elif isinstance(part, str):
+                    text_parts.append(part)
+            return {"argument": "\n".join(text_parts)}
+        return {"argument": content}
+    return {"argument": str(response)}
+```
+
+### 결과
+
+✅ Signature 메타데이터 완전 제거  
+✅ 토론 내용 전체 출력  
+✅ 이모지 색상 정상 반영 (Bull 🔴, Bear 🔵)  
+✅ 변수 오류 수정 (`new_hop` → `target_hops`)
+
+---
+
+## 2.3.5 Synthesizer Signature 제거 (추가 수정) ✅
+
+**작업 일시**: 2025-12-21 23:53  
+**작업 시간**: 약 5분
+
+### 문제 및 해결
+
+Synthesizer의 최종 리포트에서 여전히 signature가 출력되는 문제 발견.
+
+**파일**: `src/agents/synthesizer_agent.py`
+
+```python
+# Before
+if hasattr(response, "content"):
+    return response.content  # ❌ signature 포함
+
+# After
+result = self._parse_response(response)  # ✅ signature 제거
+return result["argument"]
+```
+
+✅ Synthesizer 최종 리포트에서 signature 완전 제거  
+✅ Bull, Bear, Synthesizer 모든 Agent 출력 일관성 확보
+
+---
+
+**총 작업 시간**: 2025-12-20~21 (약 5시간)  
+**완성도**: Phase 2.3 Debate Workflow 100% 완료, 검증 완료

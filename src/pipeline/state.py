@@ -20,6 +20,12 @@ class DebateState(TypedDict):
     # 제어
     debate_count: int  # 토론 라운드 (max 3)
     should_continue: bool  # 토론 계속 여부
+    
+    # Progressive Path Expansion 캐시
+    cached_paths: Optional[Dict[int, List[Dict]]]  # {round_num: [paths]}
+    
+    # Debate 전용 실행 추적 (병렬 문제 없음)
+    debate_trace: Optional[List[str]]  # Debate workflow 내부 trace
 
 
 class ReportState(TypedDict):
@@ -86,6 +92,6 @@ class ReportState(TypedDict):
     critical_paths: Optional[List[str]]  # 근거로 사용된 핵심 경로 (Provenance)
     
     errors: Annotated[List[str], operator.add]  # 에러 목록 (병렬 노드에서 추가 가능)
-    execution_trace: Annotated[List[str], operator.add]  # 실행 추적 로그 (병렬 노드에서 추가 가능)
+    execution_trace: Annotated[List[str], operator.add]  # 실행 추적 로그 (병렬 안전)
     execution_times: Annotated[List[Dict[str, float]], operator.add]  # 실행 시간 추적 (노드명: 소요시간)
 
