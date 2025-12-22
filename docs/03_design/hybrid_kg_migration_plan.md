@@ -219,6 +219,272 @@ class Relation(BaseModel):
     
     # TRIGGERED_BY 전용 메타데이터
     reasoning: Optional[str] = None  # 인과관계 설명
+    
+    # 검증용 타입 정보 (선택)
+    subject_type: Optional[NodeType] = None  # 도메인 검증용
+    object_type: Optional[NodeType] = None   # 레인지 검증용
+```
+
+---
+
+**Step 5: 도메인/레인지 스키마 정의**
+
+현재 데이터와 설계 문서 기반으로 정의 가능한 모든 관계의 스키마를 명시합니다.
+
+```python
+from typing import Dict, List, Set
+from enum import Enum
+
+class ValidationMode(str, Enum):
+    """관계 검증 모드"""
+    STRICT = "strict"          # 스키마 엄격 검증
+    PERMISSIVE = "permissive"  # LLM confidence 체크 후 허용
+    LEARNING = "learning"      # 로그만 남기고 모두 허용
+
+
+# 관계별 도메인/레인지 스키마 (현재 정의 가능한 모든 관계)
+RELATION_SCHEMA: Dict[RelationType, Dict[str, List[NodeType]]] = {
+    # ============================================
+    # Logic Layer (정적 역학 관계)
+    # ============================================
+    RelationType.AFFECTS: {
+        "domain": [NodeType.ECONOMIC_INDICATOR],  # 거시지표만
+        "range": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY,
+            NodeType.SUPPLIER
+        ],  # 모든 기업 노드
+        "description": "거시 경제 지표가 기업에 미치는 영향"
+    },
+    
+    # ============================================
+    # Causal Layer (동적 인과 관계)
+    # ============================================
+    RelationType.TRIGGERED_BY: {
+        "domain": [NodeType.PRICE_MOVEMENT],  # 주가 변동만
+        "range": [
+            NodeType.DISCLOSURE,
+            NodeType.EARNINGS,
+            NodeType.ISSUE
+        ],  # 모든 Signal
+        "description": "주가 변동을 유발한 사건"
+    },
+    
+    # ============================================
+    # Structural Layer (밸류체인)
+    # ============================================
+    RelationType.SUPPLIES: {
+        "domain": [NodeType.SUPPLIER],  # 공급사만
+        "range": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY
+        ],  # 제조사들
+        "description": "공급망 관계 (A가 B에게 공급)"
+    },
+    
+    RelationType.MANUFACTURES: {
+        "domain": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY
+        ],  # 제조사들
+        "range": [
+            # 제품 노드 (현재 데이터에는 없지만 향후 추가)
+            # NodeType.MEMORY_SEMICONDUCTOR,
+            # NodeType.SYSTEM_SEMICONDUCTOR
+        ],  # 제품들 (TODO: 제품 노드 추가 시)
+        "description": "제조 관계 (A가 B를 생산)"
+    },
+    
+    RelationType.HAS_SIGNAL: {
+        "domain": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY,
+            NodeType.SUPPLIER,
+            NodeType.ORGANIZATION
+        ],  # 모든 Agent
+        "range": [
+            NodeType.EARNINGS,
+            NodeType.PRICE_MOVEMENT,
+            NodeType.DISCLOSURE,
+            NodeType.ISSUE
+        ],  # 모든 Signal
+        "description": "기업이 발생시킨 시그널"
+    },
+    
+    RelationType.MENTIONED_IN: {
+        "domain": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY,
+            NodeType.SUPPLIER,
+            NodeType.ORGANIZATION,
+            NodeType.ECONOMIC_INDICATOR
+        ],  # Agent + MacroMetric
+        "range": [
+            NodeType.NEWS,
+            NodeType.REPORT
+        ],  # Document
+        "description": "엔티티가 문서에서 언급됨"
+    },
+    
+    # ============================================
+    # Legacy (하위 호환성)
+    # ============================================
+    RelationType.HAS_METRIC: {
+        "domain": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY,
+            NodeType.SUPPLIER
+        ],  # 모든 Agent
+        "range": [],  # 레거시 METRIC 노드 (현재는 사용 안 함)
+        "description": "레거시: 기업의 재무 지표 (향후 fundamental_stats 속성으로 대체)"
+    },
+    
+    RelationType.HAS_TREND: {
+        "domain": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY
+        ],
+        "range": [],  # 레거시 TREND 노드
+        "description": "레거시: 기업의 추세 (향후 Signal로 통합)"
+    },
+    
+    RelationType.AFFECTED_BY: {
+        "domain": [
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY
+        ],
+        "range": [
+            NodeType.DISCLOSURE,
+            NodeType.EARNINGS,
+            NodeType.ISSUE
+        ],
+        "description": "레거시: 기업이 사건의 영향을 받음 (TRIGGERED_BY와 유사)"
+    }
+}
+
+
+def validate_relation(
+    relation: Relation,
+    mode: ValidationMode = ValidationMode.LEARNING
+) -> bool:
+    """
+    관계의 도메인/레인지 검증
+    
+    Args:
+        relation: 검증할 Relation 객체
+        mode: 검증 모드 (STRICT | PERMISSIVE | LEARNING)
+    
+    Returns:
+        검증 성공 여부
+    
+    Raises:
+        ValueError: STRICT 모드에서 스키마 위반 시
+    """
+    schema = RELATION_SCHEMA.get(relation.predicate)
+    
+    if not schema:
+        # ✅ 스키마 정의 없음 → LLM에게 위임
+        logger.info(
+            f"🤖 LLM-defined relation (no schema): {relation.predicate}"
+        )
+        return True
+    
+    # 도메인/레인지 체크
+    is_domain_valid = (
+        not relation.subject_type or 
+        relation.subject_type in schema["domain"]
+    )
+    is_range_valid = (
+        not relation.object_type or 
+        relation.object_type in schema["range"]
+    )
+    is_valid = is_domain_valid and is_range_valid
+    
+    if not is_valid:
+        error_msg = (
+            f"Schema violation: {relation.predicate}\n"
+            f"  Subject: {relation.subject} (type={relation.subject_type})\n"
+            f"  Object: {relation.object} (type={relation.object_type})\n"
+            f"  Expected domain: {schema['domain']}\n"
+            f"  Expected range: {schema['range']}"
+        )
+        
+        if mode == ValidationMode.STRICT:
+            # ❌ STRICT: 즉시 실패
+            raise ValueError(error_msg)
+        
+        elif mode == ValidationMode.LEARNING:
+            # 📝 LEARNING: 로그만 남기고 통과 (개발 단계)
+            logger.warning(f"⚠️ {error_msg} (allowed in LEARNING mode)")
+            return True
+        
+        elif mode == ValidationMode.PERMISSIVE:
+            # 🔓 PERMISSIVE: LLM 신뢰도 체크
+            if relation.confidence and relation.confidence >= 0.7:
+                logger.info(
+                    f"✅ LLM override (confidence={relation.confidence:.2f})\n"
+                    f"  {error_msg}"
+                )
+                return True
+            else:
+                raise ValueError(
+                    f"Low confidence LLM relation (confidence="
+                    f"{relation.confidence or 0.0:.2f})\n{error_msg}"
+                )
+    
+    # ✅ 검증 통과
+    logger.debug(f"✓ Schema validated: {relation.predicate}")
+    return True
+
+
+def get_allowed_relations(node_type: NodeType) -> List[RelationType]:
+    """
+    특정 노드 타입이 subject가 될 수 있는 관계 타입 조회
+    
+    Args:
+        node_type: 노드 타입
+    
+    Returns:
+        허용된 관계 타입 리스트
+    
+    Example:
+        >>> get_allowed_relations(NodeType.ECONOMIC_INDICATOR)
+        [RelationType.AFFECTS, RelationType.MENTIONED_IN]
+    """
+    allowed = []
+    for rel_type, schema in RELATION_SCHEMA.items():
+        if node_type in schema["domain"]:
+            allowed.append(rel_type)
+    return allowed
+```
+
+**사용 예시**:
+```python
+# Parser에서 관계 생성 시
+relation = Relation(
+    subject="USD/KRW",
+    subject_type=NodeType.ECONOMIC_INDICATOR,
+    predicate=RelationType.AFFECTS,
+    object="Samsung Electronics",
+    object_type=NodeType.IDM,
+    correlation="DIRECT",
+    sensitivity=0.72,
+    confidence=0.9
+)
+
+# 검증 (LEARNING 모드)
+try:
+    validate_relation(relation, mode=ValidationMode.LEARNING)
+except ValueError as e:
+    logger.error(f"Validation failed: {e}")
 ```
 
 ---
