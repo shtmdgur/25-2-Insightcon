@@ -1,5 +1,5 @@
 """
-yfinance 기반 시계열 및 재무 데이터 수집기 (통합 버전)
+yfinance 기반 시계열 및 재무 데이터 수집기 (Global Semis 전용)
 
 - 가격 시계열 수집: get_price_history
 - 파생값 계산: 일간 수익률, z-score, 변동성
@@ -197,22 +197,12 @@ def build_states(df: pd.DataFrame, ticker: str, zscore_window: int = 60) -> List
 
 
 # ----------------------------
-# 티커 프리셋 (모두 유지)
+# ★ 여기 수정됨: Global Semis만 남김
 # ----------------------------
 PRESET_TICKERS: Dict[str, List[str]] = {
-    "samsung_related": [
-        "005930.KS", "000660.KS", "000990.KS", "091160.KS", "102110.KS",
-    ],
     "global_semis": [
         "NVDA", "TSM", "INTC", "MU", "ASML", "AMAT", "LRCX", "AVGO", "AMD", "QCOM", "TXN"
-    ],
-    "macro": [
-        "^KS11", "^KQ11", "091160.KS", "102110.KS",
-        "^GSPC", "^IXIC", "^DJI", "SOXX", "SMH",
-        "USDKRW=X", "USDJPY=X", "USDCNH=X", "EURUSD=X",
-        "^IRX", "^FVX", "^TNX", "^TYX",
-        "000300.SS", "000001.SS",
-    ],
+    ]
 }
 
 
