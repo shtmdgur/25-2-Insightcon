@@ -85,46 +85,10 @@ class DARTParserAgent(BaseParserAgent):
         except Exception as e:
             self.logger.error(f"Failed to parse DART data: {str(e)}")
             raise ValueError(f"DART parsing failed: {str(e)}")
-    
-    def validate(self, data: Dict[str, Any]) -> bool:
-        """
-        파싱된 데이터 검증
-        
-        Args:
-            data: 검증할 데이터
-        
-        Returns:
-            검증 성공 여부
-        """
-        # 필수 키 확인
-        if "entities" not in data or "relations" not in data:
-            self.logger.warning("Missing entities or relations")
-            return False
-        
-        # Company, Event, Metric 엔티티가 모두 있는지 확인
-        entity_types = set(e.get("type") for e in data["entities"])
-        required_types = {
-            NodeType.COMPANY.value,
-            NodeType.EVENT.value,
-            NodeType.METRIC.value
-        }
-        
-        if not required_types.issubset(entity_types):
-            missing = required_types - entity_types
-            self.logger.warning(f"Missing entity types: {missing}")
-            return False
-        
-        return True
-    
+
     def _load_csv(self, file_path: Path) -> pd.DataFrame:
         """
         CSV 파일 로드
-        
-        Args:
-            file_path: CSV 파일 경로
-        
-        Returns:
-            DataFrame
         """
         if not file_path.exists():
             self.logger.warning(f"CSV not found: {file_path}, returning empty DataFrame")
@@ -148,15 +112,6 @@ class DARTParserAgent(BaseParserAgent):
     ) -> KnowledgeGraph:
         """
         3개 DataFrame을 Knowledge Graph로 변환
-        
-        Args:
-            companies_df: 기업 데이터
-            disclosure_df: 공시 데이터
-            financial_df: 재무 데이터
-            source_dir: 원본 디렉토리
-        
-        Returns:
-            KnowledgeGraph 객체
         """
         entities = []
         relations = []
@@ -165,23 +120,23 @@ class DARTParserAgent(BaseParserAgent):
         companies = self._create_company_entities(companies_df)
         entities.extend(companies)
         
-        # 2. Event 노드 생성 (동적 KG - 공시)
-        events, event_relations = self._create_event_entities(
+        # 2. Disclosure 노드 생성 (Signal Layer)
+        disclosures, disclosure_relations = self._create_event_entities(
             disclosure_df,
             companies_df,
             str(source_dir)
         )
-        entities.extend(events)
-        relations.extend(event_relations)
+        entities.extend(disclosures)
+        relations.extend(disclosure_relations)
         
-        # 3. Metric 노드 생성 (동적 KG - 재무)
-        metrics, metric_relations = self._create_metric_entities(
+        # 3. Earnings 노드 생성 (Signal Layer)
+        earnings, earnings_relations = self._create_metric_entities(
             financial_df,
             companies_df,
             str(source_dir)
         )
-        entities.extend(metrics)
-        relations.extend(metric_relations)
+        entities.extend(earnings)
+        relations.extend(earnings_relations)
         
         # Knowledge Graph 생성
         kg = KnowledgeGraph(
@@ -189,27 +144,40 @@ class DARTParserAgent(BaseParserAgent):
             relations=relations,
             metadata={
                 "source_dir": str(source_dir),
-                "file_type": "dart_csv",
-                "num_companies": len(companies),
-                "num_events": len(events),
-                "num_metrics": len(metrics)
+                "file_type": "dart_csv"
             }
         )
         
         return kg
     
+    def validate(self, data: Dict[str, Any]) -> bool:
+        """
+        파싱된 데이터 검증
+        """
+        if "entities" not in data or "relations" not in data:
+            return False
+        
+        entity_types = set(e.get("type") for e in data["entities"])
+        # Hybrid KG 모델에 맞는 타입 체크
+        required_types = {
+            NodeType.ORGANIZATION.value,
+            NodeType.DISCLOSURE.value,
+            NodeType.EARNINGS.value
+        }
+        
+        # 최소한 하나 이상의 필수 타입이 있는지 확인 (엄격 모드 아님)
+        if not any(t in entity_types for t in required_types):
+            self.logger.warning(f"No Hybrid KG core entity types found in DART output: {entity_types}")
+            return False
+        
+        return True
+
     def _create_company_entities(
         self,
         companies_df: pd.DataFrame
     ) -> List[Entity]:
         """
         Company 엔티티 생성 (정적 KG)
-        
-        Args:
-            companies_df: companies.csv DataFrame
-        
-        Returns:
-            Company Entity 리스트
         """
         entities = []
         
@@ -217,25 +185,26 @@ class DARTParserAgent(BaseParserAgent):
             return entities
         
         for idx, row in companies_df.iterrows():
-            # Ticker 6자리 패딩 (000660 etc)
             ticker = str(row.get('ticker', '')).strip().zfill(6)
             corp_name = str(row.get('corp_name', '')).strip()
             
             if not ticker or not corp_name:
                 continue
             
-            # Entity 정규화
             normalized_name_dict = self.normalizer.normalize_entity(corp_name)
             normalized_name = normalized_name_dict["canonical_name"]
             
+            # TODO: 섹터 분류 기반으로 NodeType 결정 로직 추가 필요
+            # 현재는 기본적으로 ORGANIZATION 또는 IDM 시도
+            node_type = NodeType.IDM
+            
             entity = Entity(
                 name=normalized_name,
-                type=NodeType.COMPANY,
+                type=node_type,
                 properties={
                     "ticker": ticker,
                     "corp_code": str(row.get('corp_code', '')),
-                    "corp_name": corp_name,
-                    "original_name": corp_name
+                    "corp_name": corp_name
                 },
                 confidence=1.0
             )
@@ -250,15 +219,7 @@ class DARTParserAgent(BaseParserAgent):
         source: str
     ) -> tuple[List[Entity], List[Relation]]:
         """
-        Event 엔티티 생성 (동적 KG - 공시)
-        
-        Args:
-            disclosure_df: disclosure_states.csv DataFrame
-            companies_df: companies.csv DataFrame (ticker 매핑용)
-            source: 소스 경로
-        
-        Returns:
-            (Event Entity 리스트, Relation 리스트)
+        Disclosure 엔티티 생성 (Signal Layer)
         """
         entities = []
         relations = []
@@ -266,7 +227,6 @@ class DARTParserAgent(BaseParserAgent):
         if disclosure_df.empty:
             return entities, relations
         
-        # ticker -> corp_name 매핑 생성
         ticker_map = {}
         if not companies_df.empty:
             for idx, row in companies_df.iterrows():
@@ -282,39 +242,48 @@ class DARTParserAgent(BaseParserAgent):
             if not ticker:
                 continue
             
-            # 날짜 파싱
             date = self._parse_date(row.get('date', ''))
             if not date:
                 continue
             
-            # Event 엔티티
+            report_nm = str(row.get('report_nm', row.get('title', '')))
             event_name = f"Disclosure_{ticker}_{date}"
-            event_entity = Entity(
+            
+            signal_entity = Entity(
                 name=event_name,
-                type=NodeType.EVENT,
+                type=NodeType.DISCLOSURE,
+                sentiment=self._classify_sentiment(report_nm),
                 properties={
                     "ticker": ticker,
                     "date": date,
-                    "event_type": "공시",
-                    "title": str(row.get('report_nm', row.get('title', '')))[:200],  # 제목 매핑 수정 (report_nm)
-                    "disclosure_type": str(row.get('disclosure_type', row.get('type', ''))), # 타입 매핑 수정 (disclosure_type)
+                    "report_nm": report_nm,
+                    "disclosure_type": str(row.get('disclosure_type', row.get('type', '')))
                 },
                 confidence=1.0
             )
-            entities.append(event_entity)
+            entities.append(signal_entity)
             
-            # Company-[:AFFECTED_BY]->Event 관계
             company_name = ticker_map.get(ticker, ticker)
             relation = Relation(
                 subject=company_name,
-                predicate=RelationType.AFFECTED_BY,
+                predicate=RelationType.HAS_SIGNAL,
                 object=event_name,
-                weight=1.0,
-                source=source
+                properties={"date": date}
             )
             relations.append(relation)
         
         return entities, relations
+
+    def _classify_sentiment(self, report_name: str) -> str:
+        """공시 유형별 Sentiment 분류"""
+        positive_keywords = ["증설", "투자", "배당", "계약", "수주", "흑자", "특허"]
+        negative_keywords = ["소송", "적자", "파산", "정정", "해고", "손실", "지연"]
+        
+        for keyword in positive_keywords:
+            if keyword in report_name: return "POSITIVE"
+        for keyword in negative_keywords:
+            if keyword in report_name: return "NEGATIVE"
+        return "NEUTRAL"
     
     def _create_metric_entities(
         self,
@@ -323,15 +292,7 @@ class DARTParserAgent(BaseParserAgent):
         source: str
     ) -> tuple[List[Entity], List[Relation]]:
         """
-        Metric 엔티티 생성 (동적 KG - 재무)
-        
-        Args:
-            financial_df: financial_states.csv DataFrame
-            companies_df: companies.csv DataFrame
-            source: 소스 경로
-        
-        Returns:
-            (Metric Entity 리스트, Relation 리스트)
+        Earnings 엔티티 생성 (Signal Layer)
         """
         entities = []
         relations = []
@@ -339,7 +300,6 @@ class DARTParserAgent(BaseParserAgent):
         if financial_df.empty:
             return entities, relations
         
-        # ticker -> corp_name 매핑
         ticker_map = {}
         if not companies_df.empty:
             for idx, row in companies_df.iterrows():
@@ -356,30 +316,32 @@ class DARTParserAgent(BaseParserAgent):
             if not ticker or not period:
                 continue
             
-            # Metric 엔티티
-            metric_name = f"Financial_{ticker}_{period}"
+            metric_name = f"Earnings_{ticker}_{period}"
+            revenue = float(row.get('revenue', 0)) if pd.notna(row.get('revenue')) else 0
+            op_profit = float(row.get('operating_profit', 0)) if pd.notna(row.get('operating_profit')) else 0
+            
+            sentiment = "POSITIVE" if op_profit > 0 else "NEGATIVE"
+            
             metric_entity = Entity(
                 name=metric_name,
-                type=NodeType.METRIC,
+                type=NodeType.EARNINGS,
+                sentiment=sentiment,
                 properties={
                     "ticker": ticker,
                     "period": period,
-                    "revenue": float(row.get('revenue', 0)) if pd.notna(row.get('revenue')) else None,
-                    "operating_profit": float(row.get('operating_profit', 0)) if pd.notna(row.get('operating_profit')) else None,
-                    "net_income": float(row.get('net_income', 0)) if pd.notna(row.get('net_income')) else None,
+                    "revenue": revenue,
+                    "operating_profit": op_profit,
                 },
                 confidence=1.0
             )
             entities.append(metric_entity)
             
-            # Company-[:HAS_METRIC]->Metric 관계
             company_name = ticker_map.get(ticker, ticker)
             relation = Relation(
                 subject=company_name,
-                predicate=RelationType.HAS_METRIC,
+                predicate=RelationType.HAS_SIGNAL,
                 object=metric_name,
-                weight=1.0,
-                source=source
+                properties={"period": period}
             )
             relations.append(relation)
         

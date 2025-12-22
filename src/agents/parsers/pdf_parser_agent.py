@@ -76,7 +76,14 @@ class GeminiPDFParser(ParserInterface):
             
             kg_json = self._extract_knowledge_graph(file_uri)
             
-            # 3. JSON 파일로 저장 (data/processed/)
+            # 3. KnowledgeGraph 객체 생성
+            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
+            
+            # 4. 임베딩 생성 및 주입 (Vector Index용)
+            logger.info("Generating embeddings for entities...")
+            self._enrich_with_embeddings(knowledge_graph)
+            
+            # 5. JSON 파일로 저장 (data/processed/)
             import os
             from datetime import datetime
             from pathlib import Path
@@ -90,11 +97,8 @@ class GeminiPDFParser(ParserInterface):
             processed_dir = project_root / "data" / "processed"
             json_path = processed_dir / f"{file_id}_{timestamp}.json"
             
-            # KnowledgeGraph 객체 생성 (저장용)
-            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
+            # 저장 (임베딩 포함됨)
             knowledge_graph.save_to_json(str(json_path))
-            
-            return kg_json  # Dict 반환
             
             logger.info(f"Saved KG to: {json_path}")
             
@@ -166,3 +170,48 @@ class GeminiPDFParser(ParserInterface):
         # JSON 파싱
         import json
         return json.loads(response.text)
+    
+    def _enrich_with_embeddings(self, kg: KnowledgeGraph):
+        """
+        KG 엔티티에 임베딩 추가 (Batch 처리)
+        """
+        try:
+            # 임베딩 대상 텍스트 생성
+            # 포맷: "이름 (타입): 속성요약"
+            texts = []
+            valid_entities = []
+            
+            for entity in kg.entities:
+                # 임베딩 텍스트 구성
+                props_str = ", ".join(f"{k}={v}" for k, v in entity.properties.items())
+                text = f"{entity.name} ({entity.type.value})"
+                if props_str:
+                    text += f": {props_str}"
+                
+                texts.append(text)
+                valid_entities.append(entity)
+            
+            if not texts:
+                return
+
+            # Batch 임베딩 생성 (text-embedding-004)
+            # 한 번에 최대 100개씩 처리 권장
+            batch_size = 100
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                batch_entities = valid_entities[i:i + batch_size]
+                
+                response = client.models.embed_content(
+                    model="text-embedding-004",
+                    contents=batch_texts
+                )
+                
+                # 결과 매핑
+                for entity, embedding in zip(batch_entities, response.embeddings):
+                    entity.embedding = embedding.values
+                    
+            logger.info(f"Generated embeddings for {len(valid_entities)} entities")
+            
+        except Exception as e:
+            logger.error(f"Embedding generation failed: {str(e)}")
+            # 임베딩 실패해도 전체 프로세스는 계속 진행 (선택적 기능)

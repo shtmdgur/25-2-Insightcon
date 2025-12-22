@@ -86,45 +86,10 @@ class PriceParserAgent(BaseParserAgent):
         except Exception as e:
             self.logger.error(f"Failed to parse price CSV {file_path}: {str(e)}")
             raise ValueError(f"Price CSV parsing failed: {str(e)}")
-    
-    def validate(self, data: Dict[str, Any]) -> bool:
-        """
-        파싱된 데이터 검증
-        
-        Args:
-            data: 검증할 데이터
-        
-        Returns:
-            검증 성공 여부
-        """
-        # 필수 키 확인
-        required_keys = ["entities", "relations"]
-        for key in required_keys:
-            if key not in data:
-                self.logger.warning(f"Missing key: {key}")
-                return False
-        
-        # Metric 또는 Trend 엔티티가 있는지 확인
-        has_metric_or_trend = any(
-            e.get("type") in [NodeType.METRIC.value, NodeType.TREND.value]
-            for e in data["entities"]
-        )
-        
-        if not has_metric_or_trend:
-            self.logger.warning("No Metric or Trend entities found")
-            return False
-        
-        return True
-    
+
     def _extract_ticker(self, filename: str) -> str:
         """
         파일명에서 Ticker 추출
-        
-        Args:
-            filename: 파일명 (예: 005930.KS_prices.csv, NVDA_prices.csv)
-        
-        Returns:
-            Ticker 코드
         """
         # _prices.csv 제거
         name = filename.replace("_prices.csv", "")
@@ -138,12 +103,6 @@ class PriceParserAgent(BaseParserAgent):
     def _validate_columns(self, df: pd.DataFrame) -> None:
         """
         CSV 필수 컬럼 검증
-        
-        Args:
-            df: DataFrame
-        
-        Raises:
-            ValueError: 필수 컬럼 누락 시
         """
         # 소문자로 변환하여 검증 (대소문자 무시)
         columns_lower = [col.lower() for col in df.columns]
@@ -158,6 +117,26 @@ class PriceParserAgent(BaseParserAgent):
         if len(df) == 0:
             raise ValueError("CSV file is empty")
     
+    def validate(self, data: Dict[str, Any]) -> bool:
+        """
+        파싱된 데이터 검증
+        """
+        if "entities" not in data or "relations" not in data:
+            return False
+        
+        entity_types = set(e.get("type") for e in data["entities"])
+        # Hybrid KG 모델에 맞는 타입 체크
+        required_types = {
+            NodeType.PRICE_MOVEMENT.value,
+            NodeType.TREND.value
+        }
+        
+        if not any(t in entity_types for t in required_types):
+            self.logger.warning(f"No Price Signal types found: {entity_types}")
+            return False
+        
+        return True
+
     def _create_knowledge_graph(
         self,
         df: pd.DataFrame,
@@ -166,107 +145,94 @@ class PriceParserAgent(BaseParserAgent):
     ) -> KnowledgeGraph:
         """
         DataFrame을 Knowledge Graph로 변환
-        
-        Args:
-            df: 주가 DataFrame
-            ticker: Ticker 코드
-            file_path: 원본 파일 경로
-        
-        Returns:
-            KnowledgeGraph 객체
         """
         entities = []
         relations = []
         
-        # 컬럼명 소문자로 정규화
         df.columns = [col.lower() for col in df.columns]
-        
-        # 날짜 정렬
         df['date'] = pd.to_datetime(df['date'])
         df = df.sort_values('date')
         
-        # SAX 패턴 변환 (TimeSeriesProcessor 사용)
+        # 1. Trend 노드 생성
         sax_result = self._calculate_sax_pattern(df['close'].values, ticker)
-        
-        # 1. Trend 노드 생성 (동적 KG)
         trend_entity = Entity(
             name=f"Trend_{ticker}",
             type=NodeType.TREND,
             properties={
                 "ticker": ticker,
-                "period": f"{df['date'].min().strftime('%Y-%m-%d')}_{df['date'].max().strftime('%Y-%m-%d')}",
-                "pattern": sax_result.get("pattern", "unknown"),
-                "trend_type": sax_result.get("trend_type", "Unknown"),
-                "data_points": len(df)
+                "pattern": sax_result.get("pattern"),
+                "trend_type": sax_result.get("trend_type")
             },
             confidence=1.0
         )
         entities.append(trend_entity)
         
-        # 2. 주가 Metric 노드 생성 (샘플링)
-        from src.config.parser_config import get_config
-        config = get_config('price')
+        # 1.5 Agent 노드 생성 (매핑)
+        # TODO: 매핑 테이블을 Config나 별도 관리 필요
+        TICKER_MAP = {
+            "005930": "Samsung Electronics",
+            "000660": "SK Hynix"
+        }
+        agent_name = TICKER_MAP.get(ticker, ticker)
+        agent_type = NodeType.IDM if ticker == "005930" else NodeType.COMPANY # 삼성전자는 IDM
         
-        sample_size = min(
-            config.sample_size,
-            max(config.min_samples, int(len(df) * config.sample_ratio))
+        agent_entity = Entity(
+            name=agent_name,
+            type=agent_type,
+            properties={"ticker": ticker},
+            confidence=1.0
         )
-        recent_df = df.tail(sample_size)
+        entities.append(agent_entity)
         
-        for idx, row in recent_df.iterrows():
-            metric_entity = Entity(
-                name=f"StockPrice_{ticker}_{row['date'].strftime('%Y%m%d')}",
-                type=NodeType.METRIC,
-                properties={
-                    "ticker": ticker,
-                    "date": row['date'].strftime('%Y-%m-%d'),
-                    "close": float(row['close']),
-                    "volume": int(row.get('volume', 0))  if 'volume' in df.columns else 0,
-                    "open": float(row.get('open', row['close'])) if 'open' in df.columns else None,
-                    "high": float(row.get('high', row['close'])) if 'high' in df.columns else None,
-                    "low": float(row.get('low', row['close'])) if 'low' in df.columns else None,
-                },
-                confidence=1.0
-            )
-            entities.append(metric_entity)
+        # 2. Price Movement Signals (±5% 이상 변동 탐지)
+        movements = self._detect_price_movements(df, ticker)
+        entities.extend(movements)
+        
+        # 3. 관계 생성
+        # TODO: 실제 Agent 이름을 알 수 없는 경우 Ticker 유지
+        # 3. 관계 생성
+        # Agent 이름 사용
+        for m in movements:
+            relations.append(Relation(
+                subject=agent_name,
+                predicate=RelationType.HAS_SIGNAL,
+                object=m.name,
+                properties={"date": m.properties.get("date")}
+            ))
             
-            # 관계: Company-[:HAS_METRIC]->Metric
-            # (Company 노드는 이미 존재한다고 가정)
-            relation = Relation(
-                subject=ticker,  # Company name
-                predicate=RelationType.HAS_METRIC,
-                object=metric_entity.name,
-                weight=1.0,
-                source=str(file_path)
-            )
-            relations.append(relation)
-        
-        # 3. Company-[:HAS_TREND]->Trend 관계
-        trend_relation = Relation(
-            subject=ticker,
+        relations.append(Relation(
+            subject=agent_name,
             predicate=RelationType.HAS_TREND,
-            object=trend_entity.name,
-            weight=1.0,
-            source=str(file_path)
-        )
-        relations.append(trend_relation)
+            object=trend_entity.name
+        ))
         
-        # Knowledge Graph 생성
-        kg = KnowledgeGraph(
+        return KnowledgeGraph(
             entities=entities,
             relations=relations,
-            metadata={
-                "source_file": str(file_path),
-                "file_type": "price_csv",
-                "ticker": ticker,
-                "start_date": df['date'].min().strftime('%Y-%m-%d'),
-                "end_date": df['date'].max().strftime('%Y-%m-%d'),
-                "total_data_points": len(df),
-                "sampled_data_points": sample_size
-            }
+            metadata={"ticker": ticker}
         )
+
+    def _detect_price_movements(self, df: pd.DataFrame, ticker: str, threshold: float = 5.0) -> List[Entity]:
+        """주가 급등/급락 탐지"""
+        signals = []
+        df['pct_change'] = df['close'].pct_change() * 100
         
-        return kg
+        for idx, row in df.iterrows():
+            if abs(row['pct_change']) >= threshold:
+                signal = Entity(
+                    name=f"PriceMovement_{ticker}_{row['date'].strftime('%Y%m%d')}",
+                    type=NodeType.PRICE_MOVEMENT,
+                    direction="UP" if row['pct_change'] > 0 else "DOWN",
+                    magnitude=abs(row['pct_change']),
+                    sentiment="POSITIVE" if row['pct_change'] > 0 else "NEGATIVE",
+                    properties={
+                        "date": row['date'].strftime('%Y-%m-%d'),
+                        "close": float(row['close'])
+                    },
+                    confidence=1.0
+                )
+                signals.append(signal)
+        return signals
     
     def _calculate_sax_pattern(
         self,
@@ -292,7 +258,7 @@ class PriceParserAgent(BaseParserAgent):
             config = get_config('price')
             
             sax_string = sax_via_window(
-                ts=np.array(prices),
+                np.array(prices),
                 win_size=config.sax_window_size,
                 paa_size=config.sax_paa_size,
                 alphabet_size=config.sax_alphabet_size,

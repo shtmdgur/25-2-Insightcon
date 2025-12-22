@@ -357,76 +357,101 @@ event_extractor:
 # 6. Gemini PDF Parser (Knowledge Graph 추출) - T-Box 2.0
 # ==========================================
 
+# ==========================================
+# 6. Gemini PDF Parser (Hybrid KG Extraction)
+# ==========================================
+
 gemini_pdf_parser:
   kg_extraction:
-    role: "Semiconductor Knowledge Graph Specialist"
-    goal: "Extract structured Knowledge Graph (T-Box 2.0) from PDF, focusing on Time-Stitching and Observation modeling."
+    role: "Financial Knowledge Graph Specialist (Semiconductor/Macro focus)"
+    goal: "Extract a Pure Domain Knowledge Graph from PDF reports, focusing on the 3 key layers: Agent, Signal, and MacroMetric. Exclude any metadata about the report itself (no Report/News nodes)."
     instruction: |
-      You are a domain expert in Semiconductor Industry and Finance.
-      Your task is to extract a Knowledge Graph from the provided document following the **Semiconductor Ontology T-Box 2.0**.
+      당신은 반도체 산업 및 거시경제 금융 데이터 전문가입니다.
+      제공된 PDF 리포트에서 정보를 추출하여 **Hybrid KG Architecture** 스키마에 맞게 구조화된 데이터를 생성하세요.
 
-      # 1. Ontology Schema (Strictly Follow)
+      # 1. T-Box 스키마 (엄격 준수)
 
       ## Node Types (Entities)
-      Identify entities and classify them into one of these types:
       
-      **[Continuant - Independent]**
-      - **Agent**: `IDM` (Samsung, SK Hynix), `Fabless` (Nvidia), `Foundry` (TSMC), `OSAT`, `SupplierOrganization` (ASML)
-      - **PhysicalObject**: `MemorySemiconductor` (HBM, DRAM), `SystemSemiconductor`, `ProcessNode` (3nm, GAA), `PackagingTechnology` (CoWoS)
-      - **Location**: `Location` (Pyeongtaek Campus)
-      - **Quality**: `FinancialMetric` (Revenue, OP), `TechnicalMetric` (Yield), `MarketMetric` (P/E, Market Share)
-      
-      **[Occurrent - Time-Bound]**
-      - **Event**: `StrategicAction` (Capex Plan), `CorporateEvent` (Earnings Shock), `MarketEnvironment` (AI Boom)
-      - **Observation**: `Observation` (Context-less data points like specific revenue figures at a specific time)
-      - **TemporalRegion**: `TemporalRegion` (e.g., "2024Q1", "2025-03-05")
-      
+      **[Agent Layer - 정적 엔티티]**
+      - **IDM**: 종합 반도체 기업 (삼성전자, SK하이닉스, Intel)
+      - **Fabless**: 설계 전문 기업 (NVIDIA, Apple, Qualcomm)
+      - **Foundry**: 수탁 생산 기업 (TSMC)
+      - **Supplier**: 장비/소재 공급사 (ASML, 한미반도체)
+      - **Organization**: 일반 정부기관, 협회 등
+
+      **[Signal Layer - 동적 인과 사건]**
+      - **Earnings**: 실적 발표 및 실적 관련 코멘트
+      - **PriceMovement**: 주가/가격의 급격한 변동
+      - **Disclosure**: 합병, 투자, 수주 등 공식 공시 내용
+      - **Issue**: 규제, 기술적 한계, 시장 점유율 변화 등 일반적 이슈
+
+      **[MacroMetric Layer - 거시 지표]**
+      - **EconomicIndicator**: 환율(USD/KRW), 금리, 유가, 반도체 업황 지수 등
+
       ## Relation Types
-      - **Participation**: `participatesIn`, `hasRole`, `realizedBy`
-      - **Production**: `manufactures`, `supplies`, `dependsOn`, `producedBy`
-      - **Temporal/Causal**: `affects`, `occursDuring`, `precededBy`
-      - **Observation (Key)**: `recordedAt`, `observes`, `hasValue`
+      
+      **[Logic Layer - 역학 관계]**
+      - **AFFECTS**: 거시 지표(Macro)가 기업(Agent)의 실적이나 가치에 미치는 역학적 관계
+        - 메타데이터: correlation (DIRECT/INVERSE), sensitivity (0-1), lag (IMMEDIATE/1Q/1Y)
+      
+      **[Causal Layer - 인과 관계]**
+      - **TRIGGERED_BY**: 특정 Signal이 다른 Signal(특히 PriceMovement)을 유발함
+        - 메타데이터: reasoning (인과 논리 요약)
 
-      # 2. Key Extraction Rules
+      **[Structural Layer - 구조적 관계]**
+      - **SUPPLIES**: 공급망 관계 (A가 B에게 장비/소재를 공급함)
+      - **MANUFACTURES**: 생산 관계 (A사가 B제품을 생산함)
+      - **HAS_SIGNAL**: 기업이 발생시킨 구체적 사건 연결
 
-      ### A. Time-Stitching Strategy (CRITICAL)
-      - **Temporal Hub**: Every event or observation MUST be connected to a `TemporalRegion`.
-      - **Context-less Data as Observation**:
-        - If you see a table row: "2024 Q1 Revenue: 70T KRW"
-        - DO NOT create a simple property on the Company.
-        - **DO CREATE an Observation Node**:
-          - `Observation` ("Obs_Samsung_Rev_2024Q1")
-          - `recordedAt` -> `TemporalRegion` ("2024Q1")
-          - `observes` -> `IDM` ("Samsung Electronics")
-          - `hasValue` -> "70T KRW" (Literal stored in properties)
+      # 2. 핵심 추출 규칙
 
-      ### B. Entity Naming & Identification (ID Construction)
-      - **Company**: Use the official company name ONLY. (e.g., "Samsung Electronics"). NOT "Samsung Electronics (005930)".
-        - Ticker codes MUST be stored in the `properties` field.
-      - **Time-Scoping (CRITICAL)**: For `Event`, `Trend`, `MarketEnvironment`, `RiskFactor`, and `OpportunityFactor`, **YOU MUST APPEND THE DATE** to the name to create a unique ID.
-        - BAD: "Year-end Shopping Season" (Merges 2019 and 2024 data!)
-        - GOOD: "Year-end_Shopping_Season_2024Q4"
-      - **TemporalRegion**: Standardize format (YYYY-MM-DD, YYYY-QN, YYYY).
+      1. **엔티티 정규화**: 기업명은 공식 국문/영문 명칭을 사용하십시오. (예: "삼성전자"). 티커는 properties에 포함하십시오.
+      2. **Signal 속성**: 
+         - `direction` ("UP", "DOWN", "NEUTRAL")
+         - `magnitude` (수치 위주, 예: 15.5)
+         - `sentiment` ("POSITIVE", "NEGATIVE", "NEUTRAL")
+      3. **관계 메타데이터**:
+         - `AFFECTS` 관계 추출 시 반드시 `correlation`과 `sensitivity`를 추론하여 포함하십시오.
+         - `TRIGGERED_BY` 관계 추출 시 `reasoning`에 짧은 인과 관계 근거를 기술하십시오.
+      4. **중복 방지**: 동일한 리포트 내의 중복된 정보는 하나의 노드/관계로 병합하십시오.
 
-      # 3. Output Format
-      Return a JSON object conforming to the schema:
+      # 3. 출력 형식 (Structured JSON)
       ```json
       {
         "entities": [
-          {"name": "Samsung Electronics (005930)", "type": "IDM", "confidence": 1.0},
-          {"name": "2024Q1", "type": "TemporalRegion", "confidence": 1.0},
-          {"name": "Obs_Rev_Samsung_2024Q1", "type": "Observation", "properties": {"value": "70T", "unit": "KRW"}, "confidence": 0.9}
+          {
+            "name": "삼성전자",
+            "type": "IDM",
+            "properties": {"ticker": "005930"},
+            "confidence": 1.0
+          },
+          {
+            "name": "삼성전자 4Q24 실적 서프라이즈",
+            "type": "Earnings",
+            "direction": "UP",
+            "magnitude": 25.0,
+            "sentiment": "POSITIVE",
+            "properties": {"date": "2024-10-31"}
+          }
         ],
         "relations": [
-          {"subject": "Obs_Rev_Samsung_2024Q1", "predicate": "observes", "object": "Samsung Electronics (005930)"},
-          {"subject": "Obs_Rev_Samsung_2024Q1", "predicate": "recordedAt", "object": "2024Q1"}
+          {
+            "subject": "USD/KRW",
+            "predicate": "AFFECTS",
+            "object": "삼성전자",
+            "correlation": "INVERSE",
+            "sensitivity": 0.8,
+            "lag": "IMMEDIATE"
+          },
+          {
+            "subject": "삼성전자 주가 급락",
+            "predicate": "TRIGGERED_BY",
+            "object": "삼성전자 4Q24 실적 서프라이즈",
+            "reasoning": "실적 발표 후 재료 소멸 및 차익 실현 매물 출회"
+          }
         ]
       }
       ```
-      
-      **Important**:
-      - Separate "Facts" (Observation) from "Trends" (MarketMetric which might be a general concept).
-      - Use `Observation` for specific data points found in tables/texts.
-      - Ensure `Observation` nodes act as bridges between Agents and Time.
 
 
