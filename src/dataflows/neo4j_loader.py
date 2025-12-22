@@ -47,6 +47,13 @@ class Neo4jKGLoader:
         if self.driver:
             self.driver.close()
             logger.info("Neo4j connection closed")
+            
+    def clear_database(self):
+        """데이터베이스의 모든 노드와 관계 삭제 (위험 - 초기화 전용)"""
+        with self.driver.session() as session:
+            logger.warning("Clearing all data from Neo4j database...")
+            session.run("MATCH (n) DETACH DELETE n")
+            logger.info("Database cleared.")
     
     def load_knowledge_graph(
         self,
@@ -54,22 +61,7 @@ class Neo4jKGLoader:
         use_dual_layer: bool = True
     ) -> Dict[str, int]:
         """
-        Knowledge Graph를 Neo4j에 UPSERT 방식으로 로드
-        
-        전략:
-        - use_dual_layer=True: 정적(MERGE)/동적(CREATE) 분리
-        - use_dual_layer=False: 모두 MERGE (기존 방식)
-        
-        Args:
-            kg: KnowledgeGraph 객체
-            use_dual_layer: 이중 레이어 전략 사용 여부
-        
-        Returns:
-            {
-                "static_nodes": N,
-                "dynamic_nodes": M,
-                "relationships_created": K
-            }
+        Knowledge Graph를 Neo4j에 배치 방식으로 로드
         """
         with self.driver.session() as session:
             stats = {
@@ -78,178 +70,140 @@ class Neo4jKGLoader:
                 "relationships_created": 0
             }
             
-            # 1. 엔티티(노드) 생성
-            logger.info(f"Loading {len(kg.entities)} entities...")
+            # 1. 엔티티 분류 및 배치 처리
+            static_groups = {}
+            dynamic_groups = {}
+            
             for entity in kg.entities:
-                if use_dual_layer:
-                    # 이중 레이어: 정적/동적 분리
-                    layer = self._classify_entity_layer(entity)
-                    if layer == 'static':
-                        self._upsert_static_entity(session, entity)
-                        stats["static_nodes"] += 1
-                    else:
-                        self._create_dynamic_entity(session, entity)
-                        stats["dynamic_nodes"] += 1
+                layer = self._classify_entity_layer(entity)
+                if layer == 'static':
+                    static_groups.setdefault(entity.type.value, []).append(entity)
                 else:
-                    # 단일 레이어: 모두 MERGE
-                    self._create_entity(session, entity)
-                    stats["static_nodes"] += 1
+                    dynamic_groups.setdefault(entity.type.value, []).append(entity)
             
-            # 2. 관계(엣지) 생성
-            logger.info(f"Loading {len(kg.relations)} relations...")
+            for node_type, entities in static_groups.items():
+                logger.info(f"Batch upserting {len(entities)} static nodes of type {node_type}...")
+                self._batch_upsert_static_entities(session, node_type, entities)
+                stats["static_nodes"] += len(entities)
+                
+            for node_type, entities in dynamic_groups.items():
+                logger.info(f"Batch creating {len(entities)} dynamic nodes of type {node_type}...")
+                self._batch_create_dynamic_entities(session, node_type, entities)
+                stats["dynamic_nodes"] += len(entities)
+            
+            # 2. 관계 분류 및 배치 처리
+            rel_groups = {}
             for relation in kg.relations:
-                self._create_relation(session, relation)
-                stats["relationships_created"] += 1
-            
-            logger.info(
-                f"Graph loaded successfully: "
-                f"{stats.get('static_nodes', 0)} static nodes, "
-                f"{stats.get('dynamic_nodes', 0)} dynamic nodes, "
-                f"{stats['relationships_created']} relationships"
-            )
+                rel_groups.setdefault(relation.predicate.value, []).append(relation)
+                
+            for predicate, relations in rel_groups.items():
+                logger.info(f"Batch creating {len(relations)} relations of type {predicate}...")
+                self._batch_create_relations(session, predicate, relations)
+                stats["relationships_created"] += len(relations)
             
             return stats
-    
+
+    def _batch_upsert_static_entities(self, session, node_type: str, entities: List[Entity]):
+        """정적 엔티티 배치 MERGE"""
+        query = f"""
+        UNWIND $batch as row
+        MERGE (n:`{node_type}` {{id: row.name}})
+        SET n.name = row.name,
+            n.confidence = row.confidence,
+            n.fundamental_stats = row.fundamental_stats,
+            n.embedding = row.embedding,
+            n.last_updated = datetime()
+        SET n += row.properties
+        """
+        batch_data = [
+            {
+                "name": e.name,
+                "confidence": e.confidence,
+                "properties": e.properties,
+                "fundamental_stats": e.fundamental_stats,
+                "embedding": e.embedding
+            } for e in entities
+        ]
+        session.run(query, batch=batch_data)
+
+    def _batch_create_dynamic_entities(self, session, node_type: str, entities: List[Entity]):
+        """동적 엔티티 배치 CREATE"""
+        from datetime import datetime as dt
+        now = dt.now().isoformat()
+        
+        query = f"""
+        UNWIND $batch as row
+        CREATE (n:`{node_type}`)
+        SET n.name = row.name,
+            n.confidence = row.confidence,
+            n.direction = row.direction,
+            n.magnitude = row.magnitude,
+            n.sentiment = row.sentiment,
+            n.embedding = row.embedding,
+            n.created_at = datetime($now)
+        SET n += row.properties
+        """
+        batch_data = [
+            {
+                "name": e.name,
+                "confidence": e.confidence,
+                "properties": e.properties,
+                "direction": e.direction,
+                "magnitude": e.magnitude,
+                "sentiment": e.sentiment,
+                "embedding": e.embedding
+            } for e in entities
+        ]
+        session.run(query, batch=batch_data, now=now)
+
+    def _batch_create_relations(self, session, predicate: str, relations: List[Relation]):
+        """관계 배치 MERGE"""
+        query = f"""
+        UNWIND $batch as row
+        MATCH (source {{name: row.subject}})
+        MATCH (target {{name: row.object}})
+        MERGE (source)-[r:`{predicate}`]->(target)
+        SET r += row.properties
+        """
+        batch_data = [
+            {
+                "subject": r.subject,
+                "object": r.object,
+                "properties": {
+                    **r.properties,
+                    **{k: v for k, v in {
+                        "correlation": r.correlation,
+                        "sensitivity": r.sensitivity,
+                        "lag": r.lag,
+                        "confidence": r.confidence,
+                        "reasoning": r.reasoning
+                    }.items() if v is not None}
+                }
+            } for r in relations
+        ]
+        session.run(query, batch=batch_data)
+
     def _classify_entity_layer(self, entity: Entity) -> str:
         """
         Entity를 정적/동적 레이어로 분류
         
-        T-Box 2.0 기반 분류:
-        - **Dynamic (CREATE)**: 시간 종속적 노드 (Observation, Event, Metric 등)
-        - **Static (MERGE)**: 시간 불변 노드 (Company, Product, Technology 등)
-        
-        Args:
-            entity: Entity 객체
-        
-        Returns:
-            'static' (MERGE) 또는 'dynamic' (CREATE)
+        Hybrid KG Architecture 기준:
+        - **Static (MERGE)**: Agent Layer (IDM, Fabless, Foundry, Supplier, Organization)
+        - **Dynamic (CREATE)**: Signal, MacroMetric, Document Layer
         """
         from ..models.nodes import NodeType
         
-        # 동적 타입: 시간 종속적 노드 (T-Box 2.0 기준)
-        DYNAMIC_TYPES = {
-            # Occurrent (시간 종속)
-            NodeType.OBSERVATION,
-            NodeType.TEMPORAL_REGION,
-            
-            # Event 계층
-            NodeType.EVENT,
-            NodeType.STRATEGIC_ACTION,
-            NodeType.CORPORATE_EVENT,
-            NodeType.MARKET_ENVIRONMENT,
-            NodeType.POLICY_EVENT,
-            
-            # Quality - Metric 계층 (시계열 데이터)
-            NodeType.FINANCIAL_METRIC,
-            NodeType.TECHNICAL_METRIC,
-            NodeType.MARKET_METRIC,
-            NodeType.METRIC,  # Generic
-            
-            # Trend
-            NodeType.TREND,
+        STATIC_TYPES = {
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY,
+            NodeType.SUPPLIER,
+            NodeType.ORGANIZATION,
+            NodeType.AGENT,  # Legacy
+            NodeType.COMPANY  # Legacy
         }
         
-        # 동적 타입이면 'dynamic', 아니면 'static'
-        return 'dynamic' if entity.type in DYNAMIC_TYPES else 'static'
-    
-    def _create_entity(self, session, entity: Entity):
-        """엔티티(노드) 생성 (기존 방식 - MERGE)"""
-        # properties는 이미 dict로 제공됨 (nodes.py Entity.properties)
-        query = f"""
-        MERGE (n:`{entity.type.value}` {{id: $id}})
-        SET n.name = $name
-        SET n += $properties
-        SET n.confidence = $confidence
-        RETURN n
-        """
-        
-        session.run(
-            query,
-            id=entity.name,  # nodes.py에서는 name을 id로 사용
-            name=entity.name,
-            properties=entity.properties,
-            confidence=entity.confidence
-        )
-    
-    def _upsert_static_entity(self, session, entity: Entity):
-        """
-        정적 Entity 주입
-        
-        전략: MERGE (중복 방지, 업데이트)
-        - Company, Product, Technology, Person
-        - 같은 id면 기존 노드 업데이트
-        """
-        query = f"""
-        MERGE (n:`{entity.type.value}` {{id: $id}})
-        SET n.name = $name
-        SET n += $properties
-        SET n.confidence = $confidence
-        SET n.last_updated = datetime()
-        RETURN n
-        """
-        
-        session.run(
-            query,
-            id=entity.name,
-            name=entity.name,
-            properties=entity.properties,
-            confidence=entity.confidence
-        )
-    
-    def _create_dynamic_entity(self, session, entity: Entity):
-        """
-        동적 Entity 주입
-        
-        전략: CREATE (시계열 누적)
-        - Observation, TemporalRegion
-        - Event, StrategicAction, CorporateEvent, MarketEnvironment
-        - FinancialMetric, TechnicalMetric, MarketMetric
-        - Trend
-        
-        매번 새 노드 생성 (시간 속성 필수)
-        """
-        from datetime import datetime as dt
-        
-        query = f"""
-        CREATE (n:`{entity.type.value}`)
-        SET n.name = $name
-        SET n += $properties
-        SET n.confidence = $confidence
-        SET n.created_at = datetime($created_at)
-        RETURN n
-        """
-        
-        session.run(
-            query,
-            name=entity.name,
-            properties=entity.properties,
-            confidence=entity.confidence,
-            created_at=dt.now().isoformat()
-        )
-    
-    def _create_relation(self, session, relation: Relation):
-        """관계(엣지) 생성"""
-        # properties는 이미 dict로 제공됨
-        props = {}
-        if relation.weight != 1.0:
-            props["weight"] = relation.weight
-        if relation.source:
-            props["source"] = relation.source
-        
-        query = f"""
-        MATCH (source {{id: $source_id}})
-        MATCH (target {{id: $target_id}})
-        MERGE (source)-[r:`{relation.predicate.value}`]->(target)
-        SET r += $properties
-        RETURN r
-        """
-        
-        session.run(
-            query,
-            source_id=relation.subject,
-            target_id=relation.object,
-            properties=props
-        )
+        return 'static' if entity.type in STATIC_TYPES else 'dynamic'
     
     def get_graph_stats(self) -> Dict[str, Any]:
         """그래프 통계 조회"""
@@ -311,6 +265,37 @@ class Neo4jKGLoader:
         
         # Neo4j에 주입
         return self.load_knowledge_graph(kg)
+    
+    def link_temporal_signals(self, days_window: int = 0):
+        """
+        주가 변동(PriceMovement)과 다른 시그널(Event, Issue 등)을 날짜/기업 기준으로 연결
+        
+        Args:
+            days_window: 날짜 매칭 허용 오차 (0 = 당일 일치)
+        """
+        logger.info(f"Linking temporal signals (window={days_window} days)...")
+        
+        with self.driver.session() as session:
+            # 1. PriceMovement -> Event/Issue/Earnings/Disclosure (TRIGGERED_BY)
+            # 같은 기업(HAS_SIGNAL)에 속하고, 날짜가 같은 경우 연결
+            query = f"""
+            MATCH (company)-[:HAS_SIGNAL]->(p:PriceMovement)
+            MATCH (company)-[:HAS_SIGNAL]->(s)
+            WHERE (s:Event OR s:Issue OR s:Earnings OR s:Disclosure)
+              AND p.date IS NOT NULL 
+              AND s.date IS NOT NULL
+              AND abs(duration.between(date(p.date), date(s.date)).days) <= $window
+            MERGE (p)-[r:TRIGGERED_BY]->(s)
+            SET r.reasoning = 'Temporal correlation (same day or within window)',
+                r.source = 'TemporalLinker'
+            RETURN count(r) as links
+            """
+            
+            result = session.run(query, window=days_window)
+            links = result.single()["links"]
+            logger.info(f"Created {links} TRIGGERED_BY links between PriceMovement and Signals.")
+            
+            return links
 
 
 def load_kg_from_gemini_pdf(

@@ -12,7 +12,6 @@ import json
 from src.agents.parsers.base_parser_agent import BaseParserAgent
 from src.agents.parsers.pdf_parser_agent import GeminiPDFParser
 from src.agents.parsers.price_parser_agent import PriceParserAgent
-from src.agents.parsers.dart_parser_agent import DARTParserAgent
 from src.agents.parsers.news_parser_agent import NewsParserAgent
 from src.agents.parsers.macro_parser_agent import MacroParserAgent
 from src.agents.parsers.fund_parser_agent import FundParserAgent
@@ -62,7 +61,6 @@ class KGConstructionAgent:
         # Parser Agents 초기화
         self.pdf_parser = GeminiPDFParser(use_batch=False)
         self.price_parser = PriceParserAgent()
-        self.dart_parser = DARTParserAgent()
         self.news_parser = NewsParserAgent(llm=llm) if llm else NewsParserAgent()
         self.macro_parser = MacroParserAgent()
         self.fund_parser = FundParserAgent()
@@ -161,7 +159,6 @@ class KGConstructionAgent:
         sources = {
             'pdf': [],
             'price': [],
-            'dart': [],
             'news': [],
             'macro': [],
             'fund': []
@@ -184,11 +181,6 @@ class KGConstructionAgent:
         price_path = self.raw_dir / 'price'
         if price_path.exists():
             sources['price'] = list(price_path.glob('*.csv'))
-        
-        # DART (디렉토리 전체)
-        dart_path = self.raw_dir / 'DART'
-        if dart_path.exists():
-            sources['dart'] = [dart_path]  # 디렉토리 자체 전달
         
         # 뉴스
         news_path = self.raw_dir / 'news'
@@ -242,18 +234,6 @@ class KGConstructionAgent:
                 data_sources['price'],
                 self.processed_dir
             )
-        
-        # DART Parser
-        if data_sources.get('dart'):
-            logger.info("Running DARTParserAgent")
-            try:
-                dart_kg = self.dart_parser.parse(data_sources['dart'][0])
-                output_file = self.processed_dir / "dart_kg.json"
-                self.dart_parser.to_json(dart_kg, output_file)
-                results['dart'] = {'total': 1, 'success': 1, 'failed': 0}
-            except Exception as e:
-                logger.error(f"DART parsing failed: {str(e)}")
-                results['dart'] = {'total': 1, 'success': 0, 'failed': 1, 'errors': [str(e)]}
         
         # News Parser (LLM 필요)
         if data_sources.get('news') and self.news_parser:
