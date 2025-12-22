@@ -45,6 +45,7 @@ dependencies = [
     
     # Phase 1.3: 시계열 처리
     "saxpy>=1.0.0",  # SAX-DM (Symbolic Aggregate approXimation)
+    "yfinance>=0.2.0",  # Yahoo Finance API
     "numpy>=1.24.0,<3.0.0",  # 시계열 계산
     
     # Phase 2: 에러 핸들링
