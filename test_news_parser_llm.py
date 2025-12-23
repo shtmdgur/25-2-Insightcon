@@ -2,6 +2,7 @@
 import os
 import json
 from pathlib import Path
+from src.config.llm_config import get_model
 
 # API 키 확인
 api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -64,7 +65,7 @@ try:
     client = genai.Client(api_key=api_key)
     
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=get_model("news_parsing"),
         contents=[{"role": "user", "parts": [{"text": full_prompt}]}],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

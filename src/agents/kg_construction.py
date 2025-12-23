@@ -238,11 +238,11 @@ class KGConstructionAgent:
         
         results = {}
         
-        # 1. PDF (가장 무거우므로 먼저 실행하거나 별도 관리)
-        if data_sources.get('pdf'):
-            results['pdf'] = self._batch_parse_pdfs(data_sources['pdf'], skip_existing)
-        
         # 병렬 처리할 파서 정의
+        def run_pdf():
+            if not data_sources.get('pdf'):
+                return 'pdf', None
+            return 'pdf', self._batch_parse_pdfs(data_sources['pdf'], skip_existing)
         def run_dart():
             if not data_sources.get('dart'):
                 return 'dart', None
@@ -295,10 +295,11 @@ class KGConstructionAgent:
                 skip_existing=skip_existing
             )
         
-        # 병렬 실행 (DART, News, Macro, Fund)
-        logger.info("Running CSV Parsers (병렬 처리)...")
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        # 병렬 실행 (PDF, DART, News, Macro, Fund)
+        logger.info("Running Parsers (병렬 처리)...")
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
+                executor.submit(run_pdf),
                 executor.submit(run_dart),
                 executor.submit(run_news),
                 executor.submit(run_macro),

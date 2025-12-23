@@ -2,6 +2,7 @@
 import os
 import google.generativeai as genai
 from dotenv import load_dotenv
+from src.config.llm_config import get_flash_model
 
 load_dotenv()
 
@@ -20,10 +21,10 @@ try:
 except Exception as e:
     print(f"Error listing models: {e}")
 
-print("Testing generation with gemini-pro...")
+print(f"Testing generation with {get_flash_model()}...")
 try:
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel(get_flash_model())
     response = model.generate_content("Hello")
     print(f"Response: {response.text}")
 except Exception as e:
-    print(f"Error with gemini-pro: {e}")
+    print(f"Error with {get_flash_model()}: {e}")
