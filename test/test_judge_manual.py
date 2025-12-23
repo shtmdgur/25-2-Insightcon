@@ -2,10 +2,13 @@
 import sys
 import os
 import io
+# [CRITICAL Fix for Matplotlib/NumPy OpenMP Conflict]
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["GOOGLE_API_KEY"] = "dummy" # Mock API Key
+
 from unittest.mock import MagicMock
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-os.environ["GOOGLE_API_KEY"] = "dummy" # Mock API Key
 
 
 from src.agents.judge_agent import JudgeAgent
@@ -55,7 +58,8 @@ def test_judge_synthesizer_validator_flow():
 
 ### Driver 1: HBM Market Share Expansion
 - **Thesis**: 경쟁사 대비 할인 요인이었던 HBM 점유율 격차가 4분기를 기점으로 축소될 전망입니다.
-- **Evidence**: Bull 측은 "이미 주요 고객사 퀄(Qual) 테스트가 마무리 단계"라고 언급했습니다.
+- **Evidence**: Bull 측의 주장을 인용하였으며, **Path Validation** 결과 다음 경로가 유효합니다:
+  > *Path: [HBM3e 인증] -> [출하량 증가] -> [DRAM 사업부 마진 개선]*
 
 ### Driver 2: DRAM Price Rebound
 - **Thesis**: 공급 제한에 따른 판가(ASP) 상승이 전사 영업이익 개선을 주도하고 있습니다.
@@ -81,6 +85,15 @@ graph LR
 #### Risk 1: HBM4 경쟁 심화
 - **Scenario**: 차세대 HBM4 시장에서 경쟁사가 먼저 선점할 경우 다시 Discount 요인 부각.
 - **Mitigation**: 동사는 Turn-key 솔루션으로 대응 중.
+
+## 6. 데이터 시각화 (Data Visualization)
+> **AI 토론 점수 및 주요 재무 지표 시각화**
+
+![AI 토론 점수](data/outputs/charts/debate_score.png)
+
+![Bull vs Bear 핵심 경쟁력 분석](data/outputs/charts/debate_radar.png)
+
+![분기별 실적 추이](data/outputs/charts/financial_trend.png)
 
 ---
 *Disclaimer: 이 리포트는 AI 에이전트에 의해 생성되었으며 투자 권유가 아닙니다.*

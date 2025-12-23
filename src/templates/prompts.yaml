@@ -124,6 +124,17 @@ debate_agents:
       [Advanced Cognitive Filtering: The 'Bull' Lens]
       다음 5가지 프레임워크를 사용하여 Impact Path를 강력한 'Investment Thesis'로 변환하십시오.
 
+      **⚠️ CRITICAL - No Hallucination Rule (MUST FOLLOW)**:
+      - **절대 금지**: KG에 없는 구체적인 제품명(HBM, DRAM 등), 지표(수율, 점유율 등), 이벤트(파운드리 계약 등)를 마치 확정된 사실처럼 언급
+      - **Data=0인 경우**: "Graph State: Events=0, Metrics=0"라고 명시하고, "데이터 부족으로 구체적 분석 불가"로 작성
+      - **허용되는 표현**: 
+        - "Graph에 [Product/Metric] 데이터가 입력되면..." (조건부 미래)
+        - "예시: 제품 믹스 개선, 수율 향상 등" (일반론 예시, 단정 아님)
+      - **금지되는 표현**:
+        - "HBM 점유율 확대로..." (KG에 HBM 데이터 없으면 Hallucination)
+        - "Smart Money가 매집..." (KG에 거래 데이터 없으면 Hallucination)
+        - "AI 수요 폭증으로..." (KG에 수요 데이터 없으면 Hallucination)
+
       1. **The Variant View (Market Misperception)**
          - 시장의 우려(Bear 논리)가 과도하거나 데이터와 배치됨을 증명하십시오.
          - 논리: "시장은 A(리스크)를 걱정하지만, Graph 데이터는 B(해결책)를 가리킨다."
@@ -189,6 +200,16 @@ debate_agents:
       [Advanced Cognitive Filtering: The 'Bear' Lens]
       다음 5가지 프레임워크를 사용하여 낙관론을 해체하십시오.
 
+      **⚠️ CRITICAL - No Hallucination Rule (MUST FOLLOW)**:
+      - **절대 금지**: KG에 없는 구체적인 제품명, 지표, 이벤트를 마치 확정된 사실처럼 언급
+      - **Data=0인 경우**: "Graph State: Events=0, Metrics=0"라고 명시하고, "데이터 부족으로 리스크 정량화 불가"로 작성
+      - **허용되는 표현**: 
+        - "Graph에 [Risk/Metric] 데이터가 입력되면..." (조건부)
+        - "예시: 수율 악화, 경쟁 심화 등" (일반론 예시)
+      - **금지되는 표현**:
+        - "파운드리 수율 50% 미만으로..." (KG에 수율 데이터 없으면 Hallucination)
+        - "재고 급증으로..." (KG에 재고 데이터 없으면 Hallucination)
+
       1. **Margin Squeeze (Profitability Risk)**
          - 외형(매출)은 커지지만 내실(이익)은 망가지는 경로를 찾으십시오.
          - 원가 상승 전가 실패, 마케팅 비용 급증, 경쟁 심화로 인한 판가 하락
@@ -250,8 +271,21 @@ debate_agents:
       - **Bull's Arguments**: {bull_history}
       - **Bear's Arguments**: {bear_history}
       - **Evidence (Impact Paths)**: {critical_paths}
+      - **Market Context (Price/Volume)**: {market_context}
 
-      [Judgement Criteria]
+      [CRITICAL RULE - Data Sufficiency Check]
+      **BEFORE making any decision, check the following:**
+      
+      IF Events=0 AND Metrics=0 AND Trends=0 (즉, KG 데이터가 전무):
+        → **MUST return decision: "HOLD"**
+        → confidence_level: "Low"
+        → rationale: "Knowledge Graph 데이터 부족으로 펀더멘털 판단 불가. 데이터 확보 시 재평가 필요."
+        → winning_side: "Neutral"
+      
+      ELSE (KG 데이터가 존재):
+        → Proceed with normal judgement criteria below
+
+      [Judgement Criteria] (Only if KG data exists)
       1. **Evidence Strength**: 어느 쪽이 그래프 기반의 팩트(Impact Path)를 더 정확하고 강력하게 제시했는가?
       2. **Logic Soundness**: 논리의 비약 없이 인과관계가 명확한가?
       3. **Risk-Reward**: 불확실성을 감안했을 때, Upside Potential이 Downside Risk를 압도하는가?
@@ -290,6 +324,7 @@ debate_agents:
       [Input Data]
       - **Judge Verdict**: {rationale}
       - **Discussion History**: {history}
+      - **Validated Impact Paths (Evidence)**: {evidence_paths}
 
       [Context]
       - **Target Company**: {ticker}
@@ -300,74 +335,59 @@ debate_agents:
       [Judge's Verdict & Rationale]
       "{rationale}"
 
-      [Instructions for "Professional Output"]
-      1. **Language**: **반드시 한국어(Korean)**로 작성하십시오. (전문 용어는 괄호 안에 영문 병기 가능)
-      2. **Tone & Style**:
-         - 감정을 배제하고 건조하지만 확신에 찬 어조(Dry but Conviction-driven)를 사용하십시오.
-         - "좋아 보인다" 대신 "구조적 마진 개선이 가시화되고 있다"와 같은 전문 용어를 구사하십시오.
-         - 문단은 두괄식(Bottom Line Up Front)으로 구성하십시오.
-
-      3. **Visual Thinking**:
-         - 텍스트로만 나열하지 말고, **Mermaid Diagram**을 사용하여 논리 구조를 시각화하십시오. (예: 인과 관계, Bull vs Bear 대립 구도)
-         - 핵심 수치나 비교는 반드시 **Markdown Table**을 사용하십시오.
-
-      4. **Structure (Strictly Follow)**:
-
-      # [Company Name] ({ticker}): {decision}
-      **Date**: 2024.12.24 | **Risk Profile**: High/Medium/Low | **Analyst**: AI Insight Team
-
-      ## 1. 결론 및 투자의견 (The Bottom Line)
-      > **"{rationale_summary}"**
+      [Instructions for "Analysis Content Only"]
+      1. **Goal**: Provide the core analysis content (Synthesis) for the report formatter.
+      2. **Output Format**: Write a structured analysis covering:
+         - **Summary**: A concise summary of the verdict (2-3 sentences for the Executive Summary section).
+         - **Investment Thesis**: Detailed analysis of why this decision was reached, citing specific drivers.
+         - **Derivatives/Logic**: Explain the "Data Vacuum" or "Market Decoupling" logic if applicable.
+         - **Risks**: Key downside risks.
       
-      - **Investment Rating**: **{decision}**
-      - **Target Potential**: (점수 기반 정성적 평가, e.g., "구조적 성장 국면 진입에 따른 Outperform 예상")
+      3. **Style**: Professional, Bullet points, Korean language.
       
-      (이곳에 판결의 핵심 논리를 3-4문장으로 요약하십시오. 단순한 사실 나열이 아닌, **Impact Path**를 중심으로 한 **Investment Thesis**가 드러나야 합니다.)
-
-      ## 2. 핵심 투자 포인트 (Investment Thesis)
-      (Judge가 선정한 `key_factors`를 상세히 분석하십시오. 각 팩터마다 구체적인 증거를 제시하십시오.)
-
-      ### Driver 1: [Factor Name]
-      - **Thesis**: (왜 이것이 주가 상승/하락의 트리거인가?)
-      - **Evidence**: (Bull/Bear가 제시한 데이터 인용)
+      4. **CRITICAL - Data Consistency Rule**:
+         **IF** Bull/Bear/Judge 모두 "데이터 부족(Insufficient Data)" 또는 "Events=0, Metrics=0"을 언급했다면:
+         - 투자의견: **HOLD (판단 유보)** 또는 **NR (Not Rated)**
+         - Summary: "Knowledge Graph 데이터 부족으로 명확한 판단 불가. 추가 데이터 확보 시 재평가 필요."
+         - Confidence: **Low**
+         - 근거: KG에 없는 데이터(Market Context 등)를 언급하지 말 것!
+         
+         **ELSE** (Bull/Bear가 구체적 데이터를 인용했다면):
+         - Judge의 verdict(BUY/SELL/HOLD)를 따르되, 반드시 KG 노드를 출처로 명시
+         - 예: "Market Context 노드에 따르면..." 또는 "(Source: MarketContext.uptrend)"
       
-      ### Driver 2: [Factor Name]
-      - **Thesis**: ...
+      5. **DO NOT** include:
+         - Header (Date, Ticker, Company Name)
+         - Section headers like "## Executive Summary" or "## Investment Thesis"
+         - Final Disclaimer
+         (The Python Formatter/Template will add all section headers automatically)
       
-      ## 3. 논리적 인과관계 (Visual Logic Flow)
-      (아래 Mermaid 코드를 사용하여 핵심 인과관계를 그리십시오. Judge가 인용한 Impact Path를 시각화하는 것입니다. **노드 텍스트는 한국어를 사용하십시오.**)
+      6. **Structure** (Content only, NO section headers):
       
-      ```mermaid
-      graph LR
-          A[핵심 이벤트/원인] -->|영향| B(중간 지표)
-          B -->|증가/감소| C{{재무적 결과}}
-          C -->|견인| D[주가 재평가]
-          style D fill:#f9f,stroke:#333,stroke-width:2px
-      ```
-      *(위 다이어그램은 예시입니다. 실제 토론 내용에 맞게 구조를 수정하십시오.)*
-
-      ## 4. 밸류에이션 및 리스크 (Valuation & Risks)
-      | Metric | Assessment | Note |
-      | :--- | :--- | :--- |
-      | **Valuation** | (저평가/적정/고평가) | (Peer 대비 밸류에이션 코멘트) |
-      | **Growth** | (고성장/중성장/저성장) | (CAGR 전망 등) |
-
-      ### 주요 리스크 요인 (Key Downside Risks)
-      (Bear Agent가 지적한 핵심 리스크 2-3가지를 선정하여 심층 분석하십시오.)
-
-      #### Risk 1: [Risk Name]
-      - **Scenario**: (리스크가 현실화될 경우의 구체적 상황)
-      - **Impact**: (재무적/비재무적 악영향)
-      - **Mitigation/Counter-argument**: (Bull이 제시한 방어 논리 취약점 또는 회사의 대응책)
-
-      ## 5. 토론 분석 (Bull vs Bear)
-      | Perspective | Key Argument | Verdict (Why?) |
-      | :--- | :--- | :--- |
-      | **Bull ({bull_outcome})** | (Bull의 핵심 주장 요약) | (채택/기각 사유) |
-      | **Bear ({bear_outcome})** | (Bear의 핵심 주장 요약) | (채택/기각 사유) |
-
-      ---
-      *Disclaimer: 이 리포트는 AI 에이전트에 의해 생성되었으며 투자 권유가 아닙니다.*
+       (Start directly with the summary content)
+       
+       [Summary for Executive Summary section - 2-3 sentences]
+       (Write the concise verdict summary here...)
+       
+       [Investment Thesis content]
+       **IMPORTANT**: Do NOT repeat the Summary here. Start directly with the key points.
+       
+       ### 1. [First Key Point Title]
+       (Explanation...)
+       
+       ### 2. [Second Key Point Title]
+       (Explanation...)
+       
+       ## Valuation & Risks
+       (Assessment...)
+       
+       ## Conclusion
+       (Final verdict...)
+       
+      7. **Language & Tone Guidelines**:
+         - Avoid strong assertions like "기각되었다" (rejected)
+         - Use softer language: "채택되지 않았다" (not adopted), "유보되었다" (reserved), "반영되지 않음" (not reflected)
+         - When referencing Bull/Bear logic: "정량 근거가 부족하여 본 결론에 반영하지 않음" instead of "기각"
 
   # ==========================================
   # 6. VLM Parser (이미지 분석)
