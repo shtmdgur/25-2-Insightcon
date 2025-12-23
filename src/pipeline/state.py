@@ -37,6 +37,7 @@ class ReportState(TypedDict):
     query: str  # 사용자 질의
     target_companies: Optional[List[str]]  # 분석 대상 기업 목록
     report_type: Literal["scan", "deep"]  # 분석 깊이 ("scan": Quick, "deep": Deep)
+    target_date: Optional[str]  # 분석 기준 날짜 (YYYY-MM-DD, Price DB 조회용)
     document: Optional[str]  # 새로 처리할 문서 (파일 경로 또는 텍스트)
     
     # ========================================

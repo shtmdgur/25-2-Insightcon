@@ -1,13 +1,34 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 from src.config.prompt_loader import PROMPTS
+from src.models.nodes import RELATION_PROPERTIES_BY_TYPE
 
-# 토론 라운드별 검색 전략 (깊이 진화)
+# LLM Tool Calling 지원 (Price + Graph)
+ALL_TOOLS = []
+try:
+    from src.tools.price_tools import PRICE_TOOLS
+    ALL_TOOLS.extend(PRICE_TOOLS)
+except ImportError:
+    pass
+
+try:
+    from src.tools.graph_tools import GRAPH_TOOLS
+    ALL_TOOLS.extend(GRAPH_TOOLS)
+except ImportError:
+    pass
+
+TOOLS_AVAILABLE = len(ALL_TOOLS) > 0
+
+# 토론 라운드별 검색 전략 (Broad Search → LLM Cognitive Filtering)
+# hop: 탐색 깊이, limit: 반환 경로 수
 DEBATE_ROUND_STRATEGY = {
-    1: {"hops": 2, "limit": 20},  # 1라운드: 넓고 얕게 - 다양한 논점 제기
-    2: {"hops": 3, "limit": 15},  # 2라운드: 중간 깊이 - 구체적 반박
-    3: {"hops": 4, "limit": 10}   # 3라운드: 깊고 정밀 - 핵심 인과로 결정타
+    1: {"hops": 2, "limit": 30},  # 1라운드: 얕고 넓게 - 다양한 논점
+    2: {"hops": 3, "limit": 25},  # 2라운드: 중간 깊이
+    3: {"hops": 4, "limit": 20}   # 3라운드: 깊이 탐색 - 핵심 인과
 }
+
+# 초기 노드 추출 시 타입당 최대 개수 (부족하면 LLM이 explore_graph Tool 호출)
+NODE_EXTRACT_LIMIT = 10
 
 class BaseDebateAgent(ABC):
     """
@@ -18,6 +39,7 @@ class BaseDebateAgent(ABC):
     - Broad Search & Cognitive Filtering 지향:
       1. 범용 경로 탐색 (Broad Search) -> 모든 가능성 열어둠
       2. 인지적 필터링 (Cognitive Filtering) -> LLM이 맥락에 맞춰 선별
+    - Agentic Tool Calling: LLM이 필요 시 주가/그래프 데이터 동적 조회
     """
     
     def __init__(self, llm, neo4j_connection=None, role: str = "base"):
@@ -26,6 +48,12 @@ class BaseDebateAgent(ABC):
         self.role = role
         # 로드된 프롬프트 캐싱
         self.prompts = PROMPTS
+        
+        # Tool Binding (LLM이 주가/그래프 데이터 동적 조회 가능)
+        if TOOLS_AVAILABLE and hasattr(llm, 'bind_tools'):
+            self.llm_with_tools = llm.bind_tools(ALL_TOOLS)
+        else:
+            self.llm_with_tools = llm  # Fallback: 도구 없이 사용
     
     @abstractmethod
     def argue(
@@ -70,38 +98,51 @@ class BaseDebateAgent(ABC):
             # 현재 라운드 결과를 캐시에 저장 (State 업데이트는 Workflow에서 처리)
             # 여기서는 반환만 하고, Workflow가 state["debate_state"]["cached_paths"][round] = paths 저장
         
+        # 초기 Price 컨텍스트 조회 (target_date가 있는 경우)
+        market_context = state.get("market_context", "")
+        if not market_context:
+            target_date = state.get("target_date")
+            ticker = target_company if target_company else state.get("query", "")
+            if target_date and ticker:
+                try:
+                    from src.utils.price_data_loader import PriceDataLoader
+                    loader = PriceDataLoader()
+                    market_context = loader.get_context(ticker, target_date)
+                except Exception as e:
+                    market_context = f"[Price 조회 실패: {e}]"
+        
         return {
-            "events": self._extract_events(state),
-            "trends": self._extract_trends(state),
-            "metrics": self._extract_metrics(state),
-            "impact_paths": impact_paths
+            "agents": self._extract_nodes_by_type(state, ["IDM", "Fabless", "Foundry", "OSAT"]),
+            "suppliers": self._extract_nodes_by_type(state, ["Supplier"]),
+            "earnings": self._extract_nodes_by_type(state, ["Earnings"]),
+            "price_moves": self._extract_nodes_by_type(state, ["PriceMovement"]),
+            "issues": self._extract_nodes_by_type(state, ["Issue", "Disclosure"]),
+            "macros": self._extract_nodes_by_type(state, ["EconomicIndicator"]),
+            "impact_paths": impact_paths,
+            "query": state.get("query", ""),
+            "market_context": market_context  # Price DB 시장 데이터 (초기 조회 또는 state 값)
         }
 
     def _find_impact_paths(self, target_company: str, debate_count: int = 1, cached_paths: Dict[int, List[Dict]] = None) -> List[Dict]:
         """
-        [Progressive Path Expansion with Caching]
-        기업에 영향을 주는 모든 '사건'과 '변화'의 경로를 범용적으로 추출
-        (미리 Bull/Bear를 나누지 않음)
+        [Layered Traversal Strategy - Schema v3.0]
         
-        전략: 이전 라운드 경로 재사용 + 새로운 깊이만 추가 조회
-        - Round 1: 2-hop 쿼리 (20개) → 캐시 저장
-        - Round 2: 캐시 재사용 + 3-hop만 쿼리 (15개) → 병합
-        - Round 3: 캐시 재사용 + 4-hop만 쿼리 (10개) → 병합
+        레이어별 관계 탐색:
+        1. Agent → Signal (HAS_SIGNAL): 기업 직접 시그널
+        2. Signal → Signal (TRIGGERED_BY): 인과 체인
+        3. Macro → Agent (AFFECTS): 거시경제 영향
+        4. Agent ↔ Agent (COMPETES_WITH, PARTNERS_WITH, SUPPLIES): 경쟁/협력/공급망
         
-        효과: 중복 쿼리 제거로 Neo4j 부하 50% 절감
-        
-        Cypher 패턴:
-        (Event|Trend|Policy)-[:*exact_hop]-(Company)
+        벡터 임베딩 활용 (준비):
+        - 향후 query embedding과 node embedding의 코사인 유사도로 관련 노드 우선 탐색
         """
         if not self.neo4j:
             return []
         
-        # 라운드별 검색 전략 선택
         config = DEBATE_ROUND_STRATEGY.get(debate_count, DEBATE_ROUND_STRATEGY[1])
-        target_hops = config["hops"]
         total_limit = config["limit"]
+        max_hops = config.get("hops", 2)  # 기본 2홉
         
-        # 캐시 초기화
         if cached_paths is None:
             cached_paths = {}
         
@@ -111,97 +152,156 @@ class BaseDebateAgent(ABC):
             if round_num in cached_paths:
                 accumulated_paths.extend(cached_paths[round_num])
         
-        # 현재 라운드에서 새로 조회할 hop 계산
-        # CRITICAL: Round 1에서는 1-hop 직접 관계 포함해야 함!
-        # Round 1: [*1..2] (직접 + 인접 관계 모두)
-        # Round 2+: [*3], [*4] (정확한 깊이만, 캐시에 없는 것)
-        if debate_count == 1:
-            hop_pattern = f"[*1..{target_hops}]"  # 예: [*1..2]
-        else:
-            hop_pattern = f"[*{target_hops}]"      # 예: [*3], [*4]
+        new_paths = []
         
-        # 새로운 hop depth만 조회 (기존 경로와 중복 방지)
-        query = f"""
-        MATCH path = (source)-{hop_pattern}-(target:Company {{name: $name}})
-        WHERE source:Event OR source:Trend OR source:Metric OR source:Policy
-        RETURN path
-        LIMIT {total_limit}
+        # ===== Broad Search: 모든 관계 탐색 (LLM이 Cognitive Filtering) =====
+        # 라운드별 hop 깊이로 탐색, LLM이 관련성 판단
+        broad_query = f"""
+            MATCH path = (n)-[r*1..{max_hops}]-(target)
+            WHERE target.name = $name
+            RETURN path
+            LIMIT {total_limit}
         """
         
-        new_paths = []
         try:
             with self.neo4j.driver.session() as session:
-                result = session.run(query, {"name": target_company})
-                # Path 객체를 딕셔너리로 변환 (Node, Edge 정보 포함)
+                result = session.run(broad_query, {"name": target_company})
                 for record in result:
-                    p = record["path"]
-                    # 간단화: 노드 이름들의 시퀀스로 변환 (LLM 가독성)
-                    # Neo4j Node 객체 안전하게 변환
-                    nodes = []
-                    for n in p.nodes:
-                        try:
-                            # Neo4j Node는 dict() 대신 dict(n.items()) 사용
-                            if hasattr(n, 'items'):
-                                nodes.append({k: v for k, v in n.items()})
-                            elif hasattr(n, '__dict__'):
-                                nodes.append(dict(n))
-                            else:
-                                nodes.append({"name": str(n)})
-                        except Exception:
-                            nodes.append({"name": str(n)})
-                    
-                    # 관계(Relationship) 타입 추출
-                    rels = []
-                    for r in p.relationships:
-                        try:
-                            rels.append(r.type if hasattr(r, 'type') else str(r))
-                        except Exception:
-                            rels.append("UNKNOWN")
-                    
-                    # 텍스트 표현
-                    chain_text = ""
-                    for i in range(len(rels)):
-                        node_name = nodes[i].get("name", "Unknown") if isinstance(nodes[i], dict) else str(nodes[i])
-                        chain_text += f"{node_name} --[{rels[i]}]--> "
-                    if nodes:
-                        last_node_name = nodes[-1].get("name", "Unknown") if isinstance(nodes[-1], dict) else str(nodes[-1])
-                        chain_text += last_node_name
-                    
-                    new_paths.append({
-                        "text": chain_text,
-                        "nodes": nodes,
-                        "relationships": rels,
-                        "hop_depth": target_hops  # 디버깅용 (수정: new_hop -> target_hops)
-                    })
+                    path_data = self._process_path_record(record)
+                    if path_data:
+                        new_paths.append(path_data)
         except Exception as e:
-            print(f"[경고] 인과 경로 탐색 실패: {e}")
+            print(f"[경고] Neo4j 쿼리 실패: {e}")
         
-        # 캐시된 경로와 새 경로 병합
         all_paths = accumulated_paths + new_paths
-        
-        # 총 limit 적용 (최신 경로 우선)
         return all_paths[-total_limit:] if len(all_paths) > total_limit else all_paths
-
-    def _extract_events(self, state: Dict) -> List[Dict]:
-        """
-        이벤트 추출 (단순 수집, 판단은 LLM에게 위임)
-        """
-        graphrag = state.get("graphrag_results", {})
-        nodes = graphrag.get("subgraph", {}).get("nodes", [])
+    
+    def _process_path_record(self, record) -> Optional[Dict]:
+        """Neo4j Path 레코드를 딕셔너리로 변환 (공통 로직)"""
+        try:
+            p = record["path"]
+            
+            # 노드 추출 (모든 속성 포함)
+            nodes = []
+            for n in p.nodes:
+                try:
+                    if hasattr(n, 'items'):
+                        node_dict = {k: v for k, v in n.items()}
+                        # 라벨 추출 (노드 타입)
+                        if hasattr(n, 'labels'):
+                            node_dict["_labels"] = list(n.labels)
+                        nodes.append(node_dict)
+                    elif hasattr(n, '__dict__'):
+                        nodes.append(dict(n))
+                    else:
+                        nodes.append({"name": str(n)})
+                except Exception:
+                    nodes.append({"name": str(n)})
+            
+            # 관계 추출 (타입 + 속성)
+            rels = []
+            for r in p.relationships:
+                try:
+                    r_data = {"type": "UNKNOWN", "properties": {}}
+                    if hasattr(r, 'type'):
+                        r_data["type"] = r.type
+                    else:
+                        r_data["type"] = str(r)
+                    
+                    if hasattr(r, 'items'):
+                        r_data["properties"] = {k: v for k, v in r.items()}
+                    elif hasattr(r, '_properties'):
+                        r_data["properties"] = dict(r._properties)
+                    
+                    rels.append(r_data)
+                except Exception as e:
+                    print(f"Rel extraction error: {e}")
+                    rels.append({"type": "UNKNOWN", "properties": {}})
+            
+            # 텍스트 표현 생성
+            chain_text = self._build_chain_text(nodes, rels)
+            
+            return {
+                "text": chain_text,
+                "nodes": nodes,
+                "relationships": rels,
+                "hop_depth": len(rels)
+            }
+        except Exception as e:
+            print(f"[경고] Path 처리 실패: {e}")
+            return None
+    
+    def _build_chain_text(self, nodes: List[Dict], rels: List[Dict]) -> str:
+        """노드-관계 체인을 텍스트로 변환 (LLM 가독성)"""
+        chain_text = ""
+        for i in range(len(rels)):
+            node_name = nodes[i].get("name", "Unknown") if isinstance(nodes[i], dict) else str(nodes[i])
+            node_type = ""
+            if isinstance(nodes[i], dict) and "_labels" in nodes[i]:
+                node_type = f":{nodes[i]['_labels'][0]}" if nodes[i]['_labels'] else ""
+            
+            rel_type = rels[i].get("type", "UNKNOWN")
+            rel_props = rels[i].get("properties", {})
+            
+            # 스키마 기반 동적 속성 추출
+            type_props = RELATION_PROPERTIES_BY_TYPE.get(rel_type, [])
+            valid_props = []
+            for k in type_props:
+                if k in rel_props and rel_props[k] is not None:
+                    valid_props.append(f"{k}:{rel_props[k]}")
+            
+            props_str = f" {{{', '.join(valid_props)}}}" if valid_props else ""
+            chain_text += f"({node_name}{node_type}) --[{rel_type}{props_str}]--> "
         
-        return [n for n in nodes if n.get("type", "") == "Event"]
+        if nodes:
+            last_node = nodes[-1]
+            last_name = last_node.get("name", "Unknown") if isinstance(last_node, dict) else str(last_node)
+            last_type = ""
+            if isinstance(last_node, dict) and "_labels" in last_node:
+                last_type = f":{last_node['_labels'][0]}" if last_node['_labels'] else ""
+            chain_text += f"({last_name}{last_type})"
+        
+        return chain_text
 
-    def _extract_trends(self, state: Dict) -> List[Dict]:
-        """트렌드 추출"""
-        graphrag = state.get("graphrag_results", {})
-        nodes = graphrag.get("subgraph", {}).get("nodes", [])
-        return [n for n in nodes if n.get("type", "") == "Trend"]
-
-    def _extract_metrics(self, state: Dict) -> List[Dict]:
-        """지표 추출"""
-        graphrag = state.get("graphrag_results", {})
-        nodes = graphrag.get("subgraph", {}).get("nodes", [])
-        return [n for n in nodes if n.get("type", "") == "Metric"]
+    def _extract_nodes_by_type(self, state: Dict, types: List[str]) -> List[Dict]:
+        """
+        특정 타입의 노드 추출 (Neo4j 직접 쿼리)
+        
+        graphrag_results가 비어있으므로 Neo4j에서 직접 조회
+        """
+        if not self.neo4j:
+            return []
+        
+        nodes = []
+        target_company = state.get("target_companies", [None])[0]
+        
+        try:
+            with self.neo4j.driver.session() as session:
+                # 타겟 기업과 연결된 특정 타입 노드 조회
+                for node_type in types:
+                    query = f"""
+                        MATCH (n:{node_type})
+                        WHERE n.name IS NOT NULL
+                        OPTIONAL MATCH (n)-[r]-(target)
+                        WHERE target.name = $target
+                        RETURN DISTINCT n
+                        LIMIT {NODE_EXTRACT_LIMIT}
+                    """
+                    result = session.run(query, {"target": target_company or ""})
+                    for record in result:
+                        n = record["n"]
+                        if hasattr(n, 'items'):
+                            node_dict = {k: v for k, v in n.items()}
+                        elif hasattr(n, '__dict__'):
+                            node_dict = dict(n)
+                        else:
+                            node_dict = {"name": str(n)}
+                        node_dict["type"] = node_type
+                        nodes.append(node_dict)
+        except Exception as e:
+            print(f"[경고] 노드 추출 실패: {e}")
+        
+        return nodes
 
     def _build_prompt(self, query: str, data: Dict, opponent_arg: Optional[str], history: str) -> str:
         """
@@ -249,50 +349,52 @@ class BaseDebateAgent(ABC):
         """
         base_summary_tpl = self.prompts.get("debate_agents", {}).get("base", {}).get("data_summary", "")
         
-        # 기본 요약 생성
+        # 기본 요약 생성 (v3.0 Schema)
         summary = base_summary_tpl.format(
             query=data.get("query", "알 수 없음"),
-            event_count=len(data.get("events", [])),
-            recent_event_count=0, # TODO: 최근 필터 구현
-            trend_count=len(data.get("trends", [])),
-            metric_count=len(data.get("metrics", [])),
+            agent_count=len(data.get("agents", [])),
+            supplier_count=len(data.get("suppliers", [])),
+            earnings_count=len(data.get("earnings", [])),
+            price_move_count=len(data.get("price_moves", [])),
+            issue_count=len(data.get("issues", [])),
+            macro_count=len(data.get("macros", [])),
             path_count=len(data.get("impact_paths", []))
         )
         
         details = []
         
-        # 데이터 리스팅
-        # 1. Events (NULL 안전성 강화)
-        events = data.get("events", [])
-        if events:
-            details.append("\n### Events (이벤트)")
-            for e in events[:5]:
-                name = e.get('name', 'Unknown')
-                desc = e.get('description', 'N/A')
-                details.append(f"- {name}: {desc}")
-                
-        # 2. Trends
-        trends = data.get("trends", [])
-        if trends:
-            details.append("\n### Trends (트렌드)")
-            for t in trends[:3]:
-                details.append(f"- {t.get('name', 'Unknown')}")
-                 
-        # 3. Metrics (NULL 안전성 강화)
-        metrics = data.get("metrics", [])
-        if metrics:
-            details.append("\n### Metrics (지표)")
-            for m in metrics[:5]:
-                val = m.get('properties', {}).get('value', 'N/A')
-                name = m.get('name', 'Unknown')
-                details.append(f"- {name}: {val}")
+        # 상세 데이터 리스팅
+        # 1. Signals (Earnings & Price & Issues)
+        all_signals = data.get("earnings", []) + data.get("price_moves", []) + data.get("issues", [])
+        if all_signals:
+            details.append("\n### Signals (Events & Issues)")
+            for s in all_signals[:8]: # 상위 8개만 표시
+                name = s.get('name', 'Unknown')
+                stype = s.get('type', 'Unknown')
+                desc = s.get('properties', {}).get('description') or s.get('description', '')
+                if not desc and 'magnitude' in s:
+                    desc = f"{s.get('direction')} {s.get('magnitude')}"
+                details.append(f"- [{stype}] {name}: {desc}")
 
-        # 4. Impact Paths (Cognitive Filtering의 핵심)
+        # 2. Macros
+        macros = data.get("macros", [])
+        if macros:
+            details.append("\n### Macro Indices")
+            for m in macros[:3]:
+                details.append(f"- {m.get('name', 'Unknown')}")
+
+        # 3. Impact Paths
         impact_paths = data.get("impact_paths", [])
         if impact_paths:
             details.append("\n### Impact Paths (인과 경로)")
             for i, p in enumerate(impact_paths[:10]):
                 details.append(f"- [Path {i+1}] {p.get('text', 'N/A')}")
+        
+        # 4. Market Context (Price DB) - 시장 상황 데이터
+        market_context = data.get("market_context", "")
+        if market_context:
+            details.append("\n### Market Context (시장 상황)")
+            details.append(market_context)
                 
         return summary + "\n".join(details)
         

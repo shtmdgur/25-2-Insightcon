@@ -186,6 +186,7 @@ def main():
         "query": "삼성전자 투자 판단",
         "target_companies": ["삼성전자"],
         "report_type": "deep",
+        "target_date": "2023-01-05",  # Price DB 조회용 기준 날짜
         "document": None,
         
         # GraphRAG 결과 (Mock)
