@@ -1,0 +1,266 @@
+
+import matplotlib
+matplotlib.use('Agg') # GUI 없는 환경용
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+import os
+from typing import List, Dict, Tuple
+
+class MatplotlibVisualizer:
+    """
+    리포트용 차트 생성을 위한 시각화 유틸리티 클래스
+    Matplotlib를 사용하여 정적 이미지를 생성합니다.
+    """
+    
+    
+    def __init__(self, save_dir: str = "data/outputs/charts"):
+        self.save_dir = save_dir
+        os.makedirs(self.save_dir, exist_ok=True)
+        
+        # 한글 폰트 설정 (Windows: 맑은 고딕 기준)
+        self._setup_font()
+        
+        # 스타일 설정
+        try:
+            plt.style.use('seaborn-v0_8-whitegrid')
+        except:
+            pass
+        
+    def _setup_font(self):
+        """한글 폰트 설정 (강화 버전)"""
+        import platform
+        from matplotlib import font_manager
+        
+        system = platform.system()
+        
+        # Windows에서 사용 가능한 한글 폰트 찾기
+        if system == "Windows":
+            korean_fonts = [
+                'Malgun Gothic',
+                'NanumGothic', 
+                'NanumBarunGothic',
+                'Gulim',
+                'Batang',
+                'Dotum'
+            ]
+            
+            # 설치된 폰트 목록에서 한글 폰트 찾기
+            available_fonts = [f.name for f in font_manager.fontManager.ttflist]
+            
+            font_to_use = None
+            for font in korean_fonts:
+                if font in available_fonts:
+                    font_to_use = font
+                    break
+            
+            if font_to_use:
+                plt.rcParams['font.family'] = font_to_use
+                print(f"✅ Korean font set to: {font_to_use}")
+            else:
+                # 폰트를 찾지 못한 경우 기본 설정
+                plt.rcParams['font.family'] = 'sans-serif'
+                print("⚠️ No Korean font found. Falling back to sans-serif")
+                
+        elif system == "Darwin":  # macOS
+            plt.rcParams['font.family'] = 'AppleGothic'
+        else:  # Linux
+            plt.rcParams['font.family'] = 'NanumGothic'
+        
+        # 마이너스 기호 깨짐 방지
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 폰트 캐시 리빌드 (필요시)
+        try:
+            font_manager._rebuild()
+        except:
+            pass
+
+    def plot_financial_trend(
+        self, 
+        periods: List[str], 
+        revenue: List[float], 
+        op_margin: List[float],
+        filename: str = "financial_trend.png"
+    ) -> str:
+        """
+        매출액(Bar) 및 영업이익률(Line) 추이 그래프 생성
+        
+        Args:
+            periods: 기간 리스트 (예: ['23.1Q', '23.2Q', ...])
+            revenue: 매출액 리스트 (단위: 조원)
+            op_margin: 영업이익률 리스트 (단위: %)
+            filename: 저장할 파일명
+            
+        Returns:
+            저장된 이미지의 절대 경로
+        """
+        fig, ax1 = plt.subplots(figsize=(10, 6))
+
+        # 1. Revenue (Bar Chart)
+        bars = ax1.bar(periods, revenue, color='#00539F', alpha=0.7, label='Revenue (Trillion Won)')
+        ax1.set_xlabel('Period', fontsize=12)
+        ax1.set_ylabel('Revenue (Trillion Won)', color='#00539F', fontsize=12)
+        ax1.tick_params(axis='y', labelcolor='#00539F')
+        
+        # Value labels
+        for bar in bars:
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height,
+                     f'{height:.1f}',
+                     ha='center', va='bottom')
+
+        # 2. Operating Margin (Line Chart) - dual axis
+        ax2 = ax1.twinx()
+        line = ax2.plot(periods, op_margin, color='#E31E24', marker='o', linewidth=2, label='Operating Margin (%)')
+        ax2.set_ylabel('Operating Margin (%)', color='#E31E24', fontsize=12)
+        ax2.tick_params(axis='y', labelcolor='#E31E24')
+        ax2.set_ylim(min(op_margin)-5, max(op_margin)+5)
+
+        # Value labels
+        for i, v in enumerate(op_margin):
+            ax2.text(i, v + 0.5, f'{v}%', color='#E31E24', fontweight='bold', ha='center')
+
+        plt.title('Quarterly Performance Trend', fontsize=16, pad=20)
+        
+        # Layout and save
+        save_path = os.path.join(self.save_dir, filename)
+        abs_path = os.path.abspath(save_path)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300)
+        plt.close()
+        
+        return abs_path
+
+    def plot_debate_score(
+        self, 
+        bull_score: float, 
+        bear_score: float,
+        filename: str = "debate_score.png"
+    ) -> str:
+        """
+        Bull vs Bear 토론 점수 차트 생성 (Horizontal Bar Chart)
+        """
+        from matplotlib import font_manager
+        
+        # 한글 폰트 찾기
+        korean_font = None
+        for font in font_manager.fontManager.ttflist:
+            if 'Malgun' in font.name or 'malgun' in font.name.lower():
+                korean_font = font_manager.FontProperties(fname=font.fname)
+                break
+        
+        fig, ax = plt.subplots(figsize=(8, 4))
+        
+        categories = ['Bull (Bullish)', 'Bear (Bearish)']
+        scores = [bull_score, bear_score]
+        colors = ['#ff6b6b', '#4ecdc4']
+        
+        bars = ax.barh(categories, scores, color=colors, alpha=0.8, edgecolor='black')
+        
+        # Score labels
+        for i, (bar, score) in enumerate(zip(bars, scores)):
+            width = bar.get_width()
+            ax.text(width + 2, bar.get_y() + bar.get_height()/2, 
+                   f'{score:.0f}', 
+                   va='center', ha='left', fontsize=12, fontweight='bold')
+        
+        ax.set_xlabel('Debate Score (out of 100)', fontsize=11)
+        ax.set_title('AI Debate Score Comparison', fontsize=14, fontweight='bold', pad=15)
+        ax.set_xlim(0, 100)
+        ax.grid(axis='x', alpha=0.3)
+        
+        save_path = os.path.join(self.save_dir, filename)
+        abs_path = os.path.abspath(save_path)
+        
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        return abs_path
+
+    def plot_radar_chart(
+        self,
+        categories: List[str],
+        bull_values: List[int],
+        bear_values: List[int],
+        filename: str = "debate_radar.png"
+    ) -> str:
+        """
+        Bull vs Bear 5각/6각 레이더 차트 생성 (상황 종합 분석용)
+        """
+        import numpy as np
+        
+        # 각도 계산
+        N = len(categories)
+        angles = [n / float(N) * 2 * np.pi for n in range(N)]
+        angles += angles[:1] # 닫힌 도형을 위해 시작점 반복
+        
+        # 값 반복 (닫힌 도형)
+        bull_values = bull_values + bull_values[:1]
+        bear_values = bear_values + bear_values[:1]
+        
+        # 차트 생성
+        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+        
+        # Bull Plot
+        ax.plot(angles, bull_values, linewidth=2, linestyle='solid', label='Bull (Buy)', color='#E74C3C')
+        ax.fill(angles, bull_values, '#E74C3C', alpha=0.2)
+        
+        # Bear Plot
+        ax.plot(angles, bear_values, linewidth=2, linestyle='solid', label='Bear (Sell)', color='#4A90E2')
+        ax.fill(angles, bear_values, '#4A90E2', alpha=0.2)
+        
+        # Label settings
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(categories, fontsize=11, fontweight='bold')
+        
+        # Y-axis settings
+        ax.set_rlabel_position(0)
+        plt.yticks([20, 40, 60, 80], ["20", "40", "60", "80"], color="grey", size=8)
+        plt.ylim(0, 100)
+        
+        plt.title('Bull vs Bear Core Competitiveness Analysis', size=15, y=1.05)
+        plt.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+        
+        save_path = os.path.join(self.save_dir, filename)
+        abs_path = os.path.abspath(save_path)
+        
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        return abs_path
+
+    def plot_network_graph(self, nodes: List[str], edges: List[Tuple[str, str]], filename: str = "network_graph.png") -> str:
+        """
+        NetworkX를 사용한 관계망 시각화
+        """
+        try:
+            import networkx as nx
+        except ImportError:
+            print("NetworkX not found. Install with `pip install networkx`.")
+            return ""
+        
+        plt.figure(figsize=(10, 8))
+        
+        G = nx.Graph()
+        G.add_nodes_from(nodes)
+        G.add_edges_from(edges)
+        
+        # 레이아웃 설정
+        pos = nx.spring_layout(G, k=0.8, iterations=50)
+        
+        # Draw nodes and edges
+        nx.draw_networkx_nodes(G, pos, node_size=2000, node_color="#E31E24", alpha=0.9)
+        nx.draw_networkx_edges(G, pos, width=2, alpha=0.5, edge_color="gray")
+        nx.draw_networkx_labels(G, pos, font_size=10, font_color="white", font_weight="bold")
+        
+        plt.title("Key Entity Relationship Network", fontsize=15, pad=20)
+        plt.axis("off")
+        
+        save_path = os.path.join(self.save_dir, filename)
+        abs_path = os.path.abspath(save_path)
+        
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        return abs_path

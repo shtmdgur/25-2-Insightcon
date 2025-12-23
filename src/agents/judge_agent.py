@@ -48,7 +48,8 @@ class JudgeAgent(BaseDebateAgent):
             ticker=state.get("query", ""),
             bull_history=bull_history,
             bear_history=bear_history,
-            critical_paths=impact_paths
+            critical_paths=impact_paths,
+            market_context=state.get("market_context", "No market data available.")
         )
         
         # 4. LLM 실행
@@ -60,6 +61,25 @@ class JudgeAgent(BaseDebateAgent):
     def _parse_json_response(self, response: Any) -> Dict[str, Any]:
         """LLM 응답에서 JSON 추출 및 파싱"""
         text = response.content if hasattr(response, "content") else str(response)
+        
+        # Handle list content (common in some Gemini versions)
+        if isinstance(text, list):
+            # text = "".join([str(item) for item in text]) # OLD
+            text_parts = []
+            for item in text:
+                if isinstance(item, dict) and "text" in item:
+                    text_parts.append(item["text"])
+                elif hasattr(item, "text"):
+                        text_parts.append(item.text)
+                else:
+                    text_parts.append(str(item))
+            text = "".join(text_parts)
+            
+        if isinstance(text, dict):
+             text = text.get("text", str(text))
+        
+        # Ensure it is a string
+        text = str(text)
         
         # Markdown Code block 제거
         if "```json" in text:

@@ -1,5 +1,5 @@
 
-from ..state import ReportState
+from .state import ReportState
 from ..utils.price_data_loader import PriceDataLoader
 from pathlib import Path
 import logging

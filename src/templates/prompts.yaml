@@ -250,6 +250,7 @@ debate_agents:
       - **Bull's Arguments**: {bull_history}
       - **Bear's Arguments**: {bear_history}
       - **Evidence (Impact Paths)**: {critical_paths}
+      - **Market Context (Price/Volume)**: {market_context}
 
       [Judgement Criteria]
       1. **Evidence Strength**: 어느 쪽이 그래프 기반의 팩트(Impact Path)를 더 정확하고 강력하게 제시했는가?
@@ -290,6 +291,7 @@ debate_agents:
       [Input Data]
       - **Judge Verdict**: {rationale}
       - **Discussion History**: {history}
+      - **Validated Impact Paths (Evidence)**: {evidence_paths}
 
       [Context]
       - **Target Company**: {ticker}
@@ -300,74 +302,33 @@ debate_agents:
       [Judge's Verdict & Rationale]
       "{rationale}"
 
-      [Instructions for "Professional Output"]
-      1. **Language**: **반드시 한국어(Korean)**로 작성하십시오. (전문 용어는 괄호 안에 영문 병기 가능)
-      2. **Tone & Style**:
-         - 감정을 배제하고 건조하지만 확신에 찬 어조(Dry but Conviction-driven)를 사용하십시오.
-         - "좋아 보인다" 대신 "구조적 마진 개선이 가시화되고 있다"와 같은 전문 용어를 구사하십시오.
-         - 문단은 두괄식(Bottom Line Up Front)으로 구성하십시오.
-
-      3. **Visual Thinking**:
-         - 텍스트로만 나열하지 말고, **Mermaid Diagram**을 사용하여 논리 구조를 시각화하십시오. (예: 인과 관계, Bull vs Bear 대립 구도)
-         - 핵심 수치나 비교는 반드시 **Markdown Table**을 사용하십시오.
-
-      4. **Structure (Strictly Follow)**:
-
-      # [Company Name] ({ticker}): {decision}
-      **Date**: 2024.12.24 | **Risk Profile**: High/Medium/Low | **Analyst**: AI Insight Team
-
-      ## 1. 결론 및 투자의견 (The Bottom Line)
-      > **"{rationale_summary}"**
+      [Instructions for "Analysis Content Only"]
+      1. **Goal**: Provide the core analysis content (Synthesis) for the report formatter.
+      2. **Output Format**: Write a structured analysis covering:
+         - **Executive Summary**: A concise summary of the verdict (2-3 sentences).
+         - **Investment Thesis**: Detailed analysis of why this decision was reached, citing specific drivers.
+         - **Derivatives/Logic**: Explain the "Data Vacuum" or "Market Decoupling" logic if applicable.
+         - **Risks**: Key downside risks.
       
-      - **Investment Rating**: **{decision}**
-      - **Target Potential**: (점수 기반 정성적 평가, e.g., "구조적 성장 국면 진입에 따른 Outperform 예상")
+      3. **Style**: Professional, Bullet points, Korean language.
       
-      (이곳에 판결의 핵심 논리를 3-4문장으로 요약하십시오. 단순한 사실 나열이 아닌, **Impact Path**를 중심으로 한 **Investment Thesis**가 드러나야 합니다.)
-
-      ## 2. 핵심 투자 포인트 (Investment Thesis)
-      (Judge가 선정한 `key_factors`를 상세히 분석하십시오. 각 팩터마다 구체적인 증거를 제시하십시오.)
-
-      ### Driver 1: [Factor Name]
-      - **Thesis**: (왜 이것이 주가 상승/하락의 트리거인가?)
-      - **Evidence**: (Bull/Bear가 제시한 데이터 인용)
+      4. **DO NOT** include the Header (Date, Ticker) or the Final Disclaimer. The Python Formatter will add them.
       
-      ### Driver 2: [Factor Name]
-      - **Thesis**: ...
+      5. **Structure**:
       
-      ## 3. 논리적 인과관계 (Visual Logic Flow)
-      (아래 Mermaid 코드를 사용하여 핵심 인과관계를 그리십시오. Judge가 인용한 Impact Path를 시각화하는 것입니다. **노드 텍스트는 한국어를 사용하십시오.**)
-      
-      ```mermaid
-      graph LR
-          A[핵심 이벤트/원인] -->|영향| B(중간 지표)
-          B -->|증가/감소| C{{재무적 결과}}
-          C -->|견인| D[주가 재평가]
-          style D fill:#f9f,stroke:#333,stroke-width:2px
-      ```
-      *(위 다이어그램은 예시입니다. 실제 토론 내용에 맞게 구조를 수정하십시오.)*
-
-      ## 4. 밸류에이션 및 리스크 (Valuation & Risks)
-      | Metric | Assessment | Note |
-      | :--- | :--- | :--- |
-      | **Valuation** | (저평가/적정/고평가) | (Peer 대비 밸류에이션 코멘트) |
-      | **Growth** | (고성장/중성장/저성장) | (CAGR 전망 등) |
-
-      ### 주요 리스크 요인 (Key Downside Risks)
-      (Bear Agent가 지적한 핵심 리스크 2-3가지를 선정하여 심층 분석하십시오.)
-
-      #### Risk 1: [Risk Name]
-      - **Scenario**: (리스크가 현실화될 경우의 구체적 상황)
-      - **Impact**: (재무적/비재무적 악영향)
-      - **Mitigation/Counter-argument**: (Bull이 제시한 방어 논리 취약점 또는 회사의 대응책)
-
-      ## 5. 토론 분석 (Bull vs Bear)
-      | Perspective | Key Argument | Verdict (Why?) |
-      | :--- | :--- | :--- |
-      | **Bull ({bull_outcome})** | (Bull의 핵심 주장 요약) | (채택/기각 사유) |
-      | **Bear ({bear_outcome})** | (Bear의 핵심 주장 요약) | (채택/기각 사유) |
-
-      ---
-      *Disclaimer: 이 리포트는 AI 에이전트에 의해 생성되었으며 투자 권유가 아닙니다.*
+       (Start directly with the content)
+       
+       ## Executive Summary
+       (Summary text...)
+       
+       ## Investment Thesis
+       (Drivers...)
+       
+       ## Valuation & Risks
+       (Assessment...)
+       
+       ## Conclusion
+       (Final verdict...)
 
   # ==========================================
   # 6. VLM Parser (이미지 분석)
