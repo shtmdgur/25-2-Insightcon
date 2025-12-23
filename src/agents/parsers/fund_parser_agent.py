@@ -11,7 +11,8 @@ import pandas as pd
 
 from .base_parser_agent import BaseParserAgent
 from src.models.nodes import KnowledgeGraph, Entity, Relation, NodeType, RelationType
-from src.dataflows.entity_normalizer import get_entity_normalizer
+from src.utils.entity_matcher import get_entity_matcher
+from src.utils.ticker_mapping import get_company_name, get_node_type
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class FundParserAgent(BaseParserAgent):
         """
         super().__init__(name="FundParserAgent")
         self.save_as_snapshot = save_as_snapshot
-        self.normalizer = get_entity_normalizer()
+        self.entity_matcher = get_entity_matcher()
     
     def parse(self, file_path: Path) -> KnowledgeGraph:
         """
@@ -89,14 +90,15 @@ class FundParserAgent(BaseParserAgent):
             self.logger.warning("Missing entities or relations")
             return False
         
-        # Company 또는 Metric 엔티티 확인
+        # Agent 또는 Earnings 엔티티 확인 (현재 스키마)
+        agent_types = {NodeType.IDM.value, NodeType.FABLESS.value, NodeType.FOUNDRY.value, NodeType.SUPPLIER.value}
         has_entities = any(
-            e.get("type") in [NodeType.COMPANY.value, NodeType.METRIC.value]
+            e.get("type") in agent_types or e.get("type") == NodeType.EARNINGS.value
             for e in data["entities"]
         )
         
         if not has_entities:
-            self.logger.warning("No Company or Metric entities found")
+            self.logger.warning("No Agent or Earnings entities found")
             return False
         
         return True
@@ -145,54 +147,95 @@ class FundParserAgent(BaseParserAgent):
         
         for idx, row in df.iterrows():
             ticker = str(row.get('ticker', '')).strip()
+            # KR 주식의 경우 6자리 숫자로 패딩 (leading zero 보존)
+            if ticker.isdigit() and len(ticker) < 6:
+                ticker = ticker.zfill(6)
+            short_name = str(row.get('shortname', '')).strip()
             
             if not ticker:
                 continue
             
-            # 옵션 A: Company 노드 속성 업데이트 (정적 KG)
+            # 회사명 결정 (shortName 우선, 없으면 ticker→회사명 매핑)
+            company_name = short_name if short_name else get_company_name(ticker)
+            
+            # NodeType 자동 분류
+            node_type = get_node_type(company_name)
+            
+            # 옵션 A: Company 노드 속성 업데이트 (정적 KG) - Hybrid KG 권장
             if not self.save_as_snapshot:
                 company_entity = Entity(
-                    name=ticker,
-                    type=NodeType.COMPANY,
+                    name=company_name,
+                    type=node_type,
                     properties={
                         "ticker": ticker,
-                        "marketCap": float(row.get('marketcap', 0)) if pd.notna(row.get('marketcap')) else None,
-                        "totalDebt": float(row.get('totaldebt', 0)) if pd.notna(row.get('totaldebt')) else None,
-                        "profitMargins": float(row.get('profitmargins', 0)) if pd.notna(row.get('profitmargins')) else None,
-                        "ROE": float(row.get('roe', 0)) if pd.notna(row.get('roe')) else None,
+                        "sector": str(row.get('sector', '')) if pd.notna(row.get('sector')) else None,
+                        "country": str(row.get('country', '')) if pd.notna(row.get('country')) else None,
+                    },
+                    fundamental_stats={
+                        "market_cap": float(row.get('marketcap', 0)) if pd.notna(row.get('marketcap')) else None,
+                        "total_revenue": float(row.get('totalrevenue', 0)) if pd.notna(row.get('totalrevenue')) else None,
+                        "total_debt": float(row.get('totaldebt', 0)) if pd.notna(row.get('totaldebt')) else None,
+                        "ebitda_margins": float(row.get('ebitdamargins', 0)) if pd.notna(row.get('ebitdamargins')) else None,
+                        "gross_margins": float(row.get('grossmargins', 0)) if pd.notna(row.get('grossmargins')) else None,
+                        "profit_margins": float(row.get('profitmargins', 0)) if pd.notna(row.get('profitmargins')) else None,
+                        "roe": float(row.get('returnonequity', 0)) if pd.notna(row.get('returnonequity')) else None,
+                        "roa": float(row.get('returnonassets', 0)) if pd.notna(row.get('returnonassets')) else None,
+                        "pe_ratio": float(row.get('trailingpe', 0)) if pd.notna(row.get('trailingpe')) else None,
+                        "pb_ratio": float(row.get('pricetobook', 0)) if pd.notna(row.get('pricetobook')) else None,
                     },
                     confidence=1.0
                 )
                 entities.append(company_entity)
             
-            # 옵션 B: Metric 노드로 스냅샷 저장 (동적 KG)
+            # 옵션 B: Earnings 노드로 펀더멘탈 스냅샷 저장 (동적 KG)
             else:
                 from datetime import datetime
                 date_str = datetime.now().strftime('%Y-%m-%d')
                 
-                metric_entity = Entity(
-                    name=f"Fundamentals_{ticker}_{date_str}",
-                    type=NodeType.METRIC,
+                # 1. Company 노드 생성 (필수: 관계의 주체가 되어야 함)
+                # 정적 정보도 함께 업데이트
+                company_entity = Entity(
+                    name=company_name,
+                    type=node_type,
                     properties={
                         "ticker": ticker,
-                        "date": date_str,
-                        "metric_type": "fundamentals",
-                        "marketCap": float(row.get('marketcap', 0)) if pd.notna(row.get('marketcap')) else None,
-                        "totalDebt": float(row.get('totaldebt', 0)) if pd.notna(row.get('totaldebt')) else None,
-                        "profitMargins": float(row.get('profitmargins', 0)) if pd.notna(row.get('profitmargins')) else None,
-                        "ROE": float(row.get('roe', 0)) if pd.notna(row.get('roe')) else None,
+                        "sector": str(row.get('sector', '')) if pd.notna(row.get('sector')) else None,
+                        "country": str(row.get('country', '')) if pd.notna(row.get('country')) else None,
                     },
                     confidence=1.0
                 )
-                entities.append(metric_entity)
+                entities.append(company_entity)
                 
-                # Company-[:HAS_METRIC]->Metric 관계
+                # 2. Earnings 노드 생성
+                fundamentals_entity = Entity(
+                    name=f"Fundamentals_{company_name}_{date_str}",
+                    type=NodeType.EARNINGS,  # METRIC → EARNINGS
+                    properties={
+                        "ticker": ticker,
+                        "company_name": company_name,
+                        "date": date_str,
+                        "metric_type": "fundamentals",
+                        "is_fundamentals_snapshot": True,
+                        "marketCap": float(row.get('marketcap', 0)) if pd.notna(row.get('marketcap')) else None,
+                        "totalDebt": float(row.get('totaldebt', 0)) if pd.notna(row.get('totaldebt')) else None,
+                        "profitMargins": float(row.get('profitmargins', 0)) if pd.notna(row.get('profitmargins')) else None,
+                        "ROE": float(row.get('returnonequity', 0)) if pd.notna(row.get('returnonequity')) else None,
+                    },
+                    confidence=1.0
+                )
+                entities.append(fundamentals_entity)
+                
+                # 3. 관계 생성
                 relation = Relation(
-                    subject=ticker,
-                    predicate=RelationType.HAS_METRIC,
-                    object=metric_entity.name,
-                    weight=1.0,
-                    source=str(file_path)
+                    subject=company_name,
+                    predicate=RelationType.HAS_SIGNAL,
+                    object=fundamentals_entity.name,
+                    date=date_str,
+                    source=str(file_path),
+                    properties={
+                        "weight": 1.0
+                    },
+                    confidence=1.0
                 )
                 relations.append(relation)
         

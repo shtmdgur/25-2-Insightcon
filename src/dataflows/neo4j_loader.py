@@ -27,20 +27,46 @@ class Neo4jKGLoader:
         self,
         uri: str = "bolt://localhost:7687",
         user: str = "neo4j",
-        password: str = "password"
+        password: str = "password",
+        batch_size: int = 1000,  # 배치 크기 설정
+        store_null_properties: bool = True  # null 속성 저장 여부
     ):
         """
         Args:
             uri: Neo4j URI
             user: 사용자명
             password: 비밀번호
+            batch_size: 배치 처리 크기 (기본 1000)
+            store_null_properties: null 속성 저장 여부 (True=모든 속성, False=값 있는 것만)
         """
         try:
             self.driver = GraphDatabase.driver(uri, auth=(user, password))
-            logger.info(f"Connected to Neo4j at {uri}")
+            self.batch_size = batch_size
+            self.store_null_properties = store_null_properties
+            logger.info(f"Connected to Neo4j at {uri} (batch_size={batch_size}, store_null={store_null_properties})")
+            
+            # 성능 최적화: name 인덱스 생성
+            self._ensure_indexes()
+            
         except (ServiceUnavailable, AuthError) as e:
             logger.error(f"Failed to connect to Neo4j: {str(e)}")
             raise
+    
+    def _ensure_indexes(self):
+        """필수 인덱스 생성 (성능 최적화)"""
+        with self.driver.session() as session:
+            try:
+                # 모든 노드 타입에 대해 name 인덱스 생성
+                node_types = ["IDM", "Fabless", "Foundry", "OSAT", "Supplier", "Organization",
+                             "Earnings", "PriceMovement", "Disclosure", "Issue", "EconomicIndicator"]
+                
+                for node_type in node_types:
+                    query = f"CREATE INDEX {node_type}_name IF NOT EXISTS FOR (n:`{node_type}`) ON (n.name)"
+                    session.run(query)
+                
+                logger.info("✅ Indexes created/verified for all node types")
+            except Exception as e:
+                logger.warning(f"Index creation failed (may already exist): {e}")
     
     def close(self):
         """드라이버 종료"""
@@ -104,92 +130,233 @@ class Neo4jKGLoader:
             return stats
 
     def _batch_upsert_static_entities(self, session, node_type: str, entities: List[Entity]):
-        """정적 엔티티 배치 MERGE"""
+        """정적 엔티티 배치 MERGE (null로 기존값 덮어쓰기 방지)"""
+        
         query = f"""
         UNWIND $batch as row
         MERGE (n:`{node_type}` {{id: row.name}})
-        SET n.name = row.name,
+        ON CREATE SET 
+            n.name = row.name,
             n.confidence = row.confidence,
-            n.fundamental_stats = row.fundamental_stats,
             n.embedding = row.embedding,
+            n.created_at = datetime()
+        ON CREATE SET n += row.properties
+        ON MATCH SET 
+            n.confidence = COALESCE(row.confidence, n.confidence),
+            n.embedding = COALESCE(row.embedding, n.embedding),
             n.last_updated = datetime()
-        SET n += row.properties
+        ON MATCH SET n += row.properties
         """
         batch_data = [
             {
                 "name": e.name,
                 "confidence": e.confidence,
-                "properties": e.properties,
-                "fundamental_stats": e.fundamental_stats,
+                "properties": self._filter_null_properties({
+                    **e.properties,
+                    **(e.fundamental_stats or {})
+                }),
                 "embedding": e.embedding
             } for e in entities
         ]
         session.run(query, batch=batch_data)
+    
+    def _filter_null_properties(self, props: dict) -> dict:
+        """null 값을 필터링하여 기존 값을 보호"""
+        return {k: v for k, v in props.items() if v is not None}
 
     def _batch_create_dynamic_entities(self, session, node_type: str, entities: List[Entity]):
-        """동적 엔티티 배치 CREATE"""
+        """동적 엔티티 배치 MERGE (v3.0: 날짜 기반 갱신)"""
         from datetime import datetime as dt
         now = dt.now().isoformat()
         
+        # 날짜 기반 갱신: 최신 데이터만 반영
         query = f"""
         UNWIND $batch as row
-        CREATE (n:`{node_type}`)
-        SET n.name = row.name,
+        MERGE (n:`{node_type}` {{name: row.name}})
+        ON CREATE SET 
+            n.created_at = datetime($now),
+            n.data_date = row.date,
+            n.first_source = row.source,
             n.confidence = row.confidence,
-            n.direction = row.direction,
-            n.magnitude = row.magnitude,
-            n.sentiment = row.sentiment,
-            n.embedding = row.embedding,
-            n.created_at = datetime($now)
-        SET n += row.properties
+            n.embedding = row.embedding
+        ON CREATE SET n += row.properties
+        ON MATCH SET 
+            n.confidence = CASE WHEN row.date IS NULL OR row.date >= COALESCE(n.data_date, '1970-01-01') 
+                           THEN row.confidence ELSE n.confidence END,
+            n.embedding = CASE WHEN row.date IS NULL OR row.date >= COALESCE(n.data_date, '1970-01-01') 
+                          THEN row.embedding ELSE n.embedding END,
+            n.data_date = CASE WHEN row.date IS NULL OR row.date >= COALESCE(n.data_date, '1970-01-01') 
+                          THEN row.date ELSE n.data_date END,
+            n.last_updated = datetime($now)
         """
         batch_data = [
             {
                 "name": e.name,
+                "date": e.date,
+                "source": e.source,
                 "confidence": e.confidence,
-                "properties": e.properties,
-                "direction": e.direction,
-                "magnitude": e.magnitude,
-                "sentiment": e.sentiment,
+                "properties": self._build_entity_properties(e),
                 "embedding": e.embedding
             } for e in entities
         ]
         session.run(query, batch=batch_data, now=now)
+    
+    def _build_entity_properties(self, e: Entity) -> dict:
+        """엔티티 속성 dict 생성 (null 필터링 옵션 적용)"""
+        base_props = {
+            "direction": e.direction,
+            "magnitude": e.magnitude,
+            "sentiment": e.sentiment,
+            "source": e.source,
+            "is_significant": e.is_significant,
+            "relative_performance": e.relative_performance,
+            "trigger": e.trigger,
+            "description": e.description,
+            **e.properties,
+        }
+        
+        # null 필터링 옵션 확인
+        if not self.store_null_properties:
+            return {k: v for k, v in base_props.items() if v is not None}
+        return base_props
 
     def _batch_create_relations(self, session, predicate: str, relations: List[Relation]):
-        """관계 배치 MERGE"""
+        """관계 배치 MERGE (v3.0: 히스토리 누적 + 최신값 저장)"""
         query = f"""
         UNWIND $batch as row
         MATCH (source {{name: row.subject}})
         MATCH (target {{name: row.object}})
         MERGE (source)-[r:`{predicate}`]->(target)
-        SET r += row.properties
+        ON CREATE SET 
+            r.created_at = row.date,
+            r.first_source = row.source
+        SET r.history = COALESCE(r.history, []) + [row.history_entry]
+        SET r += row.latest_props
+        RETURN count(r) as created
         """
         batch_data = [
             {
                 "subject": r.subject,
                 "object": r.object,
-                "properties": {
-                    **r.properties,
-                    **{k: v for k, v in {
-                        "correlation": r.correlation,
-                        "sensitivity": r.sensitivity,
-                        "lag": r.lag,
-                        "confidence": r.confidence,
-                        "reasoning": r.reasoning
-                    }.items() if v is not None}
-                }
+                "date": r.date,
+                "source": r.source,
+                "history_entry": self._build_history_entry(r),
+                "latest_props": self._build_latest_props(r)
             } for r in relations
         ]
-        session.run(query, batch=batch_data)
+        result = session.run(query, batch=batch_data)
+        summary = result.consume()
+        created = summary.counters.relationships_created
+        requested = len(relations)
+        logger.info(f"Created/merged {created}/{requested} {predicate} relationships")
+        
+        # MATCH 실패 감지
+        if created < requested:
+            logger.warning(f"⚠️ {requested - created} {predicate} relationships failed - source/target nodes may not exist")
+    
+    def _build_relation_properties(self, r: Relation) -> dict:
+        """관계 속성 dict 생성 (null 필터링 옵션 적용)"""
+        base_props = {
+            "confidence": r.confidence,
+            "source": r.source,
+            "correlation": r.correlation,
+            "sensitivity": r.sensitivity,
+            "lag": r.lag,
+            "reasoning": r.reasoning,
+            "impact": r.impact,
+            "dependency": r.dependency,
+            "is_critical": r.is_critical,
+            "supply_type": r.supply_type,
+            "product": r.product,
+            "importance": r.importance,
+            "is_official": r.is_official,
+            "market_segment": r.market_segment,
+            "competitive_dynamic": r.competitive_dynamic,
+            "partnership_type": r.partnership_type,
+            "scope": r.scope,
+            "investment_type": r.investment_type,
+            "amount": r.amount,
+            "stake_percentage": r.stake_percentage,
+            **r.properties,
+        }
+        
+        # null 필터링 옵션 확인
+        if not self.store_null_properties:
+            return {k: v for k, v in base_props.items() if v is not None}
+        return base_props
+    
+    def _build_history_entry(self, r: Relation) -> str:
+        """
+        관계 히스토리 엔트리 생성 (날짜별 변경 이력 기록)
+        
+        히스토리 전략 (final_schema_v3.md 기준):
+        - AFFECTS: correlation, sensitivity, lag → 변화 추적
+        - TRIGGERED_BY: reasoning, impact → 변화 추적
+        - 공통: date, source, confidence → 모든 히스토리에 포함
+        
+        Returns:
+            JSON 문자열 (Neo4j는 Map을 속성으로 저장 불가)
+        """
+        import json
+        
+        entry = {
+            "date": r.date,
+            "source": r.source,
+            "confidence": r.confidence
+        }
+        
+        # 관계 타입별 히스토리 추적 필드
+        if r.correlation is not None:
+            entry["correlation"] = r.correlation
+        if r.sensitivity is not None:
+            entry["sensitivity"] = r.sensitivity
+        if r.lag is not None:
+            entry["lag"] = r.lag
+        if r.reasoning is not None:
+            entry["reasoning"] = r.reasoning
+        if r.impact is not None:
+            entry["impact"] = r.impact
+            
+        # null 필터링 적용
+        if not self.store_null_properties:
+            entry = {k: v for k, v in entry.items() if v is not None}
+        
+        # JSON 문자열로 변환 (Neo4j 저장용)
+        return json.dumps(entry, ensure_ascii=False)
+    
+    def _build_latest_props(self, r: Relation) -> dict:
+        """
+        최신 속성값만 저장 (동적 갱신 필드)
+        
+        동적 전략 (final_schema_v3.md 기준):
+        - confidence: 최신값 우선
+        - correlation, sensitivity, lag: 최신값 우선
+        - reasoning, impact: 최신값 우선
+        """
+        latest = {
+            "confidence": r.confidence,
+            "last_updated_date": r.date,
+            "last_updated_source": r.source
+        }
+        
+        # 관계별 동적 속성 (최신값만)
+        relation_props = self._build_relation_properties(r)
+        
+        # date, source는 이미 처리했으므로 제외
+        exclude_keys = {"date", "source"}
+        for k, v in relation_props.items():
+            if k not in exclude_keys:
+                latest[k] = v
+        
+        return latest
 
     def _classify_entity_layer(self, entity: Entity) -> str:
         """
         Entity를 정적/동적 레이어로 분류
         
-        Hybrid KG Architecture 기준:
-        - **Static (MERGE)**: Agent Layer (IDM, Fabless, Foundry, Supplier, Organization)
-        - **Dynamic (CREATE)**: Signal, MacroMetric, Document Layer
+        Hybrid KG Architecture v3.0 기준:
+        - **Static (MERGE)**: Agent Layer + MacroMetric Layer
+        - **Dynamic (CREATE)**: Signal Layer
         """
         from ..models.nodes import NodeType
         
@@ -197,10 +364,10 @@ class Neo4jKGLoader:
             NodeType.IDM,
             NodeType.FABLESS,
             NodeType.FOUNDRY,
+            NodeType.OSAT,  # v3.0 신규
             NodeType.SUPPLIER,
             NodeType.ORGANIZATION,
-            NodeType.AGENT,  # Legacy
-            NodeType.COMPANY  # Legacy
+            NodeType.ECONOMIC_INDICATOR,
         }
         
         return 'static' if entity.type in STATIC_TYPES else 'dynamic'
@@ -276,18 +443,42 @@ class Neo4jKGLoader:
         logger.info(f"Linking temporal signals (window={days_window} days)...")
         
         with self.driver.session() as session:
-            # 1. PriceMovement -> Event/Issue/Earnings/Disclosure (TRIGGERED_BY)
-            # 같은 기업(HAS_SIGNAL)에 속하고, 날짜가 같은 경우 연결
+            # 디버깅: PriceMovement와 다른 Signal의 개수 확인
+            debug_query = """
+            MATCH (pm:PriceMovement)
+            OPTIONAL MATCH (e:Earnings)
+            OPTIONAL MATCH (d:Disclosure)
+            RETURN count(DISTINCT pm) as pm_count, 
+                   count(DISTINCT e) as earnings_count,
+                   count(DISTINCT d) as disclosure_count
+            """
+            debug_result = session.run(debug_query)
+            debug_data = debug_result.single()
+            logger.info(f"Available signals - PriceMovement: {debug_data['pm_count']}, "
+                       f"Earnings: {debug_data['earnings_count']}, "
+                       f"Disclosure: {debug_data['disclosure_count']}")
+            
+            # 1. PriceMovement -> Earnings/Disclosure (TRIGGERED_BY)
+            # properties 객체의 date 필드 접근
             query = f"""
-            MATCH (company)-[:HAS_SIGNAL]->(p:PriceMovement)
-            MATCH (company)-[:HAS_SIGNAL]->(s)
-            WHERE (s:Event OR s:Issue OR s:Earnings OR s:Disclosure)
-              AND p.date IS NOT NULL 
-              AND s.date IS NOT NULL
-              AND abs(duration.between(date(p.date), date(s.date)).days) <= $window
-            MERGE (p)-[r:TRIGGERED_BY]->(s)
-            SET r.reasoning = 'Temporal correlation (same day or within window)',
-                r.source = 'TemporalLinker'
+            MATCH (company)-[:HAS_SIGNAL]->(pm:PriceMovement)
+            MATCH (company)-[:HAS_SIGNAL]->(signal)
+            WHERE (signal:Earnings OR signal:Disclosure)
+              AND pm.properties IS NOT NULL
+              AND signal.properties IS NOT NULL
+              AND pm.properties.date IS NOT NULL 
+              AND signal.properties.date IS NOT NULL
+              AND abs(duration.between(
+                  date(toString(pm.properties.date)), 
+                  date(toString(signal.properties.date))
+              ).days) <= $window
+            MERGE (pm)-[r:TRIGGERED_BY]->(signal)
+            SET r.reasoning = 'Temporal correlation',
+                r.source = 'TemporalLinker',
+                r.date_diff = abs(duration.between(
+                  date(toString(pm.properties.date)), 
+                  date(toString(signal.properties.date))
+                ).days)
             RETURN count(r) as links
             """
             
@@ -324,9 +515,10 @@ def load_kg_from_gemini_pdf(
     """
     from .parsers.gemini_pdf import GeminiPDFParser
     
-    # 1. PDF 파싱
+    # 1. PDF 파싱 (중앙 설정에서 모델명 가져오기)
     logger.info(f"Parsing PDF: {pdf_path}")
-    parser = GeminiPDFParser(model_name="gemini-2.5-flash")
+    from src.config.llm_config import get_model
+    parser = GeminiPDFParser(model_name=get_model("pdf_parsing"))
     parse_result = parser.parse(pdf_path)
     
     kg = parse_result["knowledge_graph"]

@@ -36,14 +36,19 @@ class BatchJobManager:
     
     def __init__(
         self,
-        model_name: str = "gemini-2.5-flash",
+        model_name: str = None,  # None이면 중앙 설정 사용
         output_dir: str = "./data/batch_jobs"
     ):
         """
         Args:
-            model_name: 사용할 Gemini 모델
+            model_name: 사용할 Gemini 모델 (기본: llm_config에서 가져옴)
             output_dir: Batch Job 출력 디렉토리
         """
+        # 중앙 설정에서 모델명 가져오기
+        if model_name is None:
+            from src.config.llm_config import get_model
+            model_name = get_model("batch")
+        
         self.model_name = model_name
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -184,12 +189,14 @@ def create_kg_extraction_requests(
     requests = []
     
     for i, doc in enumerate(documents):
+        # 중앙 설정에서 모델명 가져오기
+        from src.config.llm_config import get_model
         request = {
             "custom_id": f"kg_extract_{i}",
             "method": "POST",
             "url": "/v1/generate",
             "body": {
-                "model": "gemini-2.5-flash",
+                "model": get_model("batch"),
                 "prompt": prompt_template.format(document=doc)
             }
         }

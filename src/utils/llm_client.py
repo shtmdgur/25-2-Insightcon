@@ -29,16 +29,19 @@ class LLMSelector:
         if not self.google_api_key:
             raise ValueError("GOOGLE_API_KEY가 설정되지 않았습니다.")
         
+        # 중앙 설정에서 모델명 가져오기
+        from src.config.llm_config import get_flash_model, get_deep_model
+        
         # Quick-thinking 모델 (빠른 작업용)
         self.quick_llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model=get_flash_model(),
             temperature=0,
             google_api_key=self.google_api_key
         )
         
         # Deep-thinking 모델 (추론 집약적 작업용)
         self.deep_llm = ChatGoogleGenerativeAI(
-            model="gemini-3-pro-preview",
+            model=get_deep_model(),
             temperature=0,
             google_api_key=self.google_api_key
         )

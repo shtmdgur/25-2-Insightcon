@@ -17,7 +17,7 @@ from pprint import pprint
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.utils.llm_config import get_model_config, should_use_batch, TASK_MODEL_MAPPING
+from src.config.llm_config import get_model_config, get_model, TASK_TO_MODEL as TASK_MODEL_MAPPING
 from src.utils.gemini_files import get_gemini_files_client
 from src.dataflows.parsers.vlm import VLMParser
 from src.dataflows.parser_interface import RobustPDFParser, ParserStrategy

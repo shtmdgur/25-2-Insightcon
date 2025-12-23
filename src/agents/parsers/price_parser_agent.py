@@ -14,6 +14,7 @@ from .base_parser_agent import BaseParserAgent
 from src.models.nodes import KnowledgeGraph, Entity, Relation, NodeType, RelationType
 from src.dataflows.time_series_processor import TimeSeriesProcessor
 from src.utils.neo4j_client import Neo4jClient
+from src.utils.ticker_mapping import get_company_name, get_node_type
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,10 @@ class PriceParserAgent(BaseParserAgent):
         # .KS, .KQ 등 제거
         name = name.split(".")[0]
         
+        # KR 주식의 경우 6자리 숫자로 패딩 (leading zero 보존)
+        if name.isdigit() and len(name) < 6:
+            name = name.zfill(6)
+            
         return name
     
     def _validate_columns(self, df: pd.DataFrame) -> None:
@@ -125,10 +130,10 @@ class PriceParserAgent(BaseParserAgent):
             return False
         
         entity_types = set(e.get("type") for e in data["entities"])
-        # Hybrid KG 모델에 맞는 타입 체크
+        # Hybrid KG 모델에 맞는 타입 체크 (TREND → ISSUE로 대체)
         required_types = {
             NodeType.PRICE_MOVEMENT.value,
-            NodeType.TREND.value
+            NodeType.ISSUE.value  # Trend는 Issue로 저장됨 (is_trend=True)
         }
         
         if not any(t in entity_types for t in required_types):
@@ -153,28 +158,24 @@ class PriceParserAgent(BaseParserAgent):
         df['date'] = pd.to_datetime(df['date'])
         df = df.sort_values('date')
         
-        # 1. Trend 노드 생성
+        # 1. 전체 기간 트렌드를 Issue로 저장 (SAX 패턴 요약)
         sax_result = self._calculate_sax_pattern(df['close'].values, ticker)
-        trend_entity = Entity(
-            name=f"Trend_{ticker}",
-            type=NodeType.TREND,
+        trend_issue = Entity(
+            name=f"Trend_{ticker}_{df['date'].max().strftime('%Y%m%d')}",
+            type=NodeType.ISSUE,
             properties={
                 "ticker": ticker,
                 "pattern": sax_result.get("pattern"),
-                "trend_type": sax_result.get("trend_type")
+                "trend_type": sax_result.get("trend_type"),
+                "is_trend": True  # Issue 중 Trend 구분용
             },
             confidence=1.0
         )
-        entities.append(trend_entity)
+        entities.append(trend_issue)
         
-        # 1.5 Agent 노드 생성 (매핑)
-        # TODO: 매핑 테이블을 Config나 별도 관리 필요
-        TICKER_MAP = {
-            "005930": "Samsung Electronics",
-            "000660": "SK Hynix"
-        }
-        agent_name = TICKER_MAP.get(ticker, ticker)
-        agent_type = NodeType.IDM if ticker == "005930" else NodeType.COMPANY # 삼성전자는 IDM
+        # 1.5 Agent 노드 생성 (ticker_mapping 활용)
+        agent_name = get_company_name(ticker)
+        agent_type = get_node_type(agent_name)
         
         agent_entity = Entity(
             name=agent_name,
@@ -197,13 +198,23 @@ class PriceParserAgent(BaseParserAgent):
                 subject=agent_name,
                 predicate=RelationType.HAS_SIGNAL,
                 object=m.name,
-                properties={"date": m.properties.get("date")}
+                date=m.properties.get("date"),
+                source=str(file_path),
+                properties={
+                    "weight": 1.0
+                }
             ))
             
         relations.append(Relation(
             subject=agent_name,
-            predicate=RelationType.HAS_TREND,
-            object=trend_entity.name
+            predicate=RelationType.HAS_SIGNAL,  # HAS_TREND → HAS_SIGNAL (v3.0)
+            object=trend_issue.name,  # trend_entity → trend_issue
+            date=df['date'].max().strftime('%Y-%m-%d'),
+            source=str(file_path),
+            properties={
+                "weight": 1.0,
+                "is_trend": True
+            }
         ))
         
         return KnowledgeGraph(
@@ -213,11 +224,16 @@ class PriceParserAgent(BaseParserAgent):
         )
 
     def _detect_price_movements(self, df: pd.DataFrame, ticker: str, threshold: float = 5.0) -> List[Entity]:
-        """주가 급등/급락 탐지"""
+        """주가 급등/급락 탐지 (±5% 이상 변동만)"""
         signals = []
         df['pct_change'] = df['close'].pct_change() * 100
         
         for idx, row in df.iterrows():
+            # NaN 값 건너뛰기 (첫 번째 행은 항상 NaN)
+            if pd.isna(row['pct_change']):
+                continue
+            
+            # ±5% 이상 변동만 감지
             if abs(row['pct_change']) >= threshold:
                 signal = Entity(
                     name=f"PriceMovement_{ticker}_{row['date'].strftime('%Y%m%d')}",
@@ -227,11 +243,14 @@ class PriceParserAgent(BaseParserAgent):
                     sentiment="POSITIVE" if row['pct_change'] > 0 else "NEGATIVE",
                     properties={
                         "date": row['date'].strftime('%Y-%m-%d'),
-                        "close": float(row['close'])
+                        "close": float(row['close']),
+                        "pct_change": float(row['pct_change'])
                     },
                     confidence=1.0
                 )
                 signals.append(signal)
+        
+        self.logger.info(f"Detected {len(signals)} price movements for {ticker} (threshold={threshold}%)")
         return signals
     
     def _calculate_sax_pattern(

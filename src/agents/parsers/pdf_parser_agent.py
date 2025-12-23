@@ -20,7 +20,8 @@ from google.genai import types
 
 from src.dataflows.parser_interface import ParserInterface
 from src.utils.gemini_files import get_gemini_files_client
-from src.models.nodes import KnowledgeGraph, get_kg_json_schema
+from src.models.nodes import KnowledgeGraph, get_kg_json_schema, NodeType
+from src.utils.ticker_mapping import resolve_entity_name, get_ticker_from_name
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +43,19 @@ class GeminiPDFParser(ParserInterface):
     
     def __init__(
         self,
-        model_name: str = "gemini-2.5-pro",
+        model_name: str = None,  # None이면 중앙 설정 사용
         use_batch: bool = False # 테스트 단계에서는 False, 향후 True로 변경
     ):
         """
         Args:
-            model_name: Gemini 모델 이름 (기본: gemini-2.5-pro)
+            model_name: Gemini 모델 이름 (기본: llm_config에서 가져옴)
             use_batch: Batch API 사용 여부 (비용 50% 절감)
         """
+        # 중앙 설정에서 모델명 가져오기
+        if model_name is None:
+            from src.config.llm_config import get_model
+            model_name = get_model("pdf_parsing")
+        
         self.model_name = model_name
         self.use_batch = use_batch
         self.files_client = get_gemini_files_client()
@@ -78,6 +84,9 @@ class GeminiPDFParser(ParserInterface):
             
             # 3. KnowledgeGraph 객체 생성
             knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
+            
+            # 3.5 엔티티 이름 정규화 (표준명 변환 & Ticker 매핑)
+            self._normalize_entities(knowledge_graph)
             
             # 4. 임베딩 생성 및 주입 (Vector Index용)
             logger.info("Generating embeddings for entities...")
@@ -170,6 +179,44 @@ class GeminiPDFParser(ParserInterface):
         # JSON 파싱
         import json
         return json.loads(response.text)
+    
+    def _normalize_entities(self, kg: KnowledgeGraph):
+        """
+        추출된 엔티티의 이름을 정규화하고 Ticker를 보강함
+        예: "퀄컴" -> "Qualcomm", "삼성전자(주)" -> "삼성전자"
+        
+        v3.0 추가: 관계의 subject/object도 함께 정규화하여 MATCH 실패 방지
+        """
+        # 이름 매핑 테이블 (원본 → 정규화)
+        name_mapping = {}
+        
+        for entity in kg.entities:
+            # 1. 이름 정규화
+            original_name = entity.name
+            normalized_name = resolve_entity_name(original_name)
+            
+            if original_name != normalized_name:
+                logger.debug(f"Normalized entity: {original_name} -> {normalized_name}")
+                name_mapping[original_name] = normalized_name
+                entity.name = normalized_name
+            
+            # 2. Ticker 보강 (Agent 타입인 경우)
+            if entity.type in [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.SUPPLIER]:
+                ticker = get_ticker_from_name(entity.name)
+                if ticker:
+                    if "ticker" not in entity.properties:
+                        entity.properties["ticker"] = ticker
+                        logger.debug(f"Added ticker {ticker} to {entity.name}")
+        
+        # 3. 관계의 subject/object 정규화 (v3.0 추가)
+        for relation in kg.relations:
+            if relation.subject in name_mapping:
+                logger.debug(f"Normalized relation subject: {relation.subject} -> {name_mapping[relation.subject]}")
+                relation.subject = name_mapping[relation.subject]
+            if relation.object in name_mapping:
+                logger.debug(f"Normalized relation object: {relation.object} -> {name_mapping[relation.object]}")
+                relation.object = name_mapping[relation.object]
+
     
     def _enrich_with_embeddings(self, kg: KnowledgeGraph):
         """

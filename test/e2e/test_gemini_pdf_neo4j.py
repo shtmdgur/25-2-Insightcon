@@ -46,7 +46,8 @@ def test_gemini_pdf_parser():
     print(f"[File Size]: {sample_pdf.stat().st_size / 1024:.2f} KB")
     
     # Gemini PDF Parser 초기화
-    parser = GeminiPDFParser(model_name="gemini-2.5-flash")
+    from src.config.llm_config import get_model
+    parser = GeminiPDFParser(model_name=get_model("pdf_parsing"))
     
     try:
         print("\n📄 Parsing PDF with Gemini API...")

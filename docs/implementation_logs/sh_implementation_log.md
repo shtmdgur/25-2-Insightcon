@@ -2005,3 +2005,352 @@ return result["argument"]
 
 **총 작업 시간**: 2025-12-20~21 (약 5시간)  
 **완성도**: Phase 2.3 Debate Workflow 100% 완료, 검증 완료
+
+---
+
+# Phase 3: Neo4j 스키마 정합성 및 데이터 품질 개선
+
+## 완료된 작업
+
+### 3.1 Neo4j 스키마 검증 및 버그 픽스 ✅
+**작업 일시**: 2025-12-22 ~ 2025-12-23 01:45  
+**작업 시간**: 약 3시간
+
+#### 발견된 문제점
+1. **`fundamental_stats` null**: FundParser가 데이터를 생성했으나 Loader에서 누락
+2. **`EconomicIndicator` 속성 null**: MacroParser가 호출되지 않음
+3. **Disclosure 노드 누락**: DARTParser의 Disclosure 생성 로직 미호출
+4. **Legacy 노드 생성**: PDF Parser가 `PriceMovement`, `Company`, `Event` 등 삭제된 타입 생성
+5. **Entity 이름 불일치**: "퀄컴" vs "Qualcomm" 으로 중복 노드 생성
+
+#### 해결 내역
+
+**파일**: `src/dataflows/neo4j_loader.py`
+- `_batch_upsert_static_entities()`: `fundamental_stats`를 properties에 병합
+- `_batch_create_dynamic_entities()`: `direction`, `magnitude`, `sentiment` 병합
+- `FOREACH` 루프 제거 (Neo4j Map 타입 호환성 문제)
+
+**파일**: `test/load_preprocessed_to_neo4j.py`
+- 데이터 로딩 순서 변경: **PDF → News → DART → Fund → Macro**
+- `MacroParserAgent` import 및 `load_macro_data()` 함수 추가
+
+---
+
+### 3.2 Entity Normalization 통합 ✅
+**작업 일시**: 2025-12-23 01:20  
+**작업 시간**: 약 20분
+
+#### 구현 내역
+
+**파일**: `src/utils/ticker_mapping.py`
+- `ALIAS_TO_STANDARD` 매핑 추가 ("퀄컴" → "Qualcomm", "원달러" → "USD/KRW" 등)
+- `resolve_entity_name()` 함수 구현 (Alias 처리 + 텍스트 정규화)
+- `get_ticker_from_name()` 역방향 조회 함수 추가
+
+**파일**: `src/agents/parsers/pdf_parser_agent.py`
+- `_normalize_entities()` 메서드 추가
+- LLM 추출 후 Python 레벨에서 강제 정규화
+- Ticker 자동 보강 (매핑 테이블 기반)
+
+**파일**: `src/templates/prompts.yaml`
+- 엔티티 정규화 지침 강화 (CRITICAL)
+- 한국어 표준 명칭 사용 권장 ("미국 10년물 국채 금리", "USD/KRW 환율")
+
+---
+
+### 3.3 Legacy 타입 삭제 및 스키마 정리 ✅
+**작업 일시**: 2025-12-23 01:42  
+**작업 시간**: 약 10분
+
+#### 삭제된 NodeType
+```diff
+- AGENT = "Agent"
+- EVENT = "Event"
+- OBSERVATION = "Observation"
+- METRIC = "Metric"
+- TREND = "Trend"
+- COMPANY = "Company"
+```
+
+#### 삭제된 RelationType
+```diff
+- HAS_METRIC = "HAS_METRIC"
+- HAS_TREND = "HAS_TREND"
+- AFFECTED_BY = "AFFECTED_BY"
+- RELATED_TO = "RELATED_TO"
+```
+
+#### TRIGGERED_BY 스키마 확장
+```python
+# 변경 전: 주가 변동만 인과관계 주어로 허용
+domain: [PRICE_MOVEMENT]
+
+# 변경 후: 모든 Signal 간 인과관계 허용
+domain: [EARNINGS, PRICE_MOVEMENT, DISCLOSURE, ISSUE]
+range:  [EARNINGS, PRICE_MOVEMENT, DISCLOSURE, ISSUE]
+```
+
+#### Negative Constraint 추가 (prompts.yaml)
+```yaml
+5. **추출 금지 (Negative Constraint)**: 
+   - 단순 시계열 데이터(주가 히스토리, 환율 표)는 노드로 생성하지 마십시오.
+   - 의미 있는 "사건(Signal)"만 추출하십시오.
+```
+
+---
+
+## Phase 3 수정 파일 요약
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/models/nodes.py` | Legacy NodeType/RelationType 삭제, TRIGGERED_BY 스키마 확장 |
+| `src/templates/prompts.yaml` | 정규화 지침 강화, Negative Constraint 추가 |
+| `src/utils/ticker_mapping.py` | ALIAS_TO_STANDARD, resolve_entity_name() 추가 |
+| `src/agents/parsers/pdf_parser_agent.py` | _normalize_entities() 메서드 추가 |
+| `src/dataflows/neo4j_loader.py` | fundamental_stats 병합, Signal 속성 병합 |
+| `test/load_preprocessed_to_neo4j.py` | 로딩 순서 변경, MacroParser 통합 |
+
+---
+
+**총 작업 시간**: 2025-12-22~23 (약 4시간)  
+**완성도**: Phase 3 Neo4j 스키마 정합성 100% 완료
+
+---
+
+### 3.4 Parser Legacy 타입 수정 ✅
+**작업 일시**: 2025-12-23 02:10  
+**작업 시간**: 약 10분
+
+#### price_parser_agent.py (L161)
+```diff
+- type=NodeType.TREND
++ type=NodeType.ISSUE
++ properties={..., "is_trend": True}  # Issue 중 Trend 구분용
+```
+
+#### fund_parser_agent.py (L193, L211)
+```diff
+- type=NodeType.METRIC
++ type=NodeType.EARNINGS
++ properties={..., "is_fundamentals_snapshot": True}
+
+- predicate=RelationType.HAS_METRIC
++ predicate=RelationType.HAS_SIGNAL
+```
+
+---
+
+### 3.5 Neo4j Loader Legacy 참조 제거 ✅
+**작업 일시**: 2025-12-23 02:41  
+**작업 시간**: 약 2분
+
+**파일**: `src/dataflows/neo4j_loader.py` (L202-209)
+
+```diff
+ STATIC_TYPES = {
+     NodeType.IDM,
+     NodeType.FABLESS,
+     NodeType.FOUNDRY,
+     NodeType.SUPPLIER,
+     NodeType.ORGANIZATION,
+     NodeType.ECONOMIC_INDICATOR,
+-    NodeType.AGENT,  # Legacy
+-    NodeType.COMPANY  # Legacy
+ }
+```
+
+---
+
+### 3.6 Prompts.yaml 대규모 정리 ✅
+**작업 일시**: 2025-12-23 02:18  
+**작업 시간**: 약 10분
+
+#### 삭제된 섹션 (총 -118줄)
+- `analysts` (fundamentals, trend, events): -71줄
+- `vlm_parser` (chart_analysis): -47줄
+- `event_extractor` (legacy): -12줄
+
+#### 신규 섹션 추가
+- `news_parser.kg_extraction`: +76줄 (PDF Parser와 동일 형식)
+
+#### 최종 파일 크기
+- 변경 전: 465줄
+- 변경 후: 398줄 (**-67줄 순감**)
+
+---
+
+## Phase 3 최종 수정 파일 요약
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/models/nodes.py` | Legacy NodeType/RelationType 삭제 |
+| `src/templates/prompts.yaml` | analysts/vlm_parser 삭제, news_parser.kg_extraction 추가 |
+| `src/utils/ticker_mapping.py` | ALIAS_TO_STANDARD, resolve_entity_name() 추가 |
+| `src/agents/parsers/pdf_parser_agent.py` | _normalize_entities() 메서드 추가 |
+| `src/agents/parsers/price_parser_agent.py` | TREND → ISSUE 변경 |
+| `src/agents/parsers/fund_parser_agent.py` | METRIC → EARNINGS, HAS_METRIC → HAS_SIGNAL 변경 |
+| `src/dataflows/neo4j_loader.py` | STATIC_TYPES에서 Legacy 타입 제거 |
+
+---
+
+**총 작업 시간**: 2025-12-22~23 02:49 (약 5시간)  
+**완성도**: Phase 3 스키마-코드 정합성 100% 완료
+
+---
+
+## Phase 4: 관계 메타데이터 확장 및 KGConstructionAgent 통합
+
+**작업 일시**: 2025-12-23 14:06 ~ 14:15  
+**작업 시간**: 약 10분
+
+### 4.1 KGConstructionAgent 불일치 수정 (3건)
+
+| 위치 | 문제 | 수정 |
+|------|------|------|
+| L291 | `parse_pdf_to_kg()` 호출 | → `parse()` + `result["knowledge_graph"]` |
+| L469 | Legacy 타입 참조 | → 현재 스키마 타입으로 교체 |
+| L385 | 정규화 중복 | → `_normalized` 마커 기반 스킵 로직 추가 |
+
+### 4.2 Relation 모델 메타데이터 필드 확장 (+6개)
+
+```diff
++ impact_duration: Optional[str]  # TRIGGERED_BY 전용
++ dependency: Optional[float]     # SUPPLIES 전용
++ is_critical: Optional[bool]     # SUPPLIES 전용
++ supply_type: Optional[str]      # SUPPLIES 전용
++ importance: Optional[float]     # HAS_SIGNAL 전용
++ is_official: Optional[bool]     # HAS_SIGNAL 전용
++ source: Optional[str]           # 공통
+```
+
+### 4.3 prompts.yaml 관계 메타데이터 지침 확장
+
+- `TRIGGERED_BY`: `lag`, `impact_duration` 권장 추가
+- `SUPPLIES`: `dependency`, `is_critical`, `supply_type` 추가
+- `HAS_SIGNAL`: `importance`, `is_official` 추가
+
+### 4.4 neo4j_loader 관계 속성 처리 확장
+
+`_batch_create_relations()`에서 새로운 필드들 모두 Neo4j 속성으로 전달되도록 수정.
+
+---
+
+## Phase 4 수정 파일 요약
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/agents/kg_construction.py` | 3건 불일치 수정 (메서드명, 타입 참조, 정규화 중복) |
+| `src/models/nodes.py` | Relation 모델 6개 필드 추가 |
+| `src/templates/prompts.yaml` | 관계별 메타데이터 지침 확장 |
+| `src/dataflows/neo4j_loader.py` | 새 관계 속성 Neo4j 전달 로직 추가 |
+
+---
+
+**완성도**: Phase 4 완료, 컴파일 테스트 통과 ✅
+
+---
+
+## Phase 5: LLM 모델 중앙화 및 스키마 정합성 검증
+
+**작업 일시**: 2025-12-23 14:20 ~ 14:57  
+**작업 시간**: 약 37분
+
+### 5.1 LLM 모델 설정 중앙화
+
+**목적**: 프로젝트 전체에서 사용하는 LLM 모델명을 단일 파일에서 관리
+
+**핵심 변경**: `src/config/llm_config.py` 생성 (기존 `src/utils/llm_config.py` 대체)
+
+```python
+MODELS = {
+    "flash": "gemini-3-flash-preview",  # 모든 파싱 작업
+    "deep": "gemini-3-pro-preview",     # 토론 에이전트 전용
+}
+
+TASK_TO_MODEL = {
+    "pdf_parsing": MODELS["flash"],
+    "news_parsing": MODELS["flash"],
+    "kg_construction": MODELS["flash"],
+    # ...
+}
+```
+
+**헬퍼 함수**:
+- `get_model(task)`: 작업별 모델명 반환
+- `get_flash_model()`: Flash 모델명 반환
+- `get_deep_model()`: Deep 모델명 반환
+
+### 5.2 중앙 설정 적용 파일 (12개)
+
+| 파일 | 변경 |
+|------|------|
+| `src/agents/parsers/pdf_parser_agent.py` | `get_model("pdf_parsing")` 사용 |
+| `src/config/parser_config.py` | `llm_model=None` (중앙 위임) |
+| `src/dataflows/neo4j_loader.py` | `get_model("pdf_parsing")` 사용 |
+| `src/utils/llm_client.py` | `get_flash_model()`, `get_deep_model()` 사용 |
+| `src/utils/batch_job.py` | `get_model("batch")` 사용 |
+| `test/neo4j_load_test.py` | `get_model("news_parsing")` 사용 |
+| `test/neo4j_migration_poc.py` | 중앙 설정 적용 |
+| `test/e2e/test_gemini_pdf_neo4j.py` | 중앙 설정 적용 |
+| `test/integration/test_integration.py` | 중앙 설정 적용 |
+| `test/integration/test_phase0.py` | import 경로 수정 |
+
+### 5.3 스키마 정합성 검증 및 레거시 제거
+
+**레거시 NodeType 참조 수정**:
+
+| 파일 | 문제 | 수정 |
+|------|------|------|
+| `price_parser_agent.py` | `NodeType.TREND` | → `NodeType.ISSUE` |
+| `fund_parser_agent.py` | `NodeType.COMPANY`, `METRIC` | → Agent types, `EARNINGS` |
+| `base_parser_agent.py` | 레거시 static_types | → 현재 스키마 (IDM, Fabless, ...) |
+| `news_parser_agent.py` | `RelationType.AFFECTED_BY` | → `RelationType.HAS_SIGNAL` |
+
+### 5.4 백업으로 이동된 레거시 파일 (3개)
+
+| 원본 | 백업 |
+|------|------|
+| `src/utils/llm_config.py` | `backup/llm_config_legacy.py` |
+| `src/dataflows/event_extractor.py` | `backup/event_extractor_legacy.py` |
+| `src/dataflows/time_series_processor.py` | `backup/time_series_processor_legacy.py` |
+
+### 5.5 KG Schema Reference 문서 작성
+
+**파일**: `docs/kg_schema_reference.md`
+
+**내용**:
+- `nodes.py` Core Schema (NodeType 12개, RelationType 6개)
+- Parser별 상세 스키마 (입력/출력 Entity, Relation, properties)
+- Neo4j 저장 구조 및 레이어 전략
+- 데이터 흐름 다이어그램
+
+### 5.6 최종 검증 결과
+
+| 검증 항목 | 결과 |
+|----------|------|
+| LLM 설정 로드 | ✅ `flash`, `deep` 2종만 사용 |
+| NodeType Enum | ✅ 12개 정의 확인 |
+| RelationType Enum | ✅ 6개 정의 확인 |
+| 모든 Parser 컴파일 | ✅ 10개 파일 통과 |
+| 레거시 참조 제거 | ✅ COMPANY, TREND, METRIC, AFFECTED_BY 제거 |
+
+---
+
+## Phase 5 수정 파일 요약
+
+| 파일 | 변경 내용 |
+|------|-----------| 
+| `src/config/llm_config.py` | **신규** - LLM 모델 중앙 관리 |
+| `src/agents/parsers/pdf_parser_agent.py` | 중앙 설정 적용 |
+| `src/agents/parsers/price_parser_agent.py` | TREND → ISSUE 수정 |
+| `src/agents/parsers/fund_parser_agent.py` | Agent types 사용 |
+| `src/agents/parsers/base_parser_agent.py` | static_types 현대화 |
+| `src/agents/parsers/news_parser_agent.py` | AFFECTED_BY → HAS_SIGNAL |
+| `src/utils/llm_client.py` | 중앙 설정 적용 |
+| `src/utils/batch_job.py` | 중앙 설정 적용 |
+| `src/dataflows/neo4j_loader.py` | 중앙 설정 적용 |
+| `docs/kg_schema_reference.md` | **신규** - 스키마 레퍼런스 문서 |
+
+---
+
+**완성도**: Phase 5 완료, 컴파일 테스트 통과 ✅

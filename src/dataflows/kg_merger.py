@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 from pathlib import Path
 
 from ..models.nodes import KnowledgeGraph, Entity, Relation
+from ..utils.entity_matcher import get_entity_matcher
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class KGMerger:
     """
     
     def __init__(self):
-        pass
+        self.entity_matcher = get_entity_matcher()
     
     def merge_knowledge_graphs(self, kgs: List[KnowledgeGraph]) -> KnowledgeGraph:
         """
@@ -40,24 +41,32 @@ class KGMerger:
         
         for kg in kgs:
             try:
-                # 엔티티 병합
+                # 엔티티 병합 (정규화된 이름 기준)
                 for entity in kg.entities:
-                    key = (entity.name, entity.type)
+                    # EntityMatcher로 정규화
+                    normalized_name = self.entity_matcher.match(entity.name)
+                    key = (normalized_name, entity.type)
                     
                     if key in all_entities:
                         # 기존 엔티티와 병합
                         existing = all_entities[key]
-                        # properties 병합 (나중 것이 우선)
-                        existing.properties.update(entity.properties)
+                        # properties 병합 (나중 것이 우선, 단 None은 제외)
+                        for k, v in entity.properties.items():
+                            if v is not None:
+                                existing.properties[k] = v
                         # confidence 최대값
                         existing.confidence = max(existing.confidence, entity.confidence)
                     else:
-                        # 새 엔티티 추가
+                        # 새 엔티티 추가 (정규화된 이름으로)
+                        entity.name = normalized_name
                         all_entities[key] = entity
                 
-                # 관계 병합
+                # 관계 병합 (정규화된 subject/object 기준)
                 for relation in kg.relations:
-                    key = (relation.subject, relation.predicate, relation.object)
+                    # subject/object 정규화
+                    normalized_subject = self.entity_matcher.match(relation.subject)
+                    normalized_object = self.entity_matcher.match(relation.object)
+                    key = (normalized_subject, relation.predicate, normalized_object)
                     
                     if key in all_relations:
                         # 기존 관계와 병합
@@ -68,7 +77,9 @@ class KGMerger:
                         if relation.source and existing.source != relation.source:
                             existing.source = f"{existing.source}, {relation.source}"
                     else:
-                        # 새 관계 추가
+                        # 새 관계 추가 (정규화된 이름으로)
+                        relation.subject = normalized_subject
+                        relation.object = normalized_object
                         all_relations[key] = relation
                 
                 # 메타데이터 수집

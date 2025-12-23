@@ -45,9 +45,9 @@ class NewsParserConfig:
     time_decay_halflife: int = 90  # 반감기 (일)
     time_decay_min_weight: float = 0.1  # 최소 가중치
     
-    # LLM 설정
+    # LLM 설정 (실제 모델명은 src.config.llm_config에서 가져옴)
     use_llm: bool = False  # LLM 사용 여부
-    llm_model: str = "gemini-2.5-flash"  # LLM 모델명
+    llm_model: str = None  # None이면 llm_config.get_model("news_parsing") 사용
     use_batch: bool = False  # Batch API 사용 여부
 
 

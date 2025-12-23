@@ -35,7 +35,8 @@ def run_migration_poc():
         # 4. 파서 에이전트들 초기화
         price_agent = PriceParserAgent()
         news_agent = NewsParserAgent() # LLM 없이 키워드 기반으로 우선 수행 (속도/비용 절감)
-        pdf_parser = GeminiPDFParser(model_name="gemini-2.5-flash") # 속도를 위해 flash 모델 사용
+        from src.config.llm_config import get_model
+        pdf_parser = GeminiPDFParser(model_name=get_model("pdf_parsing"))
         
         # --- [A] Price 데이터 파싱 ---
         logger.info("Parsing Price data (Samsung)...")

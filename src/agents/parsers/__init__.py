@@ -5,19 +5,24 @@ Parser Agent 모듈
 """
 
 from .base_parser_agent import BaseParserAgent
-from .pdf_parser_agent import GeminiPDFParser
+from .dart_parser_agent import DARTParserAgent
 from .price_parser_agent import PriceParserAgent
+from .fund_parser_agent import FundParserAgent
 from .news_parser_agent import NewsParserAgent
 from .macro_parser_agent import MacroParserAgent
-from .dart_parser_agent import DARTParserAgent
-from .fund_parser_agent import FundParserAgent
+
+# PDF Parser는 선택적 (google-genai 의존성)
+try:
+    from .pdf_parser_agent import GeminiPDFParser
+except ImportError:
+    GeminiPDFParser = None
 
 __all__ = [
     "BaseParserAgent",
-    "GeminiPDFParser",
+    "DARTParserAgent",
     "PriceParserAgent",
+    "FundParserAgent",
     "NewsParserAgent",
     "MacroParserAgent",
-    "DARTParserAgent",
-    "FundParserAgent",
+    "GeminiPDFParser",
 ]
