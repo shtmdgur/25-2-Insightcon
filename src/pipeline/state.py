@@ -73,6 +73,7 @@ class ReportState(TypedDict):
     # 6. Debate 에이전트 결과 (Phase 2 - Sequential)
     # ========================================
     debate_state: Optional[DebateState]  # 토론 상태 (통합 관리)
+    judge_verdict: Optional[Dict[str, Any]]  # Judge 판결 결과 (Synthesizer 입력)
     synthesis_report: Optional[str]  # Synthesizer 최종 리포트 및 판단
     
     # ========================================

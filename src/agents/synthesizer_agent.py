@@ -14,38 +14,60 @@ class SynthesizerAgent(BaseDebateAgent):
         # Synthesizer는 argue를 사용하지 않지만, 인터페이스 호환성을 위해 구현
         return {"argument": "저는 종합 에이전트입니다."}
 
+
     def synthesize(self, state: Dict[str, Any]) -> str:
         """
-        토론 종합 및 최종 리포트 생성
+        토론 종합 및 최종 리포트 생성 (Judge의 판결 기반)
         
         Args:
-            state: ReportState (debate_state에서 bull_history, bear_history 추출)
+            state: ReportState containing:
+                   - debate_state: bull_history, bear_history
+                   - judge_verdict: Dict (from JudgeAgent)
         
         Returns:
             최종 투자 판단 리포트 (Markdown)
         """
-        # 1. State에서 토론 이력 추출
+        # 1. State에서 데이터 추출
         debate_state = state.get("debate_state", {})
         bull_history = debate_state.get("bull_history", "")
         bear_history = debate_state.get("bear_history", "")
+        judge_verdict = state.get("judge_verdict", {})
         
-        # 2. Broad Search (중요 경로 검증용)
-        data = self._extract_data_from_state(state)
-        
-        # 3. 템플릿 로드
+        # 2. 템플릿 로드
         template = self.prompts.get("debate_agents", {}).get("synthesizer", {}).get("instruction", "")
         
-        # 4. 프롬프트 구성
+        # 3. 프롬프트 구성
+        # Judge Verdict가 딕셔너리이므로 보기 좋게 JSON 문자열이나 포맷팅된 문자열로 변환
+        import json
+        verdict_str = json.dumps(judge_verdict, indent=2, ensure_ascii=False)
+        
+        # 안전한 get을 위해 기본값 설정
+        decision = judge_verdict.get("decision", "HOLD")
+        score = judge_verdict.get("score", 50)
+        confidence = judge_verdict.get("confidence_level", "Medium")
+        rationale = judge_verdict.get("rationale", "No rationale provided.")
+        winning_side = judge_verdict.get("winning_side", "Neutral")
+        
+        # 템플릿 채우기 (나머지 변수들도 포맷팅에 사용될 수 있도록 준비)
         prompt = template.format(
             ticker=state.get("query", ""),
             bull_history=bull_history,
             bear_history=bear_history,
-            critical_paths=str(data.get("impact_paths", []))
+            judge_verdict=verdict_str,
+            decision=decision,
+            score=score,
+            confidence_level=confidence,
+            rationale_summary=rationale[:100] + "..." if len(rationale) > 100 else rationale, # 요약용
+            rationale=rationale, # Full text for reference in instructions
+            winning_side=winning_side,
+            bull_outcome="Winner" if winning_side == "Bull" else "Loser",
+            bear_outcome="Winner" if winning_side == "Bear" else "Loser",
+            history=f"Bull History:\n{bull_history}\n\nBear History:\n{bear_history}"
         )
         
-        # 5. LLM 실행
+        # 4. LLM 실행
         response = self.llm.invoke(prompt)
         
-        # 6. 응답 파싱 (signature 제거)
+        # 5. 응답 파싱
         result = self._parse_response(response)
         return result["argument"]
