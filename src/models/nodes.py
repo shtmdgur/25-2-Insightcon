@@ -9,11 +9,12 @@ from enum import Enum
 
 
 class NodeType(str, Enum):
-    """허용된 노드 타입 (Hybrid KG Architecture 1.0 based)"""
+    """허용된 노드 타입 (Hybrid KG Architecture v3.0)"""
     # Agent Layer (정적)
     IDM = "IDM"
     FABLESS = "Fabless"
     FOUNDRY = "Foundry"
+    OSAT = "OSAT"  # ✨ 신규: 후공정 (ASE, Amkor, 하나마이크론)
     SUPPLIER = "Supplier"
     ORGANIZATION = "Organization"
     
@@ -21,43 +22,29 @@ class NodeType(str, Enum):
     EARNINGS = "Earnings"
     PRICE_MOVEMENT = "PriceMovement"
     DISCLOSURE = "Disclosure"
-    ISSUE = "Issue"
+    ISSUE = "Issue"  # 정책/리스크/기회 통합 (자유형식)
     
     # MacroMetric Layer
     ECONOMIC_INDICATOR = "EconomicIndicator"
-    
-    # Document Layer
-    NEWS = "News"
-    REPORT = "Report"
-
-    # Compatibility/Legacy
-    AGENT = "Agent"
-    EVENT = "Event"
-    OBSERVATION = "Observation"
-    METRIC = "Metric"
-    TREND = "Trend"
-    COMPANY = "Company"
 
 
 class RelationType(str, Enum):
-    """허용된 관계 타입 (Hybrid KG Architecture 1.0 based)"""
-    # Logic Layer (정적 역학 관계)
-    AFFECTS = "AFFECTS"  # 메타데이터: correlation, sensitivity, lag, confidence
+    """허용된 관계 타입 (Hybrid KG Architecture v3.0)"""
+    # Logic Layer (영향 관계)
+    AFFECTS = "AFFECTS"  # 메타데이터: correlation, sensitivity, lag
     
-    # Causal Layer (동적 인과 관계)
-    TRIGGERED_BY = "TRIGGERED_BY"  # 메타데이터: confidence, reasoning
+    # Causal Layer (인과 관계)
+    TRIGGERED_BY = "TRIGGERED_BY"  # 메타데이터: reasoning, impact
     
     # Structural Layer (밸류체인)
-    SUPPLIES = "SUPPLIES"
+    SUPPLIES = "SUPPLIES"  # 메타데이터: dependency, is_critical, supply_type, product
     MANUFACTURES = "MANUFACTURES"
     HAS_SIGNAL = "HAS_SIGNAL"
-    MENTIONED_IN = "MENTIONED_IN"
     
-    # 기존 유지 (하위 호환성)
-    HAS_METRIC = "HAS_METRIC"
-    HAS_TREND = "HAS_TREND"
-    AFFECTED_BY = "AFFECTED_BY"
-    RELATED_TO = "RELATED_TO"
+    # Agent↔Agent 관계 ✨ 신규
+    COMPETES_WITH = "COMPETES_WITH"  # 경쟁 관계
+    PARTNERS_WITH = "PARTNERS_WITH"  # 협력/파트너
+    INVESTS_IN = "INVESTS_IN"  # 투자/인수/지분
 
 
 class Entity(BaseModel):
@@ -79,12 +66,30 @@ class Entity(BaseModel):
         description="추출 신뢰도 (0.0~1.0)"
     )
     
-    # 신규 추가 필드 (Hybrid KG)
-    embedding: Optional[List[float]] = Field(default=None, description="Vector Index용 임베딩")
-    fundamental_stats: Optional[Dict[str, float]] = Field(default=None, description="Agent 전용 재무 통계")
-    direction: Optional[str] = Field(default=None, description="Signal 전용 변동 방향 (UP/DOWN/NEUTRAL)")
-    magnitude: Optional[float] = Field(default=None, description="Signal 전용 변동 폭")
-    sentiment: Optional[str] = Field(default=None, description="Signal 전용 감성 (POSITIVE/NEGATIVE/NEUTRAL)")
+    # 신규 추가 필드 (Hybrid KG v3.0)
+    date: Optional[str] = Field(default=None, description="데이터 발생/추출 날짜 (YYYY-MM-DD)")
+    embedding: Optional[List[float]] = Field(default=None, description="Vector Index용 임베딩 (PDF/News만)")
+    source: Optional[str] = Field(default=None, description="출처 문서명")
+    
+    # === Agent Layer 전용 ===
+    fundamental_stats: Optional[Dict[str, float]] = Field(default=None, description="재무 통계")
+    technical_metric: Optional[Dict[str, Any]] = Field(default=None, description="기술 지표 (수율, 대역폭 등)")
+    market_metric: Optional[Dict[str, Any]] = Field(default=None, description="시장 지표 (점유율, PER/PBR 등)")
+    value_chain_stage: Optional[str] = Field(default=None, description="설계/전공정/후공정/테스트")
+    location: Optional[str] = Field(default=None, description="물리적 위치")
+    
+    # === Signal Layer 전용 ===
+    direction: Optional[str] = Field(default=None, description="UP/DOWN/NEUTRAL")
+    magnitude: Optional[float] = Field(default=None, description="변동 크기 (%)")
+    sentiment: Optional[str] = Field(default=None, description="POSITIVE/NEGATIVE/NEUTRAL")
+    
+    # === PriceMovement 전용 ===
+    is_significant: Optional[bool] = Field(default=None, description="의미있는 변동 여부")
+    relative_performance: Optional[str] = Field(default=None, description="시장 대비 성과")
+    trigger: Optional[str] = Field(default=None, description="원인 이벤트")
+    
+    # === Issue 전용 (자유형식) ===
+    description: Optional[str] = Field(default=None, description="LLM 자유형식 기술")
 
     class Config:
         use_enum_values = False
@@ -129,18 +134,47 @@ class Relation(BaseModel):
         description="추가 속성"
     )
     
-    # AFFECTS 전용 메타데이터
-    correlation: Optional[str] = Field(default=None, description="상관관계 방향 (DIRECT/INVERSE)")
-    sensitivity: Optional[float] = Field(default=None, description="민감도 (0.0~1.0)")
-    lag: Optional[str] = Field(default=None, description="지연 시간 (IMMEDIATE/1Q/1Y 등)")
+    # === 공통 메타데이터 ===
+    date: Optional[str] = Field(default=None, description="관계 발생/추출 날짜 (YYYY-MM-DD)")
     confidence: Optional[float] = Field(default=None, description="관계 신뢰도 (0.0~1.0)")
+    source: Optional[str] = Field(default=None, description="데이터 출처")
     
-    # TRIGGERED_BY 전용 메타데이터
+    # === AFFECTS 전용 ===
+    correlation: Optional[str] = Field(default=None, description="DIRECT/INVERSE")
+    sensitivity: Optional[float] = Field(default=None, description="민감도 (0-1)")
+    lag: Optional[str] = Field(default=None, description="지연 시간 (자유형식)")
+    
+    # === TRIGGERED_BY 전용 ===
     reasoning: Optional[str] = Field(default=None, description="인과관계 설명")
+    impact: Optional[str] = Field(default=None, description="영향 기간+시차 통합 (자유형식)")
+    
+    # === SUPPLIES 전용 (소부장) ===
+    dependency: Optional[float] = Field(default=None, description="의존도 (0-1)")
+    is_critical: Optional[bool] = Field(default=None, description="핵심 공급망 여부")
+    supply_type: Optional[str] = Field(default=None, description="장비/소재/부품/설계IP 등")
+    product: Optional[str] = Field(default=None, description="공급 품목명")
+    
+    # === HAS_SIGNAL 전용 ===
+    importance: Optional[float] = Field(default=None, description="중요도 (0-1)")
+    is_official: Optional[bool] = Field(default=None, description="공식 공시 여부")
+    
+    # === COMPETES_WITH 전용 ===
+    market_segment: Optional[str] = Field(default=None, description="경쟁 시장 (HBM, 파운드리 등)")
+    competitive_dynamic: Optional[str] = Field(default=None, description="경쟁 양상 설명")
+    
+    # === PARTNERS_WITH 전용 ===
+    partnership_type: Optional[str] = Field(default=None, description="기술협력/생산위탁/JV 등")
+    scope: Optional[str] = Field(default=None, description="협력 범위")
+    
+    # === INVESTS_IN 전용 ===
+    investment_type: Optional[str] = Field(default=None, description="M&A/지분투자/시설투자 등")
+    amount: Optional[str] = Field(default=None, description="투자 규모")
+    stake_percentage: Optional[float] = Field(default=None, description="지분율")
     
     # 검증용 타입 정보
     subject_type: Optional[NodeType] = Field(default=None)
     object_type: Optional[NodeType] = Field(default=None)
+
 
     class Config:
         use_enum_values = False
@@ -214,28 +248,41 @@ class KnowledgeGraph(BaseModel):
         return cls(entities=entities, relations=relations)
 
 
-# 관계별 도메인/레인지 스키마
+# 관계별 도메인/레인지 스키마 (v3.0)
 RELATION_SCHEMA: Dict[RelationType, Dict[str, List[NodeType]]] = {
     RelationType.AFFECTS: {
-        "domain": [NodeType.ECONOMIC_INDICATOR],
-        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.SUPPLIER],
+        "domain": [NodeType.ECONOMIC_INDICATOR, NodeType.ISSUE, NodeType.EARNINGS, NodeType.DISCLOSURE],
+        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER],
     },
     RelationType.TRIGGERED_BY: {
-        "domain": [NodeType.PRICE_MOVEMENT],
-        "range": [NodeType.DISCLOSURE, NodeType.EARNINGS, NodeType.ISSUE],
+        "domain": [NodeType.EARNINGS, NodeType.PRICE_MOVEMENT, NodeType.DISCLOSURE, NodeType.ISSUE],
+        "range": [NodeType.EARNINGS, NodeType.PRICE_MOVEMENT, NodeType.DISCLOSURE, NodeType.ISSUE, NodeType.ECONOMIC_INDICATOR],
     },
     RelationType.SUPPLIES: {
         "domain": [NodeType.SUPPLIER],
-        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY],
+        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT],
+    },
+    RelationType.MANUFACTURES: {
+        "domain": [NodeType.IDM, NodeType.FOUNDRY, NodeType.OSAT],
+        "range": [NodeType.ISSUE],  # 제품도 Issue로 표현 가능
     },
     RelationType.HAS_SIGNAL: {
-        "domain": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.SUPPLIER, NodeType.ORGANIZATION],
+        "domain": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER, NodeType.ORGANIZATION],
         "range": [NodeType.EARNINGS, NodeType.PRICE_MOVEMENT, NodeType.DISCLOSURE, NodeType.ISSUE],
     },
-    RelationType.MENTIONED_IN: {
-        "domain": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.SUPPLIER, NodeType.ORGANIZATION, NodeType.ECONOMIC_INDICATOR],
-        "range": [NodeType.NEWS, NodeType.REPORT],
-    }
+    # ✨ 신규 Agent↔Agent 관계
+    RelationType.COMPETES_WITH: {
+        "domain": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER],
+        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER],
+    },
+    RelationType.PARTNERS_WITH: {
+        "domain": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER, NodeType.ORGANIZATION],
+        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER, NodeType.ORGANIZATION],
+    },
+    RelationType.INVESTS_IN: {
+        "domain": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER, NodeType.ORGANIZATION],
+        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER, NodeType.ISSUE, NodeType.ORGANIZATION],
+    },
 }
 
 
@@ -254,18 +301,19 @@ def validate_relation(relation: Relation) -> bool:
     return True
 
 
-# 엔티티 타입별 기본 속성 정의
+# 엔티티 타입별 기본 속성 정의 (v3.0)
 ENTITY_TYPE_PROPERTIES = {
-    NodeType.IDM: ["ticker", "fab_capacity"],
-    NodeType.FABLESS: ["ticker", "major_products"],
-    NodeType.FOUNDRY: ["process_nodes"],
-    NodeType.SUPPLIER: ["equipment_type"],
+    NodeType.IDM: ["ticker", "value_chain_stage", "location"],
+    NodeType.FABLESS: ["ticker", "value_chain_stage"],
+    NodeType.FOUNDRY: ["ticker", "value_chain_stage"],
+    NodeType.OSAT: ["ticker", "value_chain_stage"],
+    NodeType.SUPPLIER: ["ticker", "supply_type"],
+    NodeType.ORGANIZATION: ["description"],
     NodeType.ECONOMIC_INDICATOR: ["unit", "source"],
-    NodeType.EARNINGS: ["period", "revenue", "op_profit"],
-    NodeType.PRICE_MOVEMENT: ["date", "pct_change"],
-    NodeType.DISCLOSURE: ["date", "report_nm"],
-    NodeType.NEWS: ["title", "date", "url"],
-    NodeType.REPORT: ["analyst", "date", "firm"]
+    NodeType.EARNINGS: ["direction", "magnitude", "sentiment"],
+    NodeType.PRICE_MOVEMENT: ["direction", "magnitude", "is_significant", "trigger"],
+    NodeType.DISCLOSURE: ["direction", "sentiment"],
+    NodeType.ISSUE: ["description"],
 }
 
 

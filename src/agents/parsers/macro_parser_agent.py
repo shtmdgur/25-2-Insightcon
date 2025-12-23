@@ -82,14 +82,14 @@ class MacroParserAgent(BaseParserAgent):
             self.logger.warning("Missing entities or relations")
             return False
         
-        # Metric 엔티티 확인
-        has_metrics = any(
-            e.get("type") == NodeType.METRIC.value
+        # EconomicIndicator 엔티티 확인
+        has_indicators = any(
+            e.get("type") == NodeType.ECONOMIC_INDICATOR.value
             for e in data["entities"]
         )
         
-        if not has_metrics:
-            self.logger.warning("No Metric entities found")
+        if not has_indicators:
+            self.logger.warning("No EconomicIndicator entities found")
             return False
         
         return True
@@ -139,37 +139,37 @@ class MacroParserAgent(BaseParserAgent):
         # 날짜 파싱
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
         df = df[df['date'].notna()]  # 날짜 없는 행 제거
-        df = df.sort_values('date', ascending=False)
+        df = df.sort_values('date', ascending=True) # KG 구조 (Static 노드로 변경: series당 1개만)
+        entities = []
+        relations = []
         
-        # 지표별 그룹화
         series_groups = df.groupby('series')
         
         self.logger.info(f"Found {len(series_groups)} unique indicators")
         
         for series_name, group_df in series_groups:
-            # 샘플링 (config에서 가져옴)
-            from src.config.parser_config import get_config
-            config = get_config('macro')
+            # 최신 값만 사용 (또는 평균)
+            latest_row = group_df.iloc[-1]  # 가장 최근 데이터
             
-            sample_size = min(config.sample_per_series, len(group_df))
-            sampled = group_df.head(sample_size)
+            # Static ECONOMIC_INDICATOR 노드 생성 (1개만)
+            indicator_entity = Entity(
+                name=f"{series_name}",  # ✅ 날짜 제거, series 이름만
+                type=NodeType.ECONOMIC_INDICATOR,
+                properties={
+                    "series": str(series_name),
+                    "latest_value": float(latest_row['value']),
+                    "latest_date": latest_row['date'].strftime('%Y-%m-%d'),
+                    "indicator_type": "macro",
+                    "data_points": len(group_df),
+                    "min_value": float(group_df['value'].min()),
+                    "max_value": float(group_df['value'].max()),
+                    "mean_value": float(group_df['value'].mean())
+                },
+                confidence=1.0
+            )
+            entities.append(indicator_entity)
             
-            for idx, row in sampled.iterrows():
-                # Metric 엔티티 생성 (동적 KG)
-                date_str = row['date'].strftime('%Y-%m-%d')
-                
-                metric_entity = Entity(
-                    name=f"MacroMetric_{series_name}_{date_str}",
-                    type=NodeType.METRIC,
-                    properties={
-                        "series": str(series_name),
-                        "date": date_str,
-                        "value": float(row['value']),
-                        "indicator_type": "macro"
-                    },
-                    confidence=1.0
-                )
-                entities.append(metric_entity)
+            self.logger.info(f"Created {series_name} with {len(group_df)} data points (latest: {latest_row['date']})")
         
         # Knowledge Graph 생성
         kg = KnowledgeGraph(

@@ -228,7 +228,8 @@ def test_gemini_pdf_with_json():
         print(f"  {i}. {pdf.name} ({pdf.stat().st_size / 1024:.1f} KB)")
     
     # 각 PDF 파일 파싱
-    parser = GeminiPDFParser(model_name="gemini-2.5-flash")
+    from src.config.llm_config import get_model
+    parser = GeminiPDFParser(model_name=get_model("pdf_parsing"))
     
     for i, sample_pdf in enumerate(pdf_files, 1):
         print(f"\n[{i}/{len(pdf_files)}] Parsing: {sample_pdf.name}")

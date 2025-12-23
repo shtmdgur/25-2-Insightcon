@@ -1,0 +1,242 @@
+# Master Entity List for Entity Normalization
+# 정규화된 회사명 리스트 - 모든 파서가 이 리스트를 기준으로 엔티티 이름을 통일합니다.
+# 
+# 구조:
+#   - name: 정규 이름 (Neo4j에 저장되는 이름)
+#     type: NodeType (IDM, FOUNDRY, FABLESS, etc.)
+#     aliases: 별칭 리스트 (이 이름들은 모두 정규 이름으로 매핑됨)
+#     ticker: 주식 코드 (있는 경우)
+
+# === 한국 기업 ===
+korean_idm:
+  - name: 삼성전자
+    type: IDM
+    ticker: "005930"
+    aliases:
+      - 삼성
+      - 삼전
+      - Samsung
+      - Samsung Electronics
+      - 삼성전자주식회사
+
+  - name: SK하이닉스
+    type: IDM
+    ticker: "000660"
+    aliases:
+      - 하이닉스
+      - SK Hynix
+      - SK 하이닉스
+      - SK하이
+      - 하이닉스반도체
+
+korean_foundry:
+  - name: 삼성파운드리
+    type: FOUNDRY
+    aliases:
+      - Samsung Foundry
+      - 삼성 파운드리
+
+korean_fabless:
+  - name: DB하이텍
+    type: FABLESS
+    ticker: "000990"
+    aliases:
+      - 디비하이텍
+      - DB하이
+      - 디비하이
+
+# === 미국 기업 ===
+us_idm:
+  - name: Intel Corporation
+    type: IDM
+    ticker: INTC
+    aliases:
+      - Intel
+      - 인텔
+      - 인텔코리아
+
+  - name: Micron Technology
+    type: IDM
+    ticker: MU
+    aliases:
+      - Micron
+      - 마이크론
+      - 마이크론테크놀로지
+
+us_fabless:
+  - name: NVIDIA Corporation
+    type: FABLESS
+    ticker: NVDA
+    aliases:
+      - NVIDIA
+      - Nvidia
+      - 엔비디아
+      - 엔비디아코리아
+
+  - name: Advanced Micro Devices
+    type: FABLESS
+    ticker: AMD
+    aliases:
+      - AMD
+      - Amd
+      - 에이엠디
+
+  - name: Qualcomm
+    type: FABLESS
+    ticker: QCOM
+    aliases:
+      - 퀄컴
+      - 퀄컴코리아
+      - QCOM
+
+  - name: Broadcom
+    type: FABLESS
+    ticker: AVGO
+    aliases:
+      - 브로드컴
+      - AVGO
+
+  - name: Apple
+    type: FABLESS
+    ticker: AAPL
+    aliases:
+      - 애플
+      - Apple Inc
+
+# === 대만/아시아 기업 ===
+taiwan_foundry:
+  - name: Taiwan Semiconductor
+    type: FOUNDRY
+    ticker: TSM
+    aliases:
+      - TSMC
+      - 티에스엠씨
+      - 대만반도체
+      - 타이완세미컨덕터
+      - TSMC홀딩스
+      - 台積電
+
+  - name: United Microelectronics
+    type: FOUNDRY
+    ticker: UMC
+    aliases:
+      - UMC
+      - 유엠씨
+
+japan_memory:
+  - name: Kioxia
+    type: IDM
+    aliases:
+      - 키옥시아
+      - KIOXIA
+      - 키오시아
+      - 도시바메모리
+      - Toshiba Memory
+
+  - name: Western Digital
+    type: IDM
+    ticker: WDC
+    aliases:
+      - WD
+      - 웨스턴디지털
+      - 웨스턴 디지털
+
+taiwan_memory:
+  - name: Nanya Technology
+    type: IDM
+    aliases:
+      - Nanya
+      - 난야
+      - 난야테크
+
+# === 장비/소재 기업 ===
+equipment:
+  - name: ASML Holding
+    type: SUPPLIER
+    ticker: ASML
+    aliases:
+      - ASML
+      - 에이에스엠엘
+      - ASML Holdings
+
+  - name: Applied Materials
+    type: SUPPLIER
+    ticker: AMAT
+    aliases:
+      - 어플라이드
+      - 어플라이드머티리얼즈
+      - AMAT
+      - Applied
+
+  - name: Lam Research
+    type: SUPPLIER
+    ticker: LRCX
+    aliases:
+      - 램리서치
+      - LRCX
+      - Lam
+
+  - name: Tokyo Electron
+    type: SUPPLIER
+    ticker: "8035.T"
+    aliases:
+      - TEL
+      - 도쿄일렉트론
+      - 東京エレクトロン
+
+  - name: Texas Instruments
+    type: SUPPLIER
+    ticker: TXN
+    aliases:
+      - 텍사스인스트루먼트
+      - 텍사스 인스트루먼트
+
+  - name: 한미반도체
+    type: SUPPLIER
+    ticker: "042700"
+    aliases:
+      - Hanmi Semiconductor
+      - Hanmi
+      - Hanmi Semi
+
+# === 경제 지표 ===
+indicators:
+  - name: USD/KRW
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - 원달러 환율
+      - 달러 환율
+      - 원/달러
+      - USD/KRW 환율
+
+  - name: 10-Year Treasury Yield
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - 미국 10년물 국채 금리
+      - 10년물 금리
+      - US10Y
+
+  - name: PHLX Semiconductor Sector
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - SOX
+      - 필라델피아 반도체 지수
+      - 반도체지수
+      - Philadelphia Semiconductor Index
+
+  - name: Federal Funds Rate
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - 연방기금금리
+      - 미국 기준금리
+      - Fed Funds Rate
+      - FFR
+
+# === Fuzzy Matching 설정 ===
+matching_config:
+  # 최소 유사도 임계값 (0-100)
+  min_similarity_threshold: 80
+  # 대소문자 무시
+  case_insensitive: true
+  # 공백 무시
+  ignore_whitespace: true

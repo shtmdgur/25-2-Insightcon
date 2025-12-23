@@ -1,16 +1,17 @@
 """
 KG Construction Agent Orchestration Test
 
-KGConstructionAgent가 6개의 Parser Agent를 오케스트레이션하여
-data/raw에서 Neo4j까지 전체 파이프라인을 실행하는 테스트입니다.
+KGConstructionAgent가 5개의 Parser Agent를 오케스트레이션하여
+data/preprocessed에서 Neo4j까지 전체 파이프라인을 실행하는 테스트입니다.
 
-Parser Agents:
-1. PDFParserAgent - PDF 파일 처리
-2. PriceParserAgent - 주가 데이터 처리 (CSV)
+Parser Agents (v3.0):
+1. PDFParserAgent - PDF 파일 처리 (data/raw에서)
+2. DARTParserAgent - DART 공시 데이터 처리
 3. NewsParserAgent - 뉴스 데이터 처리 (CSV)
 4. MacroParserAgent - 거시경제 데이터 처리 (CSV)
-5. DARTParserAgent - DART 공시 데이터 처리 (CSV)
-6. FundParserAgent - 펀더멘탈 데이터 처리 (CSV)
+5. FundParserAgent - 펀더멘털 데이터 처리 (CSV)
+
+제거됨 (v3.0): PriceParserAgent
 """
 
 import os
@@ -30,9 +31,18 @@ from src.config.parser_config import PARSER_CONFIGS
 # 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',  # 간결한 포맷
+    datefmt='%H:%M:%S'  # 시간만 표시
 )
 logger = logging.getLogger(__name__)
+
+# 외부 라이브러리 로그 숨기기 (WARNING 이상만)
+logging.getLogger("google_genai").setLevel(logging.WARNING)
+logging.getLogger("google.genai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("neo4j").setLevel(logging.WARNING)
 
 # 환경변수 로드
 load_dotenv()
@@ -86,19 +96,20 @@ def check_environment():
 
 
 def check_data_sources():
-    """데이터 소스 확인"""
+    """데이터 소스 확인 (v3.0: preprocessed 기준)"""
     print_section("2. 데이터 소스 스캔")
     
-    data_dir = project_root / "data" / "raw"
+    preprocessed_dir = project_root / "data" / "preprocessed"
+    raw_dir = project_root / "data" / "raw"
     
-    # 각 데이터 소스별 파일 확인
+    # 각 데이터 소스별 파일 확인 (v3.0 반영)
     sources = {
-        "PDF": list(data_dir.glob("reports/**/*.pdf")),
-        "Price (CSV)": list(data_dir.glob("price/**/*.csv")),
-        "News (CSV)": list(data_dir.glob("news/**/*.csv")),
-        "Macro (CSV)": list(data_dir.glob("macro/**/*.csv")),
-        "DART (CSV)": list(data_dir.glob("dart/**/*.csv")),
-        "Fund (CSV)": list(data_dir.glob("fund/**/*.csv"))
+        "PDF (raw)": list(raw_dir.glob("reports/**/*.pdf")) + list(raw_dir.glob("ir/**/*.pdf")),
+        "DART (preprocessed)": [preprocessed_dir / 'dart'] if (preprocessed_dir / 'dart').exists() else [],
+        "News (preprocessed)": list(preprocessed_dir.glob("news/**/*.csv")),
+        "Macro": list(preprocessed_dir.glob("macro/**/*.csv")) or list(raw_dir.glob("macro/**/*.csv")),
+        "Fund (preprocessed)": list(preprocessed_dir.glob("fund/**/*.csv"))
+        # Price: v3.0에서 제거됨
     }
     
     total_files = 0
@@ -129,12 +140,7 @@ def display_parser_configs():
     """Parser 설정 출력"""
     print_section("3. Parser 설정 확인")
     
-    print("📝 Price Parser:")
-    print(f"  - Sample Size: {PARSER_CONFIGS.price.sample_size}일")
-    print(f"  - SAX Window: {PARSER_CONFIGS.price.sax_window_size}")
-    print(f"  - Volatility Threshold: {PARSER_CONFIGS.price.volatility_threshold}")
-    
-    print("\n📝 News Parser:")
+    print("📝 News Parser:")
     print(f"  - Sample Size: {PARSER_CONFIGS.news.sample_size}건")
     print(f"  - Use LLM: {PARSER_CONFIGS.news.use_llm}")
     print(f"  - LLM Model: {PARSER_CONFIGS.news.llm_model}")
@@ -157,13 +163,12 @@ def enable_test_mode():
     
     print_section("테스트 모드 활성화")
     print("⚠️  테스트 모드: 소량 데이터만 처리합니다")
-    print("  - CSV 파일: 10행 정도만 파싱")
-    print("  - 파일 수: 각 타입별 2-3개만 처리\n")
+    print("  - 뉴스: 5행만 파싱")
+    print("  - PDF: reports 1개 + ir 1개\n")
     
-    # 파서별 테스트 모드 설정 적용
-    update_config('price', sample_size=10)
-    update_config('news', sample_size=10)
-    update_config('macro', sample_per_series=10)
+    # 파서별 테스트 모드 설정 적용 (v3.0)
+    update_config('news', sample_size=5)  # 뉴스 5행만
+    # update_config('price', sample_size=10)  # v3.0: 제거됨
     
     print("✅ 테스트 모드 설정 적용 완료")
 
@@ -202,9 +207,16 @@ def run_orchestration_test(load_to_neo4j: bool = False, test_mode: bool = False)
     print_section("4. KG Construction Agent 초기화")
     
     try:
+        # LLM 초기화 (News Parser용)
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        from src.config.llm_config import get_model
+        llm = ChatGoogleGenerativeAI(model=get_model("news_parsing"))
+        print(f"✅ LLM 초기화 완료: {get_model('news_parsing')}")
+        
         agent = KGConstructionAgent(
             data_dir=project_root / "data",
-            neo4j_uri=os.getenv("NEO4J_URI")  # None이면 주입 스킵
+            neo4j_uri=os.getenv("NEO4J_URI"),  # None이면 주입 스킵
+            llm=llm  # News Parser용 LLM 전달
         )
         print("✅ KGConstructionAgent 초기화 완료")
     except Exception as e:
@@ -221,22 +233,40 @@ def run_orchestration_test(load_to_neo4j: bool = False, test_mode: bool = False)
         # 테스트 모드: 파일 수 제한
         data_sources = None
         if test_mode:
-            print("\n\u26a0️  테스트 모드: 파일 수 제한 적용")
-            data_dir = project_root / "data" / "raw"
+            print("\n⚠️  테스트 모드: 파일 수 제한 적용")
+            raw_dir = project_root / "data" / "raw"
+            preprocessed_dir = project_root / "data" / "preprocessed"
+            
+            # PDF: reports 1개 + ir/Samsung 1개 = 총 2개
+            pdf_files = []
+            reports_pdfs = list((preprocessed_dir / 'reports').glob('*.pdf'))[:1]  # reports에서 1개
+            if not reports_pdfs:
+                reports_pdfs = list((raw_dir / 'reports').glob('*.pdf'))[:1]
+            pdf_files.extend(reports_pdfs)
+            
+            # ir 폴더에서 첫 번째 회사의 첫 번째 PDF
+            ir_dir = preprocessed_dir / 'ir'
+            if not ir_dir.exists():
+                ir_dir = raw_dir / 'ir'
+            if ir_dir.exists():
+                company_dirs = sorted([d for d in ir_dir.iterdir() if d.is_dir()])
+                if company_dirs:
+                    first_company_pdf = list(company_dirs[0].glob('*.pdf'))[:1]
+                    pdf_files.extend(first_company_pdf)
+            
             data_sources = {
-                'pdf': list((data_dir / 'reports').glob('**/*.pdf'))[:2],  # 2개만
-                'price': list((data_dir / 'price').glob('*.csv'))[:3],  # 3개만
-                'dart': [data_dir / 'DART'] if (data_dir / 'DART').exists() else [],
-                'news': list((data_dir / 'news').glob('*.csv'))[:1],  # 1개만
-                'macro': list((data_dir / 'macro').glob('*.csv'))[:1],  # 1개만
-                'fund': list((data_dir / 'fund').glob('*_fundamentals.csv'))[:2]  # 2개만
+                'pdf': pdf_files,  # 총 2개 (reports 1개 + ir 1개)
+                'dart': [preprocessed_dir / 'dart'] if (preprocessed_dir / 'dart').exists() else [],  # 전체
+                'news': list((preprocessed_dir / 'news').glob('*.csv')),  # 전체 (내부에서 5행 샘플링)
+                'macro': list((raw_dir / 'macro').glob('*.csv')),  # 전체
+                'fund': list((preprocessed_dir / 'fund').glob('*.csv'))  # 전체
             }
-            print(f"  PDF: {len(data_sources['pdf'])}개")
-            print(f"  Price: {len(data_sources['price'])}개")
-            print(f"  News: {len(data_sources['news'])}개")
-            print(f"  Macro: {len(data_sources['macro'])}개")
-            print(f"  DART: {len(data_sources['dart'])}개")
-            print(f"  Fund: {len(data_sources['fund'])}개\n")
+            
+            print(f"  PDF: {len(data_sources['pdf'])}개 (reports 1 + ir 1)")
+            print(f"  DART: {len(data_sources['dart'])}개 디렉토리 (전체)")
+            print(f"  News: {len(data_sources['news'])}개 CSV (내부 5행 샘플링)")
+            print(f"  Macro: {len(data_sources['macro'])}개 CSV (전체)")
+            print(f"  Fund: {len(data_sources['fund'])}개 CSV (전체)\n")
         
         result = agent.construct_knowledge_graph(
             data_sources=data_sources,  # 테스트 모드일 때 제한된 파일 목록 사용

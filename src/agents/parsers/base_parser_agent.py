@@ -69,11 +69,15 @@ class BaseParserAgent(ABC):
         Returns:
             'static' 또는 'dynamic'
         """
+        # Hybrid KG Architecture v3.0 기준 정적 타입
         static_types = {
-            NodeType.COMPANY,
-            NodeType.PRODUCT,
-            NodeType.TECHNOLOGY,
-            NodeType.PERSON
+            NodeType.IDM,
+            NodeType.FABLESS,
+            NodeType.FOUNDRY,
+            NodeType.OSAT,  # v3.0 신규: 후공정 전문 기업
+            NodeType.SUPPLIER,
+            NodeType.ORGANIZATION,
+            NodeType.ECONOMIC_INDICATOR,
         }
         
         if node_type in static_types:

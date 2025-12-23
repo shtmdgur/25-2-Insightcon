@@ -11,14 +11,16 @@ import json
 
 from src.agents.parsers.base_parser_agent import BaseParserAgent
 from src.agents.parsers.pdf_parser_agent import GeminiPDFParser
-from src.agents.parsers.price_parser_agent import PriceParserAgent
+# from src.agents.parsers.price_parser_agent import PriceParserAgent  # v3.0: 사용 안 함
 from src.agents.parsers.news_parser_agent import NewsParserAgent
 from src.agents.parsers.macro_parser_agent import MacroParserAgent
 from src.agents.parsers.fund_parser_agent import FundParserAgent
+from src.agents.parsers.dart_parser_agent import DARTParserAgent  # v3.0: 추가
 
 from src.models.nodes import KnowledgeGraph
 from src.dataflows.kg_merger import KGMerger
-from src.dataflows.entity_normalizer import get_entity_normalizer
+from src.dataflows.entity_normalizer import get_entity_normalizer  # 기존 (fallback)
+from src.utils.entity_matcher import get_entity_matcher  # YAML 기반 정규화
 from src.dataflows.neo4j_loader import Neo4jKGLoader
 
 logger = logging.getLogger(__name__)
@@ -54,20 +56,22 @@ class KGConstructionAgent:
         load_dotenv()
 
         self.data_dir = data_dir or Path("data")
-        self.raw_dir = self.data_dir / "raw"
-        self.processed_dir = self.data_dir / "processed"
+        self.raw_dir = self.data_dir / "raw"                  # PDF 원본
+        self.preprocessed_dir = self.data_dir / "preprocessed"  # CSV 입력 데이터
+        self.processed_dir = self.data_dir / "processed"         # JSON 결과 출력
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         
-        # Parser Agents 초기화
+        # Parser Agents 초기화 (v3.0 스키마 반영)
         self.pdf_parser = GeminiPDFParser(use_batch=False)
-        self.price_parser = PriceParserAgent()
+        # self.price_parser = PriceParserAgent()  # v3.0: 사용 안 함
         self.news_parser = NewsParserAgent(llm=llm) if llm else NewsParserAgent()
         self.macro_parser = MacroParserAgent()
         self.fund_parser = FundParserAgent()
+        self.dart_parser = DARTParserAgent()  # v3.0: 추가
         
         # 유틸리티
         self.merger = KGMerger()
-        self.normalizer = get_entity_normalizer()
+        self.entity_matcher = get_entity_matcher()  # YAML 기반 정규화
         
         if neo4j_uri:
             user = os.getenv("NEO4J_USERNAME") or os.getenv("NEO4J_USER", "neo4j")
@@ -124,6 +128,13 @@ class KGConstructionAgent:
             # 5. Entity 정규화
             normalized_kg = self._normalize_entities(merged_kg)
             
+            # 5.5 병합된 JSON 저장 (디버깅용)
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+            merged_output_path = self.processed_dir / f"merged_kg_{timestamp}.json"
+            normalized_kg.save_to_json(str(merged_output_path))
+            logger.info(f"Merged & Normalized KG saved to {merged_output_path}")
+
             # 6. Neo4j 주입 (선택적)
             neo4j_stats = None
             if load_to_neo4j and self.loader:
@@ -149,57 +160,56 @@ class KGConstructionAgent:
     
     def _scan_data_sources(self) -> Dict[str, List[Path]]:
         """
-        data/raw/* 자동 스캔
+        data/preprocessed/* 자동 스캔 (CSV 입력 데이터)
         
         Returns:
             파일 타입별 경로 목록
         """
-        logger.info(f"Scanning data sources in {self.raw_dir}")
+        logger.info(f"Scanning data sources in {self.preprocessed_dir}")
         
         sources = {
             'pdf': [],
-            'price': [],
+            'dart': [],  # v3.0: 추가
             'news': [],
             'macro': [],
             'fund': []
+            # 'price': []  # v3.0: 제거
         }
         
-        if not self.raw_dir.exists():
-            logger.warning(f"Raw data directory not found: {self.raw_dir}")
+        if not self.preprocessed_dir.exists():
+            logger.warning(f"Preprocessed data directory not found: {self.preprocessed_dir}")
             return sources
         
-        # PDF 파일 스캔
-        # - reports: 애널리스트 리포트 (flat 구조)
-        # - ir: IR 자료 (회사별 하위 폴더 구조, 예: ir/005930/report.pdf)
+        # PDF 파일은 preprocessed/reports, preprocessed/ir에서 스캔
         for pdf_dir in ['reports', 'ir']:
-            pdf_path = self.raw_dir / pdf_dir
+            pdf_path = self.preprocessed_dir / pdf_dir
             if pdf_path.exists():
-                # **/*.pdf: 모든 하위 폴더 재귀 검색
                 sources['pdf'].extend(list(pdf_path.glob('**/*.pdf')))
         
-        # 주가 CSV (모든 CSV 파일, 다양한 티커 형식 지원)
-        price_path = self.raw_dir / 'price'
-        if price_path.exists():
-            sources['price'] = list(price_path.glob('*.csv'))
+        # DART 디렉토리 (preprocessed에서)
+        dart_path = self.preprocessed_dir / 'dart'
+        if dart_path.exists():
+            sources['dart'] = [dart_path]  # 디렉토리 자체를 전달
         
-        # 뉴스
-        news_path = self.raw_dir / 'news'
+        # 뉴스 CSV (preprocessed에서)
+        news_path = self.preprocessed_dir / 'news'
         if news_path.exists():
             sources['news'] = list(news_path.glob('*.csv'))
         
-        # 매크로
-        macro_path = self.raw_dir / 'macro'
+        # 매크로 (preprocessed에서)
+        macro_path = self.preprocessed_dir / 'macro'
         if macro_path.exists():
             sources['macro'] = list(macro_path.glob('*.csv'))
         
-        # 펀더멘탈 (*_fundamentals.csv 패턴)
-        fund_path = self.raw_dir / 'fund'
+        # 펀더멘털 (preprocessed에서)
+        fund_path = self.preprocessed_dir / 'fund'
         if fund_path.exists():
-            sources['fund'] = list(fund_path.glob('*_fundamentals.csv'))
+            sources['fund'] = list(fund_path.glob('*.csv'))
         
         # 통계 출력
         for source_type, files in sources.items():
-            logger.info(f"  - {source_type}: {len(files)} files")
+            count = len(files) if isinstance(files, list) else 1
+            logger.info(f"  - {source_type}: {count} files")
         
         return sources
     
@@ -218,48 +228,82 @@ class KGConstructionAgent:
         Returns:
             파서별 실행 결과
         """
-        logger.info("Orchestrating Parser Agents...")
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        logger.info("Orchestrating Parser Agents (병렬 처리)...")
         
         results = {}
         
-        # PDF Parser
+        # PDF Parser (GeminiPDFParser - 순차 처리, API Rate Limit 고려)
         if data_sources.get('pdf'):
-            logger.info(f"Running PDFParserAgent ({len(data_sources['pdf'])} files)")
-            results['pdf'] = self.pdf_parser.batch_parse(data_sources['pdf'])
+            logger.info(f"Running PDFParserAgent ({len(data_sources['pdf'])} files) - 순차 처리")
+            results['pdf'] = {'total': 0, 'success': 0, 'failed': 0, 'errors': []}
+            for pdf_file in data_sources['pdf']:
+                try:
+                    result = self.pdf_parser.parse(str(pdf_file))
+                    kg = result["knowledge_graph"]
+                    output_file = self.processed_dir / f"{pdf_file.stem}_kg.json"
+                    kg.save_to_json(str(output_file))
+                    results['pdf']['success'] += 1
+                    results['pdf']['total'] += 1
+                    logger.info(f"   ✓ {pdf_file.name}: {len(kg.entities)} entities")
+                except Exception as e:
+                    results['pdf']['failed'] += 1
+                    results['pdf']['total'] += 1
+                    results['pdf']['errors'].append(f"{pdf_file.name}: {str(e)}")
+                    logger.error(f"   ✗ {pdf_file.name}: {e}")
         
-        # Price Parser
-        if data_sources.get('price'):
-            logger.info(f"Running PriceParserAgent ({len(data_sources['price'])} files)")
-            results['price'] = self.price_parser.batch_parse(
-                data_sources['price'],
-                self.processed_dir
-            )
+        # 병렬 처리할 파서 정의
+        def run_dart():
+            if not data_sources.get('dart'):
+                return 'dart', None
+            result = {'total': 0, 'success': 0, 'failed': 0}
+            for dart_dir in data_sources['dart']:
+                try:
+                    kg = self.dart_parser.parse(dart_dir)
+                    output_file = self.processed_dir / "dart_kg.json"
+                    kg.save_to_json(str(output_file))
+                    result['success'] += 1
+                    result['total'] += 1
+                    logger.info(f"   ✓ DART: {len(kg.entities)} entities")
+                except Exception as e:
+                    result['failed'] += 1
+                    result['total'] += 1
+                    logger.error(f"   ✗ DART: {e}")
+            return 'dart', result
         
-        # News Parser (LLM 필요)
-        if data_sources.get('news') and self.news_parser:
-            logger.info(f"Running NewsParserAgent ({len(data_sources['news'])} files)")
-            results['news'] = self.news_parser.batch_parse(
-                data_sources['news'],
-                self.processed_dir
-            )
-        elif data_sources.get('news'):
-            logger.warning("NewsParserAgent skipped (LLM not initialized)")
+        def run_news():
+            if not data_sources.get('news') or not self.news_parser:
+                return 'news', None
+            return 'news', self.news_parser.batch_parse(data_sources['news'], self.processed_dir)
         
-        # Macro Parser
-        if data_sources.get('macro'):
-            logger.info(f"Running MacroParserAgent ({len(data_sources['macro'])} files)")
-            results['macro'] = self.macro_parser.batch_parse(
-                data_sources['macro'],
-                self.processed_dir
-            )
+        def run_macro():
+            if not data_sources.get('macro'):
+                return 'macro', None
+            return 'macro', self.macro_parser.batch_parse(data_sources['macro'], self.processed_dir)
         
-        # Fund Parser
-        if data_sources.get('fund'):
-            logger.info(f"Running FundParserAgent ({len(data_sources['fund'])} files)")
-            results['fund'] = self.fund_parser.batch_parse(
-                data_sources['fund'],
-                self.processed_dir
-            )
+        def run_fund():
+            if not data_sources.get('fund'):
+                return 'fund', None
+            return 'fund', self.fund_parser.batch_parse(data_sources['fund'], self.processed_dir)
+        
+        # 병렬 실행 (DART, News, Macro, Fund)
+        logger.info("Running CSV Parsers (병렬 처리)...")
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [
+                executor.submit(run_dart),
+                executor.submit(run_news),
+                executor.submit(run_macro),
+                executor.submit(run_fund)
+            ]
+            for future in as_completed(futures):
+                try:
+                    parser_name, result = future.result()
+                    if result:
+                        results[parser_name] = result
+                        logger.info(f"   ✓ {parser_name}: 완료")
+                except Exception as e:
+                    logger.error(f"   ✗ 파서 실행 오류: {e}")
         
         return results
     
@@ -288,7 +332,8 @@ class KGConstructionAgent:
                 
                 # PDFParserAgent로 파싱
                 logger.info(f"Parsing PDF: {pdf_file}")
-                kg = self.pdf_parser.parse_pdf_to_kg(str(pdf_file))
+                result = self.pdf_parser.parse(str(pdf_file))  # parse_pdf_to_kg → parse 수정
+                kg = result["knowledge_graph"]
                 
                 # 메타데이터 추가
                 kg.metadata.update({
@@ -371,7 +416,7 @@ class KGConstructionAgent:
     
     def _normalize_entities(self, kg: KnowledgeGraph) -> KnowledgeGraph:
         """
-        Entity 정규화
+        Entity 정규화 (YAML 기반 마스터 리스트 + fuzzy matching)
         
         Args:
             kg: Knowledge Graph
@@ -379,30 +424,52 @@ class KGConstructionAgent:
         Returns:
             정규화된 KnowledgeGraph
         """
-        logger.info("Normalizing entities...")
+        logger.info("Normalizing entities with EntityMatcher...")
         
         # Entity 이름 정규화
+        normalized_count = 0
+        skipped_count = 0
         for entity in kg.entities:
-            # normalize_entity returns Dict: {'canonical_name': ..., 'ticker': ..., ...}
-            normalization_result = self.normalizer.normalize_entity(entity.name)
-            normalized_name = normalization_result.get('canonical_name', entity.name)
+            # 이미 정규화된 경우 스킵
+            if entity.properties.get("_normalized"):
+                skipped_count += 1
+                continue
             
-            if normalized_name != entity.name:
-                logger.debug(f"Normalized: {entity.name} -> {normalized_name}")
+            # EntityMatcher 사용 (YAML 기반 + fuzzy matching)
+            original_name = entity.name
+            normalized_name = self.entity_matcher.match(entity.name)
+            
+            if normalized_name != original_name:
+                logger.debug(f"Normalized: {original_name} → {normalized_name}")
                 entity.name = normalized_name
-                # 정규화된 정보(ticker 등)를 속성에 추가
-                if normalization_result.get('ticker'):
-                    entity.properties['ticker'] = normalization_result['ticker']
+                normalized_count += 1
+            
+            # 엔티티 정보 조회 (ticker 등)
+            entity_info = self.entity_matcher.get_entity_info(normalized_name)
+            if entity_info and entity_info.get('ticker'):
+                entity.properties['ticker'] = entity_info['ticker']
+            
+            # 정규화 마커 추가
+            entity.properties["_normalized"] = True
+        
+        logger.info(f"Normalized {normalized_count} entities (skipped {skipped_count} already normalized)")
         
         # Relation subject/object 정규화
+        relation_normalized = 0
         for relation in kg.relations:
             # Subject
-            subj_norm = self.normalizer.normalize_entity(relation.subject)
-            relation.subject = subj_norm.get('canonical_name', relation.subject)
+            original_subj = relation.subject
+            relation.subject = self.entity_matcher.match(relation.subject)
+            if relation.subject != original_subj:
+                relation_normalized += 1
             
             # Object
-            obj_norm = self.normalizer.normalize_entity(relation.object)
-            relation.object = obj_norm.get('canonical_name', relation.object)
+            original_obj = relation.object
+            relation.object = self.entity_matcher.match(relation.object)
+            if relation.object != original_obj:
+                relation_normalized += 1
+        
+        logger.info(f"Normalized {relation_normalized} relation endpoints")
         
         return kg
     
@@ -463,10 +530,10 @@ class KGConstructionAgent:
             'neo4j_stats': neo4j_stats if neo4j_stats else None
         }
         
-        # 레이어별 통계
+        # 레이어별 통계 (v3.0: OSAT 추가)
         static_count = sum(
             1 for e in merged_kg.entities
-            if e.type.value in ['Company', 'Product', 'Technology', 'Person']
+            if e.type.value in ['IDM', 'Fabless', 'Foundry', 'OSAT', 'Supplier', 'Organization', 'EconomicIndicator']
         )
         dynamic_count = len(merged_kg.entities) - static_count
         

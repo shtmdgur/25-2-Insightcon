@@ -56,7 +56,7 @@ class NewsParserAgent(BaseParserAgent):
             raise ValueError(f"Not a CSV file: {file_path}")
         
         try:
-            self.logger.info(f"Par뉴스 CSV: {file_path}")
+            self.logger.info(f"Parsing news CSV: {file_path}")
             
             # CSV 로드
             df = pd.read_csv(file_path)
@@ -92,14 +92,14 @@ class NewsParserAgent(BaseParserAgent):
             self.logger.warning("Missing entities or relations")
             return False
         
-        # Event 엔티티 확인
-        has_events = any(
-            e.get("type") == NodeType.EVENT.value
+        # Issue 엔티티 확인
+        has_issues = any(
+            e.get("type") == NodeType.ISSUE.value
             for e in data["entities"]
         )
         
-        if not has_events:
-            self.logger.warning("No Event entities found")
+        if not has_issues:
+            self.logger.warning("No Issue entities found")
             return False
         
         return True
@@ -161,69 +161,119 @@ class NewsParserAgent(BaseParserAgent):
         self.logger.info(f"Processing {sample_size} news items out of {len(df)}")
         
         for idx, row in sampled_df.iterrows():
-            # Event 엔티티 생성 (동적 KG)
+            # Issue 엔티티 생성 (Signal Layer)
             date_str = row['date'].strftime('%Y-%m-%d')
             title = str(row.get('title', ''))[:config.max_title_length]
+            keyword = str(row.get('keyword', '')).strip()
             
-            event_entity = Entity(
-                name=f"NewsEvent_{idx}_{date_str}",
-                type=NodeType.EVENT,
+            # 제목에서 의미있는 키워드 추출
+            title_short = self._extract_issue_keyword(title)
+            issue_name = f"Issue_{title_short}_{date_str}"
+            
+            # 본문 데이터 가져오기 (content 우선, 없으면 description)
+            content_full = str(row.get('content', row.get('description', ''))).strip()
+            
+            issue_entity = Entity(
+                name=issue_name,
+                type=NodeType.ISSUE,
+                sentiment=self._classify_sentiment(title),
                 properties={
                     "date": date_str,
-                    "event_type": "뉴스",
                     "title": title,
-                    "description": str(row.get('description', ''))[:config.max_desc_length],
-                    "keyword": str(row.get('keyword', '')),
+                    "keyword": keyword,
                     "link": str(row.get('link', '')),
                     "time_decay_weight": self._calculate_time_decay(date_str)
                 },
-                confidence=0.8  # 뉴스는 약간 낮은 신뢰도
+                confidence=0.8
             )
-            entities.append(event_entity)
+            entities.append(issue_entity)
             
             # LLM 기반 affected_entities 추출 및 관계 생성
-            keyword = str(row.get('keyword', '')).strip()
             
             if self.event_extractor and self.llm:
                 # LLM으로 affected_entities 추출
                 try:
                     affected_entities = self._extract_affected_entities(
                         title=title,
-                        description=str(row.get('description', '')),
+                        description=content_full,  # 원문 전체 전달
                         keyword=keyword
                     )
                     
                     for company_name in affected_entities:
+                        # v3.0: LLM 추출 결과 정규화
+                        from src.utils.ticker_mapping import resolve_entity_name, get_node_type
+                        normalized_name = resolve_entity_name(company_name)
+                        node_type = get_node_type(normalized_name)
+                        
+                        # Agent 노드가 없으면 생성 (MATCH 실패 방지)
+                        agent_entity = Entity(
+                            name=normalized_name,
+                            type=node_type,
+                            confidence=0.7  # LLM 추출이므로 낮은 신뢰도
+                        )
+                        entities.append(agent_entity)
+                        
                         relation = Relation(
-                            subject=company_name,
-                            predicate=RelationType.AFFECTED_BY,
-                            object=event_entity.name,
-                            weight=event_entity.properties['time_decay_weight'],
-                            source=str(file_path)
+                            subject=normalized_name,  # 정규화된 이름 사용
+                            predicate=RelationType.HAS_SIGNAL,
+                            object=issue_entity.name,
+                            date=date_str,
+                            source=str(file_path),
+                            properties={
+                                "weight": issue_entity.properties['time_decay_weight']
+                            }
                         )
                         relations.append(relation)
                         
                 except Exception as e:
                     self.logger.warning(f"LLM extraction failed: {str(e)}. Using keyword fallback.")
-                    # Fallback: keyword 사용
+                    # Fallback: keyword 사용 (정규화 적용)
                     if keyword:
+                        from src.utils.ticker_mapping import resolve_entity_name, get_node_type
+                        normalized_keyword = resolve_entity_name(keyword)
+                        node_type = get_node_type(normalized_keyword)
+                        
+                        agent_entity = Entity(
+                            name=normalized_keyword,
+                            type=node_type,
+                            confidence=0.6
+                        )
+                        entities.append(agent_entity)
+                        
                         relation = Relation(
-                            subject=keyword,
-                            predicate=RelationType.AFFECTED_BY,
-                            object=event_entity.name,
-                            weight=event_entity.properties['time_decay_weight'],
-                            source=str(file_path)
+                            subject=normalized_keyword,
+                            predicate=RelationType.HAS_SIGNAL,
+                            object=issue_entity.name,
+                            date=date_str,
+                            source=str(file_path),
+                            properties={
+                                "weight": issue_entity.properties['time_decay_weight']
+                            }
                         )
                         relations.append(relation)
             else:
-                # LLM 없이: keyword 기반 매핑
+                # LLM 없이: keyword 기반 매핑 (정규화 적용)
                 if keyword:
+                    from src.utils.ticker_mapping import resolve_entity_name, get_node_type
+                    normalized_keyword = resolve_entity_name(keyword)
+                    node_type = get_node_type(normalized_keyword)
+                    
+                    agent_entity = Entity(
+                        name=normalized_keyword,
+                        type=node_type,
+                        confidence=0.6
+                    )
+                    entities.append(agent_entity)
+                    
                     relation = Relation(
-                        subject=keyword,
-                        predicate=RelationType.AFFECTED_BY,
-                        object=event_entity.name,
-                        weight=event_entity.properties['time_decay_weight'],
-                        source=str(file_path)
+                        subject=normalized_keyword,
+                        predicate=RelationType.HAS_SIGNAL,
+                        object=issue_entity.name,
+                        date=date_str,
+                        source=str(file_path),
+                        properties={
+                            "weight": issue_entity.properties['time_decay_weight']
+                        }
                     )
                     relations.append(relation)
         
@@ -272,6 +322,124 @@ class NewsParserAgent(BaseParserAgent):
             self.logger.warning(f"Time decay calculation failed: {str(e)}")
             return 0.5  # 기본값
     
+    def _classify_sentiment(self, title: str) -> str:
+        """
+        뉴스 제목 기반 Sentiment 분류
+        
+        Args:
+            title: 뉴스 제목
+        
+        Returns:
+            "POSITIVE" | "NEGATIVE" | "NEUTRAL"
+        """
+        positive_keywords = ["성장", "증가", "확대", "투자", "개발", "성공", "호조", "상승", "수주"]
+        negative_keywords = ["감소", "하락", "적자", "위기", "손실", "축소", "악화", "하향", "부진"]
+        
+        title_lower = title.lower()
+        for keyword in positive_keywords:
+            if keyword in title_lower:
+                return "POSITIVE"
+        for keyword in negative_keywords:
+            if keyword in title_lower:
+                return "NEGATIVE"
+        return "NEUTRAL"
+    
+    def _extract_issue_keyword(self, title: str) -> str:
+        """
+        뉴스 제목에서 의미있는 키워드 추출
+        
+        Args:
+            title: 뉴스 제목
+        
+        Returns:
+            정제된 키워드 (최대 30자)
+        """
+        import re
+        
+        # 대괄호 내용 제거 (예: [주가동향], [이데일리], [머니투데이])
+        cleaned = re.sub(r'\[.*?\]', '', title)
+        # 특수문자 제거
+        cleaned = re.sub(r'[^\w\s]', ' ', cleaned)
+        # 중복 공백 제거 및 앞뒤 공백 제거
+        cleaned = ' '.join(cleaned.split()).strip()
+        
+        # 최대 30자로 제한 (Neo4j 속성 이름으로 적합하게)
+        if len(cleaned) > 30:
+            cleaned = cleaned[:30].rsplit(' ', 1)[0]  # 단어 중간에서 자르지 않음
+        
+        return cleaned if cleaned else "Unknown"
+    
+    def _extract_text_from_response(self, content) -> str:
+        """
+        LLM 응답에서 순수 텍스트 추출 (다양한 형태 처리)
+        
+        Gemini API 응답이 list, dict, object 등 다양한 형태로 올 수 있음
+        """
+        import re
+        
+        if content is None:
+            return ""
+        
+        # 이미 문자열인 경우
+        if isinstance(content, str):
+            return content.strip()
+        
+        # list인 경우
+        if isinstance(content, list):
+            if not content:
+                return ""
+            first_item = content[0]
+            
+            # 객체에서 text 속성 추출
+            if hasattr(first_item, 'text'):
+                return first_item.text.strip()
+            
+            # dict에서 text 키 추출
+            if isinstance(first_item, dict) and 'text' in first_item:
+                return first_item['text'].strip()
+            
+            # 문자열인 경우
+            if isinstance(first_item, str):
+                return first_item.strip()
+            
+            # 기타: 문자열 변환 후 text 값만 추출
+            text_str = str(first_item)
+            # "'text': 'SK하이닉스'" 형태에서 실제 값 추출
+            match = re.search(r"'text':\s*'([^']*)'", text_str)
+            if match:
+                return match.group(1).strip()
+            
+            # "text: SK하이닉스" 형태 처리
+            match = re.search(r"text:\s*(.+)", text_str)
+            if match:
+                return match.group(1).strip()
+            
+            return ""
+        
+        # dict인 경우
+        if isinstance(content, dict):
+            return content.get('text', str(content)).strip()
+        
+        # 객체인 경우
+        if hasattr(content, 'text'):
+            return content.text.strip()
+        
+        return str(content).strip()
+    
+    def _is_invalid_company_name(self, name: str) -> bool:
+        """
+        잘못된 회사명 필터링 (파싱 오류 결과물)
+        """
+        invalid_patterns = [
+            "'text':",
+            "text:",
+            "{",
+            "}",
+            "[",
+            "]",
+        ]
+        return any(pattern in name for pattern in invalid_patterns) or len(name) < 2
+    
     def _extract_affected_entities(
         self,
         title: str,
@@ -293,12 +461,19 @@ class NewsParserAgent(BaseParserAgent):
             return [keyword] if keyword else []
         
         try:
-            # LLM 프롬프트
-            prompt = f"""
+            # 1. YAML에서 전문 프롬프트 로드 시도
+            from src.config.prompt_loader import PROMPTS
+            prompt_tmpl = PROMPTS.get('news_parser', {}).get('kg_extraction', {}).get('instruction', '')
+            
+            if prompt_tmpl:
+                prompt = prompt_tmpl.format(news_text=f"제목: {title}\n본문: {description}\n키워드: {keyword}")
+            else:
+                # 2. Fallback: 기존 하드코딩 프롬프트 (최소한의 동작 보장)
+                prompt = f"""
 다음 뉴스에서 영향을 받는 기업/회사 이름을 추출하세요.
 
 제목: {title}
-본문: {description[:500]}
+본문: {description}
 키워드: {keyword}
 
 **규칙**:
@@ -313,13 +488,15 @@ class NewsParserAgent(BaseParserAgent):
 """
             
             response = self.llm.invoke(prompt)
-            extracted_text = response.content.strip()
+            
+            # LLM 응답에서 텍스트 추출 (다양한 형태 처리)
+            extracted_text = self._extract_text_from_response(response.content)
             
             # 쉼표로 분리 및 정규화
             companies = [
                 c.strip()
                 for c in extracted_text.split(',')
-                if c.strip()
+                if c.strip() and not self._is_invalid_company_name(c.strip())
             ][:3]  # 최대 3개
             
             self.logger.debug(f"LLM extracted: {companies}")

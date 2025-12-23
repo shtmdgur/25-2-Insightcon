@@ -63,9 +63,9 @@ class DARTParserAgent(BaseParserAgent):
             self.logger.info(f"Parsing DART data from: {dart_dir}")
             
             # 3개 CSV 파일 로드
-            companies_df = self._load_csv(dart_dir / "companies.csv")
-            disclosure_df = self._load_csv(dart_dir / "disclosure_states.csv")
-            financial_df = self._load_csv(dart_dir / "financial_states.csv")
+            companies_df = self._load_csv(dart_dir / "companies_clean.csv")
+            disclosure_df = pd.DataFrame()  # disclosure_states.csv 파일 없음
+            financial_df = self._load_csv(dart_dir / "financial_clean.csv")
             
             # Knowledge Graph 생성
             kg = self._create_knowledge_graph(
@@ -185,26 +185,28 @@ class DARTParserAgent(BaseParserAgent):
             return entities
         
         for idx, row in companies_df.iterrows():
-            ticker = str(row.get('ticker', '')).strip().zfill(6)
             corp_name = str(row.get('corp_name', '')).strip()
             
-            if not ticker or not corp_name:
+            if not corp_name:
                 continue
             
             normalized_name_dict = self.normalizer.normalize_entity(corp_name)
             normalized_name = normalized_name_dict["canonical_name"]
             
-            # TODO: 섹터 분류 기반으로 NodeType 결정 로직 추가 필요
-            # 현재는 기본적으로 ORGANIZATION 또는 IDM 시도
-            node_type = NodeType.IDM
+            # ticker_mapping으로 NodeType 결정
+            from src.utils.ticker_mapping import get_node_type, normalize_company_name
+            clean_name = normalize_company_name(corp_name)
+            node_type = get_node_type(clean_name)
             
             entity = Entity(
                 name=normalized_name,
                 type=node_type,
                 properties={
-                    "ticker": ticker,
                     "corp_code": str(row.get('corp_code', '')),
-                    "corp_name": corp_name
+                    "corp_name": corp_name,
+                    "ceo_nm": str(row.get('ceo_nm', '')),
+                    "est_dt": str(row.get('est_dt', '')),
+                    "adres": str(row.get('adres', ''))
                 },
                 confidence=1.0
             )
@@ -247,7 +249,7 @@ class DARTParserAgent(BaseParserAgent):
                 continue
             
             report_nm = str(row.get('report_nm', row.get('title', '')))
-            event_name = f"Disclosure_{ticker}_{date}"
+            event_name = f"Disclosure_{ticker}_{date}_{idx}"  # ✅ idx 추가
             
             signal_entity = Entity(
                 name=event_name,
@@ -268,6 +270,7 @@ class DARTParserAgent(BaseParserAgent):
                 subject=company_name,
                 predicate=RelationType.HAS_SIGNAL,
                 object=event_name,
+                date=date,
                 properties={"date": date}
             )
             relations.append(relation)
@@ -300,47 +303,73 @@ class DARTParserAgent(BaseParserAgent):
         if financial_df.empty:
             return entities, relations
         
-        ticker_map = {}
+        # corp_code → 회사명 매핑 테이블 생성
+        corp_code_map = {}
         if not companies_df.empty:
             for idx, row in companies_df.iterrows():
-                ticker = str(row.get('ticker', '')).strip().zfill(6)
+                corp_code = str(row.get('corp_code', '')).strip().zfill(8)
                 corp_name = str(row.get('corp_name', '')).strip()
-                if ticker and corp_name:
+                if corp_code and corp_name:
                     norm_res = self.normalizer.normalize_entity(corp_name)
-                    ticker_map[ticker] = norm_res["canonical_name"]
+                    corp_code_map[corp_code] = norm_res["canonical_name"]
         
         for idx, row in financial_df.iterrows():
-            ticker = str(row.get('ticker', '')).strip().zfill(6)
-            period = str(row.get('period', '')).strip()
+            # corp_code를 8자리 문자열로 정규화 (leading zero 보존)
+            corp_code = str(row.get('corp_code', '')).strip().zfill(8)
+            year = str(row.get('year', '')).strip()
+            quarter_code = str(row.get('quarter_code', '')).strip()
             
-            if not ticker or not period:
+            if not corp_code or not year or not quarter_code:
                 continue
             
-            metric_name = f"Earnings_{ticker}_{period}"
-            revenue = float(row.get('revenue', 0)) if pd.notna(row.get('revenue')) else 0
-            op_profit = float(row.get('operating_profit', 0)) if pd.notna(row.get('operating_profit')) else 0
+            # period 생성: year + quarter
+            quarter_map = {'11013': 'Q3', '11012': 'Q2', '11014': 'Q4', '11011': 'Annual'}
+            quarter = quarter_map.get(quarter_code, quarter_code)
+            period = f"{year}_{quarter}"
             
-            sentiment = "POSITIVE" if op_profit > 0 else "NEGATIVE"
+            # 분기별 대표 날짜 생성 (Temporal Linking용)
+            quarter_end_dates = {
+                'Q1': f"{year}-03-31",
+                'Q2': f"{year}-06-30",
+                'Q3': f"{year}-09-30",
+                'Q4': f"{year}-12-31",
+                'Annual': f"{year}-12-31"
+            }
+            date = quarter_end_dates.get(quarter, f"{year}-12-31")
+            
+            metric_name = f"Earnings_{corp_code}_{period}"
+            revenue = float(row.get('revenue', 0)) if pd.notna(row.get('revenue')) else 0
+            # ✅ 수정: operating_profit → operating_income
+            op_income = float(row.get('operating_income', 0)) if pd.notna(row.get('operating_income')) else 0
+            net_income = float(row.get('net_income', 0)) if pd.notna(row.get('net_income')) else 0
+            
+            sentiment = "POSITIVE" if net_income > 0 else "NEGATIVE"
             
             metric_entity = Entity(
                 name=metric_name,
                 type=NodeType.EARNINGS,
                 sentiment=sentiment,
                 properties={
-                    "ticker": ticker,
+                    "corp_code": corp_code,
+                    "company_name": corp_code_map.get(corp_code, "Unknown"), # ✅ 추가: 가독성용
                     "period": period,
+                    "year": year,
+                    "quarter": quarter,
+                    "date": date,  # ✅ 추가: Temporal Linking용 날짜
                     "revenue": revenue,
-                    "operating_profit": op_profit,
+                    "operating_income": op_income,
+                    "net_income": net_income,
                 },
                 confidence=1.0
             )
             entities.append(metric_entity)
             
-            company_name = ticker_map.get(ticker, ticker)
+            company_name = corp_code_map.get(corp_code, corp_code)
             relation = Relation(
                 subject=company_name,
                 predicate=RelationType.HAS_SIGNAL,
                 object=metric_name,
+                date=date,
                 properties={"period": period}
             )
             relations.append(relation)
