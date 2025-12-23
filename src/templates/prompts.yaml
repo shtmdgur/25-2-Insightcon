@@ -305,24 +305,33 @@ debate_agents:
       [Instructions for "Analysis Content Only"]
       1. **Goal**: Provide the core analysis content (Synthesis) for the report formatter.
       2. **Output Format**: Write a structured analysis covering:
-         - **Executive Summary**: A concise summary of the verdict (2-3 sentences).
+         - **Summary**: A concise summary of the verdict (2-3 sentences for the Executive Summary section).
          - **Investment Thesis**: Detailed analysis of why this decision was reached, citing specific drivers.
          - **Derivatives/Logic**: Explain the "Data Vacuum" or "Market Decoupling" logic if applicable.
          - **Risks**: Key downside risks.
       
       3. **Style**: Professional, Bullet points, Korean language.
       
-      4. **DO NOT** include the Header (Date, Ticker) or the Final Disclaimer. The Python Formatter will add them.
+      4. **DO NOT** include:
+         - Header (Date, Ticker, Company Name)
+         - Section headers like "## Executive Summary" or "## Investment Thesis"
+         - Final Disclaimer
+         (The Python Formatter/Template will add all section headers automatically)
       
-      5. **Structure**:
+      5. **Structure** (Content only, NO section headers):
       
-       (Start directly with the content)
+       (Start directly with the summary content)
        
-       ## Executive Summary
-       (Summary text...)
+       [Summary for Executive Summary section - 2-3 sentences]
+       (Write the concise verdict summary here...)
        
-       ## Investment Thesis
-       (Drivers...)
+       [Investment Thesis content]
+       
+       ### 1. [First Key Point Title]
+       (Explanation...)
+       
+       ### 2. [Second Key Point Title]
+       (Explanation...)
        
        ## Valuation & Risks
        (Assessment...)
