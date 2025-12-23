@@ -317,6 +317,19 @@ ENTITY_TYPE_PROPERTIES = {
     NodeType.ISSUE: ["description"],
 }
 
+# 관계 타입별 의미 있는 속성 정의 (v3.0)
+# BaseDebateAgent가 동적으로 참조하여 하드코딩 없이 속성 추출
+RELATION_PROPERTIES_BY_TYPE: Dict[str, List[str]] = {
+    "AFFECTS": ["correlation", "sensitivity", "lag"],
+    "TRIGGERED_BY": ["reasoning", "impact"],
+    "SUPPLIES": ["dependency", "is_critical", "supply_type", "product"],
+    "HAS_SIGNAL": ["importance", "is_official"],
+    "COMPETES_WITH": ["market_segment", "competitive_dynamic"],
+    "PARTNERS_WITH": ["partnership_type", "scope"],
+    "INVESTS_IN": ["investment_type", "amount", "stake_percentage"],
+    "MANUFACTURES": [],
+}
+
 
 def get_kg_json_schema() -> dict:
     """Gemini Structured Output용 JSON Schema"""

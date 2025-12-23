@@ -144,14 +144,21 @@ def create_debate_workflow(bull_agent, bear_agent, synthesizer_agent):
     workflow = StateGraph(ReportState)
     
     # 노드 추가
-    workflow.add_node("initialize", initialize_debate)
+    workflow.add_node("initialize", initialize_debate)    
+    # Note: graphrag_search, price_load 노드 제거됨
+    # → LLM Tool Calling (explore_graph, get_price_context)로 대체
+    
     workflow.add_node("bull", bull_argue)
     workflow.add_node("bear", bear_argue)
     workflow.add_node("synthesizer", synthesize_report)
     
     # 엣지 연결
     workflow.set_entry_point("initialize")
+    
+    # 초기화 후 바로 토론 시작 (데이터는 Tool Calling으로 동적 조회)
     workflow.add_edge("initialize", "bull")
+    
+    # 순환 토론 (Bull <-> Bear) -> Synthesizer
     workflow.add_edge("bull", "bear")
     
     # 조건부 분기: Bear → Bull (계속) 또는 Synthesizer (종료)

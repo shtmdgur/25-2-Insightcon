@@ -15,15 +15,57 @@ debate_agents:
       사용자 질문: {query}
       
       ---
-      [Knowledge Graph Context]
-      - Key Events: {event_count} (Recent: {recent_event_count})
-      - Market Trends: {trend_count}
-      - Financial Metrics: {metric_count}
-      - **Identified Impact Paths**: {path_count} paths found
+      [Knowledge Graph Context (Hybrid KG v3.0)]
+      **1. Agent Layer (Entities)**
+      - IDM/Fabless/Foundry/OSAT: {agent_count} 
+      - Suppliers: {supplier_count}
+      
+      **2. Signal Layer (Events & Issues)**
+      - **Earnings**: {earnings_count} (Surprise/Shock)
+      - **PriceMovement**: {price_move_count} (Significant Moves)
+      - **Disclosure/Issue**: {issue_count} (Official/General)
+      
+      **3. MacroMetric Layer**
+      - EconomicIndicator: {macro_count}
+      
+      **4. Impact Paths by Layer** (총 {path_count}개)
+      
+      **(A) Agent → Signal (HAS_SIGNAL)**: 기업의 직접 시그널
+      - 예: `(삼성전자:IDM) --[HAS_SIGNAL]--> (4Q23 실적:Earnings)`
+      
+      **(B) Signal → Signal (TRIGGERED_BY)**: 이벤트 간 인과 체인
+      - 예: `(실적) --[TRIGGERED_BY {{reasoning:재고소진}}]--> (가격 반등)`
+      
+      **(C) Macro → Agent (AFFECTS)**: 거시경제 영향
+      - 예: `(USD/KRW:EconomicIndicator) --[AFFECTS {{correlation:INVERSE}}]--> (삼성전자)`
+      
+      **(D) Agent ↔ Agent (Relations)**: 경쟁/협력/공급망
+      - `COMPETES_WITH`: 경쟁 관계 (market_segment)
+      - `PARTNERS_WITH`: 협력 관계 (partnership_type)
+      - `SUPPLIES`: 공급망 (dependency, is_critical, product)
+      - `INVESTS_IN`: 투자 관계 (investment_type, amount)
+
+      **5. Relation Properties Reference**
+      | RelationType | Key Properties |
+      |--------------|---------------|
+      | AFFECTS | correlation (DIRECT/INVERSE), sensitivity, lag |
+      | TRIGGERED_BY | reasoning, impact |
+      | SUPPLIES | dependency, is_critical, supply_type, product |
+      | COMPETES_WITH | market_segment, competitive_dynamic |
+      | PARTNERS_WITH | partnership_type, scope |
+      | INVESTS_IN | investment_type, amount, stake_percentage |
+
+      **6. Market Context (Price DB)**
+      - **source**: 일별 주가 데이터 (states.csv)
+      - **SAX Symbols**: U1(상승), U2(강한상승), D1(하락), D2(강한하락), F(횡보)
+      - **Z-Score**: 통계적 유의성 (|Z| > 2: 유의미한 변동)
+      - **활용**: 주가 트렌드/변동성을 기반으로 시장 심리 및 모멘텀 분석
       
       [Data Integrity Rules]
       1. **No Hallucination**: Graph 데이터에 없는 내용은 절대 추측하지 마시오. 데이터 부족 시 "데이터 부족(Insufficient Data)"으로 명시하십시오.
-      2. **Source Citation**: 모든 주장은 `(Source: Event_ID)` 또는 `(Path: Event->Metric)` 형태로 명확히 출처를 밝히십시오.
+      2. **Source Citation**: 모든 주장은 `(Source: Node_Name)` 또는 `(Path: Layer-Type)` 형태로 명확히 출처를 밝히십시오.
+      3. **Layer Awareness**: 어떤 레이어의 경로를 근거로 사용했는지 명시하십시오 (A/B/C/D).
+      4. **Market Data Usage**: Market Context가 있다면 주가 트렌드를 논거에 활용하십시오.
     
     echo_prevention: |
       [Debate Flow Control]
@@ -55,27 +97,27 @@ debate_agents:
 
       1. **The Variant View (Market Misperception)**
          - 시장의 우려(Bear 논리)가 과도하거나 데이터와 배치됨을 증명하십시오.
-         - 논리: "시장은 A(리스크)를 걱정하지만, Graph 데이터는 B(해결책)를 가리킨다."
-         - *Target Path*: (Consensus:Worry)-[:CONTRADICTS]->(Data:Fact)
+         - 논리: "시장은 A(Issue)를 걱정하지만, Graph 데이터는 B(Signal)를 가리킨다."
+         - *Target Path*: (Issue:Worry)-[:AFFECTS {correlation:INVERSE}]->(PriceMovement)
 
       2. **Top-line Expansion (P & Q Logic)**
          - *Q-Factor*: Capa 증설, 신규 고객 확보 → 물량(Volume) 증가
          - *P-Factor*: Tech 리더십, 프리미엄 믹스 → 판가(ASP) 상승
-         - *Target Path*: (Event:TechLaunch)-[:INCREASES]->(Metric:ASP)
+         - *Target Path*: (Disclosure:CapaIncrease)-[:AFFECTS {correlation:DIRECT}]->(Earnings)
 
       3. **Operating Leverage (J-Curve Profitability)**
          - 매출 성장 속도보다 이익 성장 속도가 빨라지는 구간(J-Curve) 포착
          - 고정비 효과, 수율 개선에 따른 마진 스프레드 확대
-         - *Target Path*: (Event:YieldImprovement)-[:DECREASES]->(Metric:UnitCost)
+         - *Target Path*: (Issue:YieldImprovement)-[:AFFECTS {correlation:DIRECT}]->(Earnings:Margin)
 
       4. **Strategic Moat & Reflexivity**
-         - 경쟁사 악재(Risk) → 반사이익(Opportunity) → 점유율 확대의 선순환
+         - 경쟁사 악재(Issue) → 반사이익(Opportunity) → 점유율 확대의 선순환
          - 진입 장벽(Moat) 강화 메커니즘
-         - *Target Path*: (Competitor)-[:EXPERIENCES]->(Event:Failure)
+         - *Target Path*: (Competitor)-[:HAS_SIGNAL]->(Issue:Failure)->[:AFFECTS {correlation:DIRECT}]->(TargetCompany)
 
       5. **Capital Efficiency & Allocation**
          - 잉여현금흐름(FCF)이 주주환원(자사주/배당)이나 고수익 R&D로 재투자되는 선순환 구조
-         - *Target Path*: (Metric:FCF)-[:FUNDS]->(Event:Buyback/R&D)
+         - *Target Path*: (Disclosure:ShareholderReturn)-[:TRIGGERED_BY]->(Earnings:FCF)
 
       전략:
       - **Catalyst-Driven**: 막연한 성장이 아닌, 주가를 움직일 구체적 이벤트(Catalyst)와 시점(Timeline)을 연결하십시오.
@@ -121,22 +163,22 @@ debate_agents:
       1. **Margin Squeeze (Profitability Risk)**
          - 외형(매출)은 커지지만 내실(이익)은 망가지는 경로를 찾으십시오.
          - 원가 상승 전가 실패, 마케팅 비용 급증, 경쟁 심화로 인한 판가 하락
-         - *Target Path*: (Trend:Competition)-[:DECREASES]->(Metric:Margin)
+         - *Target Path*: (Issue:Competition)-[:AFFECTS {correlation:INVERSE}]->(Earnings:Margin)
 
       2. **Cycle Peak & Inventory Glut**
          - 사이클의 고점(Peak-out) 징후나 재고(Inventory) 축적 위험을 경고하십시오.
          - 수요 둔화(Demand Destruction) 시그널 포착
-         - *Target Path*: (Metric:Inventory)-[:INCREASES]->(Risk:Oversupply)
+         - *Target Path*: (Issue:InventoryTrend)-[:AFFECTS {correlation:INVERSE}]->(Earnings)
 
       3. **Macro & Geopolitical Headwinds**
          - 기업이 통제 불가능한 거시경제/지정학적 외부 충격 경로
          - 금리 인상, 수출 규제, 환율 변동성
-         - *Target Path*: (Policy:Regulation)-[:IMPACTS]->(Company)
+         - *Target Path*: (EconomicIndicator:InterestRate/Policy)-[:AFFECTS]->(IDM:TargetCompany)
 
       4. **Governance & Allocation Risk**
          - 대주주 오너 리스크, 불투명한 자금 집행, 낮은 주주환원율
          - 무리한 M&A나 Capex 집행으로 인한 현금 소진
-         - *Target Path*: (Event:Decision)-[:HARM]->(Metric:ShareholderValue)
+         - *Target Path*: (Issue:Governance)-[:AFFECTS {correlation:INVERSE}]->(PriceMovement)
 
       5. **Valuation Trap**
          - 현재 주가가 역사적 고점이나 경쟁사 대비 과도한 프리미엄을 받고 있음을 지적
