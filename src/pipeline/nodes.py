@@ -8,19 +8,22 @@ import hashlib
 from pathlib import Path
 from functools import lru_cache, wraps
 from typing import Dict, Any, Tuple
-from .state import ReportState
+from src.pipeline.state import ReportState
 
-# 로그 파일 경로 설정
-_DEBUG_LOG_PATH = Path(__file__).parent.parent.parent.parent / ".cursor" / "debug.log"
+# 로그 파일 경로 설정 (절대 경로로 변경하여 더 안전하게 관리)
+import os
+_PROJECT_ROOT = Path(os.getcwd()) # 현재 작업 디렉토리 기준
+_DEBUG_LOG_PATH = _PROJECT_ROOT / ".cursor" / "debug.log"
 _DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-from ..agents.kg_construction import KGConstructionAgent
-from ..agents.quality_check import QualityCheckAgent
-# from ..agents.ontology_architect import OntologyArchitectAgent  # TODO: 구현 필요
-from ..agents.sector_analyst import SectorAnalystAgent
-from ..agents.company_analyst import CompanyAnalystAgent
-from ..utils.neo4j_client import Neo4jClient
-from ..utils.llm_client import LLMSelector
-# from ..utils.document_loader import load_document  # TODO: 구현 필요
+
+from src.agents.kg_construction import KGConstructionAgent
+from src.agents.quality_check import QualityCheckAgent
+# from src.agents.ontology_architect import OntologyArchitectAgent
+from src.agents.sector_analyst import SectorAnalystAgent
+from src.agents.company_analyst import CompanyAnalystAgent
+from src.utils.neo4j_client import Neo4jClient
+from src.utils.llm_client import LLMSelector
+# from src.utils.document_loader import load_document
 
 
 # 전역 클라이언트 인스턴스 (실제로는 의존성 주입 사용 권장)

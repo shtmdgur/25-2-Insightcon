@@ -27,6 +27,10 @@ class DebateState(TypedDict):
     # Debate 전용 실행 추적 (병렬 문제 없음)
     debate_trace: Optional[List[str]]  # Debate workflow 내부 trace
 
+    # 신규 분석 결과 (Judge, Validator)
+    judge_result: Optional[Dict[str, Any]]  # Judge의 판결 (decision, score 등)
+    validation_result: Optional[Dict[str, Any]]  # Validator의 검증 결과 (pass/fail)
+
 
 class ReportState(TypedDict):
     """리포트 생성 워크플로우의 중앙 상태 객체"""

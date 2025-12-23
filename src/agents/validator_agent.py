@@ -1,40 +1,75 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import json
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_google_genai import ChatGoogleGenerativeAI
-from src.config.prompt_loader import load_prompts
+from .base_debate_agent import BaseDebateAgent
 
-class ValidatorAgent:
-    def __init__(self, model_name: str = "gemini-1.5-pro"):
-        self.llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
-        self.prompts = load_prompts()
-        self.template = self.prompts['validator']['instruction']
+class ValidatorAgent(BaseDebateAgent):
+    """
+    품질 검수 에이전트 (Compliance & Quality Control)
+    
+    역할:
+    - 최종 리포트의 사실 관계 검증 (Hallucination 체크)
+    - 논리적 일관성 및 전문적 톤앤매너 검수
+    - Mermaid 다이어그램 등 기술적 문법 확인
+    """
+    
+    def __init__(self, llm, neo4j_connection=None):
+        super().__init__(llm, neo4j_connection, role="validator")
+
+    def argue(self, state: Dict[str, Any], opponent_last_arg: Optional[str] = None) -> Dict[str, str]:
+        # Validator는 토론에 참여하지 않음
+        return {"argument": "저는 검수자입니다. 최종 결과물만 검수합니다."}
 
     def validate(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validates the generated report for factuality and style.
+        생성된 리포트의 사실성 및 스타일 검증
         """
-        report_initial = state.get("final_report", "")
+        report_content = state.get("synthesis_report", "") or state.get("final_report", "")
         debate_state = state.get("debate_state", {})
         bull_history = debate_state.get("bull_history", "")
         bear_history = debate_state.get("bear_history", "")
         context_data = f"Bull Arguments: {bull_history}\nBear Arguments: {bear_history}"
 
-        # 1. Format Prompt (Python str.format)
-        prompt = self.template.format(
-            report_content=report_initial,
+        # 1. 템플릿 로드
+        template = self.prompts.get("validator", {}).get("instruction", "")
+        
+        if not template:
+            # Fallback (YAML 로드 실패 시)
+            return {"decision": "pass", "feedback": "Validator template not found, skipping validation."}
+
+        # 2. 프롬프트 구성
+        prompt = template.format(
+            report_content=report_content,
             context_data=context_data
         )
         
-        # 2. Invoke LLM
+        # 3. LLM 실행
         response = self.llm.invoke(prompt)
         
-        # 3. Parse JSON
-        parser = JsonOutputParser()
-        parsed_result = parser.parse(response.content)
+        # 4. JSON 파싱
+        return self._parse_json_response(response)
+
+    def _parse_json_response(self, response: Any) -> Dict[str, Any]:
+        """JudgeAgent와 동일한 방식의 JSON 파싱 로직 (필요시 Base로 이동 가능)"""
+        text = response.content if hasattr(response, "content") else str(response)
         
-        return {
-            "validation_decision": parsed_result.get("decision", "fail"),
-            "validation_feedback": parsed_result.get("feedback", "")
-        }
+        # Handle list/dict content
+        if isinstance(text, list):
+            text = "".join([item.get("text", str(item)) if isinstance(item, dict) else str(item) for item in text])
+        elif isinstance(text, dict):
+            text = text.get("text", str(text))
+            
+        text = str(text)
+        
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+            
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # Fallback
+            return {
+                "decision": "fail",
+                "feedback": f"JSON Parsing Failed. Raw: {text[:200]}"
+            }

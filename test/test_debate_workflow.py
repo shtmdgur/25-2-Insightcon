@@ -48,7 +48,9 @@ langchain_globals.set_verbose(False)
 from src.pipeline.debate_workflow import create_debate_workflow
 from src.agents.bull_agent import BullAgent
 from src.agents.bear_agent import BearAgent
+from src.agents.judge_agent import JudgeAgent
 from src.agents.synthesizer_agent import SynthesizerAgent
+from src.agents.validator_agent import ValidatorAgent
 from src.pipeline.state import ReportState
 
 
@@ -172,12 +174,14 @@ def main():
     print("\n[3] Debate Agents 초기화...")
     bull = BullAgent(llm=llm, neo4j_connection=neo4j_conn)
     bear = BearAgent(llm=llm, neo4j_connection=neo4j_conn)
+    judge = JudgeAgent(llm=llm, neo4j_connection=neo4j_conn)
     synthesizer = SynthesizerAgent(llm=llm, neo4j_connection=neo4j_conn)
+    validator = ValidatorAgent(llm=llm, neo4j_connection=neo4j_conn)
     print("✅ Agents 초기화 완료")
     
     # 4. Workflow 생성
-    print("\n[4] Debate Workflow 컴파일...")
-    workflow = create_debate_workflow(bull, bear, synthesizer)
+    print("\n[4] Debate Workflow 컴파일 (Full Stack)...")
+    workflow = create_debate_workflow(bull, bear, synthesizer, judge, validator)
     print("✅ Workflow 컴파일 완료")
     
     # 5. 초기 State 생성
@@ -248,6 +252,24 @@ def main():
             final_state["debate_state"]["bear_history"],
             rounds=3
         )
+        
+        # Judge 판결 확인
+        print("\n" + "="*80)
+        print("⚖️ Judge Verdict")
+        print("="*80)
+        judge_res = final_state["debate_state"].get("judge_result", {})
+        print(f"Decision: {judge_res.get('decision')} (Score: {judge_res.get('score')})")
+        print(f"Confidence: {judge_res.get('confidence_level')}")
+        print(f"Winning Side: {judge_res.get('winning_side')}")
+        print(f"Rationale: {judge_res.get('rationale')[:300]}...")
+
+        # Validator 결과 확인
+        print("\n" + "="*80)
+        print("🔍 Validator Quality Control")
+        print("="*80)
+        val_res = final_state["debate_state"].get("validation_result", {})
+        print(f"Decision: {val_res.get('decision', 'N/A')}")
+        print(f"Feedback: {val_res.get('feedback', 'No feedback provided.')}")
         
         # 최종 리포트
         print("\n" + "="*80)

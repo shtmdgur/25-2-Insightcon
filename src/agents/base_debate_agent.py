@@ -133,11 +133,14 @@ class BaseDebateAgent(ABC):
         3. Macro → Agent (AFFECTS): 거시경제 영향
         4. Agent ↔ Agent (COMPETES_WITH, PARTNERS_WITH, SUPPLIES): 경쟁/협력/공급망
         
-        벡터 임베딩 활용 (준비):
-        - 향후 query embedding과 node embedding의 코사인 유사도로 관련 노드 우선 탐색
+        벡터 임베딩 활용 (Agentic Search):
+        - query embedding과 node embedding의 코사인 유사도를 기반으로 관련 노드/경로 우선 탐색
         """
         if not self.neo4j:
             return []
+        
+        # [NEW] 벡터 검색 기반 노드 선별 (Placeholder)
+        # relevant_nodes = self._vector_search(target_company, limit=10)
         
         config = DEBATE_ROUND_STRATEGY.get(debate_count, DEBATE_ROUND_STRATEGY[1])
         total_limit = config["limit"]
@@ -175,6 +178,16 @@ class BaseDebateAgent(ABC):
         
         all_paths = accumulated_paths + new_paths
         return all_paths[-total_limit:] if len(all_paths) > total_limit else all_paths
+
+    def _vector_search(self, query: str, limit: int = 10) -> List[str]:
+        """
+        [Vector Search Placeholder]
+        - Neo4j Vector Index 또는 외부 벡터 DB를 활용하여 관련 노드 검색
+        - 현재는 placeholder로 유지 (향후 embedding 모델 연결 시 구현)
+        """
+        # TODO: Implement vector embedding search
+        # return ["Node_ID_1", "Node_ID_2"]
+        return []
     
     def _process_path_record(self, record) -> Optional[Dict]:
         """Neo4j Path 레코드를 딕셔너리로 변환 (공통 로직)"""
@@ -349,7 +362,7 @@ class BaseDebateAgent(ABC):
         """
         base_summary_tpl = self.prompts.get("debate_agents", {}).get("base", {}).get("data_summary", "")
         
-        # 기본 요약 생성 (v3.0 Schema)
+        # 기본 요약 생성 (prompts.yaml의 base.data_summary 키와 정확히 일치시켜야 함)
         summary = base_summary_tpl.format(
             query=data.get("query", "알 수 없음"),
             agent_count=len(data.get("agents", [])),

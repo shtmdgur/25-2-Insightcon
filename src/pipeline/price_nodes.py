@@ -1,6 +1,6 @@
 
-from .state import ReportState
-from ..utils.price_data_loader import PriceDataLoader
+from src.pipeline.state import ReportState
+from src.utils.price_data_loader import PriceDataLoader
 from pathlib import Path
 import logging
 
