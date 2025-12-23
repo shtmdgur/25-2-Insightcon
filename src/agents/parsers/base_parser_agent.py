@@ -125,7 +125,8 @@ class BaseParserAgent(ABC):
     def batch_parse(
         self,
         file_paths: List[Path],
-        output_dir: Path
+        output_dir: Path,
+        skip_existing: bool = False
     ) -> Dict[str, Any]:
         """
         여러 파일을 배치 처리
@@ -133,6 +134,7 @@ class BaseParserAgent(ABC):
         Args:
             file_paths: 파일 경로 리스트
             output_dir: 출력 디렉토리
+            skip_existing: 이미 결과 파일이 존재하면 파싱 건너뛰기
         
         Returns:
             배치 처리 결과 통계
@@ -143,16 +145,24 @@ class BaseParserAgent(ABC):
             "total": len(file_paths),
             "success": 0,
             "failed": 0,
+            "skipped": 0,
             "errors": []
         }
         
         for file_path in file_paths:
             try:
+                output_file = output_dir / f"{file_path.stem}_kg.json"
+                
+                # 기존 파일 건너뛰기 체크
+                if skip_existing and output_file.exists():
+                    self.logger.info(f"Skipping existing KG for {file_path}")
+                    stats["skipped"] += 1
+                    continue
+
                 # 파싱
                 kg = self.parse(file_path)
                 
                 # JSON 저장
-                output_file = output_dir / f"{file_path.stem}_kg.json"
                 self.to_json(kg, output_file)
                 
                 stats["success"] += 1

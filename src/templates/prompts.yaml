@@ -340,7 +340,8 @@ news_parser:
       - **Foundry**: 수탁 생산 기업 (TSMC, DB하이텍)
       - **OSAT**: 후공정 전문 기업 (ASE, Amkor, 하나마이크론)
       - **Supplier**: 장비/소재 공급사 (ASML, 한미반도체, 동진쎄미켐)
-      - **Organization**: 일반 기관, 정부, 협회 등
+      - **Organization**: 정부기관, 협회 전용 (산업통상자원부, SEMI 등)
+      - **ETC**: 반도체 외 기업 (현대차, LG에너지솔루션, 테슬라 등)
 
       **[Signal Layer - 동적 인과 사건]**
       - **Issue**: 정책/리스크/기회/규제/기술이슈 등 모든 이슈 통합
@@ -394,21 +395,22 @@ news_parser:
       # 반드시 뉴스 기사에 명시된 정보만 추출하십시오.
       
       ```json
-      {
+      {{
         "entities": [
-          {"name": "삼성전자", "type": "IDM", "properties": {"ticker": "005930"}},
-          {"name": "HBM 수율 개선", "type": "Issue", "sentiment": "POSITIVE", "description": "..."}
+          {{"name": "삼성전자", "type": "IDM", "properties": {{"ticker": "005930"}}}},
+          {{"name": "HBM 수율 개선", "type": "Issue", "sentiment": "POSITIVE", "description": "..."}}
         ],
         "relations": [
-          {
+          {{
             "subject": "삼성전자",
             "predicate": "HAS_SIGNAL",
             "object": "HBM 수율 개선",
             "importance": 0.8
-          }
+          }}
         ]
-      }
+      }}
       ```
+
 
       뉴스 내용:
       {news_text}
@@ -425,7 +427,7 @@ gemini_pdf_parser:
       당신은 반도체 산업 및 거시경제 금융 데이터 전문가입니다.
       제공된 PDF 리포트에서 정보를 추출하여 **Hybrid KG Architecture** 스키마에 맞게 구조화된 데이터를 생성하세요.
 
-      # 1. T-Box 스키마 (v3.0)
+      # 1. T-Box 스키마 (v3.1)
 
       ## Node Types (Entities)
       
@@ -435,7 +437,8 @@ gemini_pdf_parser:
       - **Foundry**: 수탁 생산 기업 (TSMC, DB하이텍)
       - **OSAT**: 후공정 전문 기업 (ASE, Amkor, 하나마이크론)
       - **Supplier**: 장비/소재 공급사 (ASML, 한미반도체, 동진쎄미켐)
-      - **Organization**: 일반 정부기관, 협회 등
+      - **Organization**: 정부기관, 협회 전용 (산업통상자원부, SEMI 등)
+      - **ETC**: 반도체 외 기업 (현대차, LG에너지솔루션, 테슬라 등)
 
       **[Signal Layer - 동적 인과 사건]**
       - **Earnings**: 실적 발표 및 실적 관련 코멘트

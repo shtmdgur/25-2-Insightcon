@@ -1,6 +1,6 @@
 ﻿# 구현 작업 내역
 
-> **최종 업데이트**: 2025-12-21 (Phase 2.3 토론 에이전트 프롬프트 전략 고도화)  
+> **최종 업데이트**: 2025-12-24 (KG Schema Consistency & Optimization - Schema v3.1)  
 > **작업 범위**: Phase 0 (데이터 파싱) + Phase 1 (지식 그래프 구축 고도화) + Phase 2.3 (Debate Agents)
 
 ---
@@ -10,6 +10,7 @@
 - [Phase 0: 데이터 파싱 및 전처리](#phase-0-데이터-파싱-및-전처리)
 - [Phase 1: 지식 그래프 구축 고도화](#phase-1-지식-그래프-구축-고도화) (Ontology & Time-Stitching 포함)
 - [Phase 2.3: 변증법 토론 에이전트](#phase-23-변증법-토론-에이전트) (Cognitive Filtering & Variant View)
+- [Phase 6: KG Schema Consistency & Optimization](#phase-6-kg-schema-consistency--optimization) (Schema v3.1 & Force Type Correction)
 - [Appendix: Code Quality & Maintenance](#appendix-code-quality--maintenance)
 - [Layer 0.5: Raw 데이터 파싱 전략](#layer-05-raw-데이터-파싱-전략)
 
@@ -2353,4 +2354,43 @@ TASK_TO_MODEL = {
 
 ---
 
-**완성도**: Phase 5 완료, 컴파일 테스트 통과 ✅
+## Phase 6: KG Schema Consistency & Optimization ✅
+
+**날짜**: 2025-12-24  
+**작업 내용**:
+
+### 6.1 ETC 노드 타입 도입 및 스키마 업데이트 (v3.1)
+- **파일**: `src/models/nodes.py`, `docs/03_design/final_schema_v3.md`
+- **내용**: 
+  - 반도체 외 기업(현대차, LG에너지솔루션 등)을 위한 `NodeType.ETC` 추가.
+  - `ORGANIZATION`은 정부기관, 협회 전용으로 용도를 명확히 분리.
+  - `master_entities.yaml`에 주요 비반도체 기업 리스트 보강.
+
+### 6.2 마스터 데이터 기반 타입 강제 교정 (Force Type Correction)
+- **파일**: `src/agents/parsers/pdf_parser_agent.py`, `src/agents/parsers/news_parser_agent.py`, `src/dataflows/kg_merger.py` 등
+- **내용**:
+  - LLM이 추출한 타입을 그대로 사용하지 않고, 추출된 이름이 `master_entities.yaml`에 정의되어 있다면 해당 타입으로 강제로 교정.
+  - 동일한 기업이 서로 다른 파서에서 다른 타입(예: 한미반도체 → Organization vs Supplier)으로 추출되어 중복 노드가 생성되는 문제를 원천 차단.
+  - `ticker_mapping.py`를 `EntityMatcher` 기반으로 통합하여 타입 결정의 Single Source of Truth 구축.
+
+### 6.3 PDF 파서 성능 및 안정성 개선
+- **파일**: `src/parsers/gemini_pdf.py`
+- **내용**:
+  - `max_output_tokens=8192` 상향 조정으로 긴 응답 수용.
+  - JSON 파싱 에러(`JSONDecodeError`) 발생 시 지수 백오프 기반 최대 3회 재시도 로직 구현.
+
+### 6.4 파이프라인 처리 효율성 개선 (`skip_existing`)
+- **파일**: `src/agents/kg_construction.py`, `src/agents/parsers/base_parser_agent.py`
+- **내용**:
+  - 이미 로컬에 `_kg.json` 결과물이 존재하는 경우 파싱을 건너뛸 수 있는 `skip_existing` 옵션 도입.
+  - 대량의 PDF 처리 시 시간 및 API 비용 절감.
+
+### 6.5 최종 검증
+- **파일**: `verify_normalization_v3_1.py` (신규)
+- **내용**:
+  - `ETC` 타입 매핑 및 타입 강제 교정 메커니즘 단위 테스트 완료.
+  - 통합 파이프라인 재실행을 통한 중복 노드 제거 및 스키마 정합성 확인.
+
+---
+
+**완성도**: KG 스키마 고도화 및 최적화 완료, Schema v3.1 반영 ✅
