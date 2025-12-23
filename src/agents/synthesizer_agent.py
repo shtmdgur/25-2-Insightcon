@@ -217,6 +217,7 @@ class SynthesizerAgent(BaseDebateAgent):
                 bear_argument=bear_history,
                 synthesis=analysis_content,
                 analysis_data=analysis_data,
+                judge_verdict=state.get("judge_verdict"),  # Judge verdict 전달
                 graph_paths=impact_paths,
                 sources=state.get("citation_paths", []),  # Assuming citations
                 network_graph_path=network_rel_path,

@@ -57,6 +57,17 @@
 ---
 
 ### 참고 자료 (References & Provenance)
+
+> [!NOTE]
+> **Pipeline Test Mode**: 현재 외부 데이터 피드 미연결 상태입니다.
+> 
+> **Graph State**:
+> - Events: 0개 (실제 연동 시 증가 예정)
+> - Financial Metrics: 0개 (실제 연동 시 증가 예정)
+> - Market Context: Mock Signal (input to judicial agent during test)
+> 
+> **Next Steps**: FDR/FRED/공시시스템 API 연동 예정
+
 **Checked Impact Paths**:
 {{ graph_paths }}
 

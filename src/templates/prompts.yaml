@@ -124,6 +124,17 @@ debate_agents:
       [Advanced Cognitive Filtering: The 'Bull' Lens]
       다음 5가지 프레임워크를 사용하여 Impact Path를 강력한 'Investment Thesis'로 변환하십시오.
 
+      **⚠️ CRITICAL - No Hallucination Rule (MUST FOLLOW)**:
+      - **절대 금지**: KG에 없는 구체적인 제품명(HBM, DRAM 등), 지표(수율, 점유율 등), 이벤트(파운드리 계약 등)를 마치 확정된 사실처럼 언급
+      - **Data=0인 경우**: "Graph State: Events=0, Metrics=0"라고 명시하고, "데이터 부족으로 구체적 분석 불가"로 작성
+      - **허용되는 표현**: 
+        - "Graph에 [Product/Metric] 데이터가 입력되면..." (조건부 미래)
+        - "예시: 제품 믹스 개선, 수율 향상 등" (일반론 예시, 단정 아님)
+      - **금지되는 표현**:
+        - "HBM 점유율 확대로..." (KG에 HBM 데이터 없으면 Hallucination)
+        - "Smart Money가 매집..." (KG에 거래 데이터 없으면 Hallucination)
+        - "AI 수요 폭증으로..." (KG에 수요 데이터 없으면 Hallucination)
+
       1. **The Variant View (Market Misperception)**
          - 시장의 우려(Bear 논리)가 과도하거나 데이터와 배치됨을 증명하십시오.
          - 논리: "시장은 A(리스크)를 걱정하지만, Graph 데이터는 B(해결책)를 가리킨다."
@@ -189,6 +200,16 @@ debate_agents:
       [Advanced Cognitive Filtering: The 'Bear' Lens]
       다음 5가지 프레임워크를 사용하여 낙관론을 해체하십시오.
 
+      **⚠️ CRITICAL - No Hallucination Rule (MUST FOLLOW)**:
+      - **절대 금지**: KG에 없는 구체적인 제품명, 지표, 이벤트를 마치 확정된 사실처럼 언급
+      - **Data=0인 경우**: "Graph State: Events=0, Metrics=0"라고 명시하고, "데이터 부족으로 리스크 정량화 불가"로 작성
+      - **허용되는 표현**: 
+        - "Graph에 [Risk/Metric] 데이터가 입력되면..." (조건부)
+        - "예시: 수율 악화, 경쟁 심화 등" (일반론 예시)
+      - **금지되는 표현**:
+        - "파운드리 수율 50% 미만으로..." (KG에 수율 데이터 없으면 Hallucination)
+        - "재고 급증으로..." (KG에 재고 데이터 없으면 Hallucination)
+
       1. **Margin Squeeze (Profitability Risk)**
          - 외형(매출)은 커지지만 내실(이익)은 망가지는 경로를 찾으십시오.
          - 원가 상승 전가 실패, 마케팅 비용 급증, 경쟁 심화로 인한 판가 하락
@@ -252,7 +273,19 @@ debate_agents:
       - **Evidence (Impact Paths)**: {critical_paths}
       - **Market Context (Price/Volume)**: {market_context}
 
-      [Judgement Criteria]
+      [CRITICAL RULE - Data Sufficiency Check]
+      **BEFORE making any decision, check the following:**
+      
+      IF Events=0 AND Metrics=0 AND Trends=0 (즉, KG 데이터가 전무):
+        → **MUST return decision: "HOLD"**
+        → confidence_level: "Low"
+        → rationale: "Knowledge Graph 데이터 부족으로 펀더멘털 판단 불가. 데이터 확보 시 재평가 필요."
+        → winning_side: "Neutral"
+      
+      ELSE (KG 데이터가 존재):
+        → Proceed with normal judgement criteria below
+
+      [Judgement Criteria] (Only if KG data exists)
       1. **Evidence Strength**: 어느 쪽이 그래프 기반의 팩트(Impact Path)를 더 정확하고 강력하게 제시했는가?
       2. **Logic Soundness**: 논리의 비약 없이 인과관계가 명확한가?
       3. **Risk-Reward**: 불확실성을 감안했을 때, Upside Potential이 Downside Risk를 압도하는가?
@@ -312,13 +345,24 @@ debate_agents:
       
       3. **Style**: Professional, Bullet points, Korean language.
       
-      4. **DO NOT** include:
+      4. **CRITICAL - Data Consistency Rule**:
+         **IF** Bull/Bear/Judge 모두 "데이터 부족(Insufficient Data)" 또는 "Events=0, Metrics=0"을 언급했다면:
+         - 투자의견: **HOLD (판단 유보)** 또는 **NR (Not Rated)**
+         - Summary: "Knowledge Graph 데이터 부족으로 명확한 판단 불가. 추가 데이터 확보 시 재평가 필요."
+         - Confidence: **Low**
+         - 근거: KG에 없는 데이터(Market Context 등)를 언급하지 말 것!
+         
+         **ELSE** (Bull/Bear가 구체적 데이터를 인용했다면):
+         - Judge의 verdict(BUY/SELL/HOLD)를 따르되, 반드시 KG 노드를 출처로 명시
+         - 예: "Market Context 노드에 따르면..." 또는 "(Source: MarketContext.uptrend)"
+      
+      5. **DO NOT** include:
          - Header (Date, Ticker, Company Name)
          - Section headers like "## Executive Summary" or "## Investment Thesis"
          - Final Disclaimer
          (The Python Formatter/Template will add all section headers automatically)
       
-      5. **Structure** (Content only, NO section headers):
+      6. **Structure** (Content only, NO section headers):
       
        (Start directly with the summary content)
        
@@ -326,6 +370,7 @@ debate_agents:
        (Write the concise verdict summary here...)
        
        [Investment Thesis content]
+       **IMPORTANT**: Do NOT repeat the Summary here. Start directly with the key points.
        
        ### 1. [First Key Point Title]
        (Explanation...)
@@ -338,6 +383,11 @@ debate_agents:
        
        ## Conclusion
        (Final verdict...)
+       
+      7. **Language & Tone Guidelines**:
+         - Avoid strong assertions like "기각되었다" (rejected)
+         - Use softer language: "채택되지 않았다" (not adopted), "유보되었다" (reserved), "반영되지 않음" (not reflected)
+         - When referencing Bull/Bear logic: "정량 근거가 부족하여 본 결론에 반영하지 않음" instead of "기각"
 
   # ==========================================
   # 6. VLM Parser (이미지 분석)

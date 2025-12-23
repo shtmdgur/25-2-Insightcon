@@ -32,6 +32,7 @@ class HanwhaSecuritiesReportFormatter:
         bear_argument: str,
         synthesis: str,
         analysis_data: Dict,
+        judge_verdict: Optional[Dict] = None,
         graph_paths: Optional[list] = None,
         sources: Optional[list] = None,
         network_graph_path: Optional[str] = None,
@@ -58,8 +59,8 @@ class HanwhaSecuritiesReportFormatter:
         Returns:
             Markdown 형식 리포트
         """
-        # Synthesis에서 투자의견 및 목표주가 추출 (Regex 사용)
-        investment_opinion = self._extract_opinion(synthesis)
+        # Judge verdict에서 투자의견 추출 (우선), 없으면 Synthesis에서 추출
+        investment_opinion = self._extract_opinion(synthesis, judge_verdict)
         target_price = self._extract_target_price(synthesis)
         confidence = self._extract_confidence(synthesis)
         
@@ -108,12 +109,24 @@ class HanwhaSecuritiesReportFormatter:
         
         return report_md
     
-    def _extract_opinion(self, synthesis: str) -> str:
-        """Synthesis에서 투자의견 추출 (Buy/Hold/Sell)"""
-        # LLM 파싱 또는 키워드 기반 추출
-        if "매수" in synthesis or "Buy" in synthesis:
+    def _extract_opinion(self, synthesis: str, judge_verdict: Optional[Dict] = None) -> str:
+        """Judge verdict 또는 Synthesis에서 투자의견 추출 (Buy/Hold/Sell)"""
+        # 1. Judge verdict가 있으면 우선 사용
+        if judge_verdict and 'decision' in judge_verdict:
+            decision = judge_verdict['decision'].upper()
+            if 'BUY' in decision:
+                return "매수 (Buy)"
+            elif 'SELL' in decision:
+                return "매도 (Sell)"
+            elif 'HOLD' in decision or 'NR' in decision:
+                return "중립 (Hold)"
+        
+        # 2. Synthesis에서 키워드 추출 (fallback)
+        if "HOLD" in synthesis or "관망" in synthesis or "유보" in synthesis:
+            return "중립 (Hold)"
+        elif "매수" in synthesis or "Buy" in synthesis or "BUY" in synthesis:
             return "매수 (Buy)"
-        elif "매도" in synthesis or "Sell" in synthesis:
+        elif "매도" in synthesis or "Sell" in synthesis or "SELL" in synthesis:
             return "매도 (Sell)"
         else:
             return "중립 (Hold)"
