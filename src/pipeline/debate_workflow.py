@@ -145,13 +145,21 @@ def create_debate_workflow(bull_agent, bear_agent, synthesizer_agent):
     
     # 노드 추가
     workflow.add_node("initialize", initialize_debate)
+    from src.pipeline.price_nodes import load_price_context_node  # Dynamic Import to avoid circular deps
+    workflow.add_node("price_load", load_price_context_node)
+    
     workflow.add_node("bull", bull_argue)
     workflow.add_node("bear", bear_argue)
     workflow.add_node("synthesizer", synthesize_report)
     
     # 엣지 연결
     workflow.set_entry_point("initialize")
-    workflow.add_edge("initialize", "bull")
+    
+    # [Price DB Integration] 초기화 후 가격 데이터 로드
+    workflow.add_edge("initialize", "price_load")
+    workflow.add_edge("price_load", "bull")
+    
+    # 순환 토론 (Bull <-> Bear) -> Synthesizer
     workflow.add_edge("bull", "bear")
     
     # 조건부 분기: Bear → Bull (계속) 또는 Synthesizer (종료)
