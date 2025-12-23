@@ -126,8 +126,9 @@ def create_debate_workflow(bull_agent, bear_agent, judge_agent, synthesizer_agen
     workflow = StateGraph(ReportState)
     
     workflow.add_node("initialize", initialize_debate)
-    from src.pipeline.price_nodes import load_price_context_node  # Dynamic Import to avoid circular deps
-    workflow.add_node("price_load", load_price_context_node)
+    
+    # Note: graphrag_search, price_load 노드 제거됨
+    # → LLM Tool Calling (explore_graph, get_price_context)로 대체
     
     workflow.add_node("bull", bull_argue)
     workflow.add_node("bear", bear_argue)
@@ -137,9 +138,8 @@ def create_debate_workflow(bull_agent, bear_agent, judge_agent, synthesizer_agen
     
     workflow.set_entry_point("initialize")
     
-    # [Price DB Integration] 초기화 후 가격 데이터 로드
-    workflow.add_edge("initialize", "price_load")
-    workflow.add_edge("price_load", "bull")
+    # 초기화 후 바로 토론 시작 (데이터는 Tool Calling으로 동적 조회)
+    workflow.add_edge("initialize", "bull")
     
     # 순환 토론 (Bull <-> Bear) -> Synthesizer
     workflow.add_edge("bull", "bear")
