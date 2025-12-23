@@ -59,6 +59,7 @@ class ReportState(TypedDict):
     # ========================================
     graphrag_results: Optional[Dict[str, Any]]  # GraphRAG 검색 결과
     news_events: Optional[List[Dict]]  # 관련 뉴스 이벤트
+    market_context: Optional[str]  # 시장 상황 요약 (자연어, Price DB)
     
     # ========================================
     # 5. Analyst 분석 결과 (Phase 2 - Parallel)
