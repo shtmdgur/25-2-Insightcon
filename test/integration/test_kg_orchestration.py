@@ -167,7 +167,7 @@ def enable_test_mode():
     print("  - PDF: reports 1개 + ir 1개\n")
     
     # 파서별 테스트 모드 설정 적용 (v3.0)
-    update_config('news', sample_size=5)  # 뉴스 5행만
+    update_config('news', sample_size=20)  # 뉴스 20행으로 확대
     # update_config('price', sample_size=10)  # v3.0: 제거됨
     
     print("✅ 테스트 모드 설정 적용 완료")
@@ -237,22 +237,22 @@ def run_orchestration_test(load_to_neo4j: bool = False, test_mode: bool = False)
             raw_dir = project_root / "data" / "raw"
             preprocessed_dir = project_root / "data" / "preprocessed"
             
-            # PDF: reports 1개 + ir/Samsung 1개 = 총 2개
+            # PDF: reports 3개 + ir 3개 = 총 6개
             pdf_files = []
-            reports_pdfs = list((preprocessed_dir / 'reports').glob('*.pdf'))[:1]  # reports에서 1개
+            reports_pdfs = list((preprocessed_dir / 'reports').glob('*.pdf'))[:3]  # reports에서 3개
             if not reports_pdfs:
-                reports_pdfs = list((raw_dir / 'reports').glob('*.pdf'))[:1]
+                reports_pdfs = list((raw_dir / 'reports').glob('*.pdf'))[:3]
             pdf_files.extend(reports_pdfs)
             
-            # ir 폴더에서 첫 번째 회사의 첫 번째 PDF
+            # ir 폴더에서 상위 3개 회사의 첫 번째 PDF씩
             ir_dir = preprocessed_dir / 'ir'
             if not ir_dir.exists():
                 ir_dir = raw_dir / 'ir'
             if ir_dir.exists():
                 company_dirs = sorted([d for d in ir_dir.iterdir() if d.is_dir()])
-                if company_dirs:
-                    first_company_pdf = list(company_dirs[0].glob('*.pdf'))[:1]
-                    pdf_files.extend(first_company_pdf)
+                for company_dir in company_dirs[:3]:
+                    comp_pdfs = list(company_dir.glob('*.pdf'))[:1]
+                    pdf_files.extend(comp_pdfs)
             
             data_sources = {
                 'pdf': pdf_files,  # 총 2개 (reports 1개 + ir 1개)

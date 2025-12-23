@@ -92,24 +92,22 @@ class GeminiPDFParser(ParserInterface):
             logger.info("Generating embeddings for entities...")
             self._enrich_with_embeddings(knowledge_graph)
             
-            # 5. JSON 파일로 저장 (data/processed/)
-            import os
-            from datetime import datetime
+            # 5. JSON 파일로 저장 (data/processed/) - _kg.json 형식으로 통일
             from pathlib import Path
             
-            # 파일명 생성: {file_id}_{timestamp}.json
+            # 파일명 생성: {file_id}_kg.json (타임스탬프 제거)
             file_id = Path(file_path).stem
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             # 프로젝트 루트 기준 경로
             project_root = Path(__file__).parent.parent.parent.parent
             processed_dir = project_root / "data" / "processed"
-            json_path = processed_dir / f"{file_id}_{timestamp}.json"
+            json_path = processed_dir / f"{file_id}_kg.json"
             
             # 저장 (임베딩 포함됨)
             knowledge_graph.save_to_json(str(json_path))
             
             logger.info(f"Saved KG to: {json_path}")
+
             
             logger.info(
                 f"Extracted {len(knowledge_graph.entities)} entities "
@@ -143,6 +141,9 @@ class GeminiPDFParser(ParserInterface):
         Returns:
             Knowledge Graph JSON
         """
+        import json
+        import time
+        
         # YAML에서 프롬프트 로드
         prompt = PROMPTS.get('gemini_pdf_parser', {}).get('kg_extraction', {}).get('instruction', '')
         
@@ -153,32 +154,55 @@ class GeminiPDFParser(ParserInterface):
                 "Please check the YAML file configuration."
             )
         
-        # Gemini API 호출 (Structured Output)
-        response = client.models.generate_content(
-            model=self.model_name,
-            contents=[
-                {
-                    "role": "user",
-                    "parts": [
-                        {"text": prompt},
-                        {
-                            "fileData": {
-                                "fileUri": file_uri,
-                                "mimeType": "application/pdf"
-                            }
-                        }
-                    ]
-                }
-            ],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=get_kg_json_schema()
-            )
-        )
+        # 재시도 로직 (최대 3회)
+        max_retries = 3
+        last_error = None
         
-        # JSON 파싱
-        import json
-        return json.loads(response.text)
+        for attempt in range(max_retries):
+            try:
+                # Gemini API 호출 (Structured Output + max_output_tokens 증가)
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=[
+                        {
+                            "role": "user",
+                            "parts": [
+                                {"text": prompt},
+                                {
+                                    "fileData": {
+                                        "fileUri": file_uri,
+                                        "mimeType": "application/pdf"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=get_kg_json_schema(),
+                        max_output_tokens=8192  # 응답 길이 제한 완화
+                    )
+                )
+                
+                # JSON 파싱
+                return json.loads(response.text)
+                
+            except json.JSONDecodeError as e:
+                last_error = e
+                logger.warning(f"JSON parsing failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)  # 재시도 전 대기
+                continue
+            except Exception as e:
+                last_error = e
+                logger.warning(f"API call failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                continue
+        
+        # 모든 재시도 실패
+        raise RuntimeError(f"Failed after {max_retries} attempts: {last_error}")
+
     
     def _normalize_entities(self, kg: KnowledgeGraph):
         """
@@ -186,7 +210,12 @@ class GeminiPDFParser(ParserInterface):
         예: "퀄컴" -> "Qualcomm", "삼성전자(주)" -> "삼성전자"
         
         v3.0 추가: 관계의 subject/object도 함께 정규화하여 MATCH 실패 방지
+        v3.1 추가: master_entities.yaml에서 타입도 가져와 교정 (ORGANIZATION → SUPPLIER 등)
         """
+        from src.utils.entity_matcher import get_entity_matcher
+        
+        matcher = get_entity_matcher()
+        
         # 이름 매핑 테이블 (원본 → 정규화)
         name_mapping = {}
         
@@ -200,7 +229,20 @@ class GeminiPDFParser(ParserInterface):
                 name_mapping[original_name] = normalized_name
                 entity.name = normalized_name
             
-            # 2. Ticker 보강 (Agent 타입인 경우)
+            # 2. 타입 교정 (master_entities.yaml 기반) - v3.1 추가
+            entity_info = matcher.get_entity_info(entity.name)
+            if entity_info and entity_info.get('type'):
+                master_type_str = entity_info['type']
+                try:
+                    master_type = NodeType(master_type_str)
+                    if entity.type != master_type:
+                        logger.info(f"Type corrected: {entity.name} {entity.type.value} -> {master_type.value}")
+                        entity.type = master_type
+                except ValueError:
+                    # NodeType enum에 없는 경우 무시
+                    pass
+            
+            # 3. Ticker 보강 (Agent 타입인 경우)
             if entity.type in [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.SUPPLIER]:
                 ticker = get_ticker_from_name(entity.name)
                 if ticker:
@@ -208,7 +250,7 @@ class GeminiPDFParser(ParserInterface):
                         entity.properties["ticker"] = ticker
                         logger.debug(f"Added ticker {ticker} to {entity.name}")
         
-        # 3. 관계의 subject/object 정규화 (v3.0 추가)
+        # 4. 관계의 subject/object 정규화 (v3.0 추가)
         for relation in kg.relations:
             if relation.subject in name_mapping:
                 logger.debug(f"Normalized relation subject: {relation.subject} -> {name_mapping[relation.subject]}")
@@ -216,6 +258,7 @@ class GeminiPDFParser(ParserInterface):
             if relation.object in name_mapping:
                 logger.debug(f"Normalized relation object: {relation.object} -> {name_mapping[relation.object]}")
                 relation.object = name_mapping[relation.object]
+
 
     
     def _enrich_with_embeddings(self, kg: KnowledgeGraph):

@@ -124,8 +124,8 @@ class Neo4jKGLoader:
                 
             for predicate, relations in rel_groups.items():
                 logger.info(f"Batch creating {len(relations)} relations of type {predicate}...")
-                self._batch_create_relations(session, predicate, relations)
-                stats["relationships_created"] += len(relations)
+                created_count = self._batch_create_relations(session, predicate, relations)
+                stats["relationships_created"] += created_count
             
             return stats
 
@@ -220,7 +220,7 @@ class Neo4jKGLoader:
             return {k: v for k, v in base_props.items() if v is not None}
         return base_props
 
-    def _batch_create_relations(self, session, predicate: str, relations: List[Relation]):
+    def _batch_create_relations(self, session, predicate: str, relations: List[Relation]) -> int:
         """관계 배치 MERGE (v3.0: 히스토리 누적 + 최신값 저장)"""
         query = f"""
         UNWIND $batch as row
@@ -245,14 +245,20 @@ class Neo4jKGLoader:
             } for r in relations
         ]
         result = session.run(query, batch=batch_data)
-        summary = result.consume()
-        created = summary.counters.relationships_created
+        # summary.counters.relationships_created는 MERGE 시 이미 존재하면 0으로 나올 수 있음
+        # 실제 쿼리 결과인 count(r)을 사용
+        created = result.single()["created"]
         requested = len(relations)
         logger.info(f"Created/merged {created}/{requested} {predicate} relationships")
         
         # MATCH 실패 감지
         if created < requested:
             logger.warning(f"⚠️ {requested - created} {predicate} relationships failed - source/target nodes may not exist")
+            # 샘플 출력으로 원인 노드 파악 지원
+            if len(relations) > 0:
+                logger.debug(f"Sample subjects: {[r.subject for r in relations[:3]]}")
+        
+        return created
     
     def _build_relation_properties(self, r: Relation) -> dict:
         """관계 속성 dict 생성 (null 필터링 옵션 적용)"""
@@ -367,6 +373,7 @@ class Neo4jKGLoader:
             NodeType.OSAT,  # v3.0 신규
             NodeType.SUPPLIER,
             NodeType.ORGANIZATION,
+            NodeType.ETC,  # v3.1 신규: 반도체 외 기업
             NodeType.ECONOMIC_INDICATOR,
         }
         

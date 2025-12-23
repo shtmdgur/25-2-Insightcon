@@ -87,7 +87,8 @@ class KGConstructionAgent:
         data_sources: Optional[Dict[str, List[Path]]] = None,
         auto_scan: bool = True,
         use_batch: bool = False,
-        load_to_neo4j: bool = False
+        load_to_neo4j: bool = False,
+        skip_existing: bool = False
     ) -> Dict[str, Any]:
         """
         Knowledge Graph 자동 구축
@@ -97,6 +98,7 @@ class KGConstructionAgent:
             auto_scan: data/raw 자동 스캔 여부 (기본 True)
             use_batch: Batch API 사용 여부 (뉴스 파서 전용)
             load_to_neo4j: Neo4j 직접 주입 여부
+            skip_existing: 이미 결과 파일이 존재하면 파싱 건너뛰기 (기본 False)
         
         Returns:
             통계 리포트 {
@@ -117,7 +119,7 @@ class KGConstructionAgent:
                 data_sources = self._scan_data_sources()
             
             # 2. Parser Agent 실행
-            parser_results = self._orchestrate_parsers(data_sources, use_batch)
+            parser_results = self._orchestrate_parsers(data_sources, use_batch, skip_existing)
             
             # 3. JSON 수집
             json_files = self._collect_json_files()
@@ -216,7 +218,8 @@ class KGConstructionAgent:
     def _orchestrate_parsers(
         self,
         data_sources: Dict[str, List[Path]],
-        use_batch: bool
+        use_batch: bool,
+        skip_existing: bool = False
     ) -> Dict[str, Dict[str, Any]]:
         """
         Parser Agent 실행
@@ -224,6 +227,7 @@ class KGConstructionAgent:
         Args:
             data_sources: 파일 타입별 경로 목록
             use_batch: Batch API 사용 여부
+            skip_existing: 이미 결과 파일이 존재하면 파싱 건너뛰기
         
         Returns:
             파서별 실행 결과
@@ -234,24 +238,9 @@ class KGConstructionAgent:
         
         results = {}
         
-        # PDF Parser (GeminiPDFParser - 순차 처리, API Rate Limit 고려)
+        # 1. PDF (가장 무거우므로 먼저 실행하거나 별도 관리)
         if data_sources.get('pdf'):
-            logger.info(f"Running PDFParserAgent ({len(data_sources['pdf'])} files) - 순차 처리")
-            results['pdf'] = {'total': 0, 'success': 0, 'failed': 0, 'errors': []}
-            for pdf_file in data_sources['pdf']:
-                try:
-                    result = self.pdf_parser.parse(str(pdf_file))
-                    kg = result["knowledge_graph"]
-                    output_file = self.processed_dir / f"{pdf_file.stem}_kg.json"
-                    kg.save_to_json(str(output_file))
-                    results['pdf']['success'] += 1
-                    results['pdf']['total'] += 1
-                    logger.info(f"   ✓ {pdf_file.name}: {len(kg.entities)} entities")
-                except Exception as e:
-                    results['pdf']['failed'] += 1
-                    results['pdf']['total'] += 1
-                    results['pdf']['errors'].append(f"{pdf_file.name}: {str(e)}")
-                    logger.error(f"   ✗ {pdf_file.name}: {e}")
+            results['pdf'] = self._batch_parse_pdfs(data_sources['pdf'], skip_existing)
         
         # 병렬 처리할 파서 정의
         def run_dart():
@@ -260,8 +249,15 @@ class KGConstructionAgent:
             result = {'total': 0, 'success': 0, 'failed': 0}
             for dart_dir in data_sources['dart']:
                 try:
-                    kg = self.dart_parser.parse(dart_dir)
+                    # 건너뛰기 체크
                     output_file = self.processed_dir / "dart_kg.json"
+                    if skip_existing and output_file.exists():
+                        logger.info(f"Skipping existing DART KG: {output_file.name}")
+                        result['success'] += 1
+                        result['total'] += 1
+                        continue
+
+                    kg = self.dart_parser.parse(dart_dir)
                     kg.save_to_json(str(output_file))
                     result['success'] += 1
                     result['total'] += 1
@@ -275,17 +271,29 @@ class KGConstructionAgent:
         def run_news():
             if not data_sources.get('news') or not self.news_parser:
                 return 'news', None
-            return 'news', self.news_parser.batch_parse(data_sources['news'], self.processed_dir)
+            return 'news', self.news_parser.batch_parse(
+                data_sources['news'], 
+                self.processed_dir,
+                skip_existing=skip_existing
+            )
         
         def run_macro():
             if not data_sources.get('macro'):
                 return 'macro', None
-            return 'macro', self.macro_parser.batch_parse(data_sources['macro'], self.processed_dir)
+            return 'macro', self.macro_parser.batch_parse(
+                data_sources['macro'], 
+                self.processed_dir,
+                skip_existing=skip_existing
+            )
         
         def run_fund():
             if not data_sources.get('fund'):
                 return 'fund', None
-            return 'fund', self.fund_parser.batch_parse(data_sources['fund'], self.processed_dir)
+            return 'fund', self.fund_parser.batch_parse(
+                data_sources['fund'], 
+                self.processed_dir,
+                skip_existing=skip_existing
+            )
         
         # 병렬 실행 (DART, News, Macro, Fund)
         logger.info("Running CSV Parsers (병렬 처리)...")
@@ -307,12 +315,17 @@ class KGConstructionAgent:
         
         return results
     
-    def _batch_parse_pdfs(self, pdf_files: List[Path]) -> Dict[str, Any]:
+    def _batch_parse_pdfs(
+        self, 
+        pdf_files: List[Path],
+        skip_existing: bool = False
+    ) -> Dict[str, Any]:
         """
         PDF 파일 배치 파싱
         
         Args:
             pdf_files: PDF 파일 경로 리스트
+            skip_existing: 이미 결과 파일이 존재하면 파싱 건너뛰기
         
         Returns:
             파싱 결과 통계
@@ -330,6 +343,13 @@ class KGConstructionAgent:
                 if pdf_file.suffix.lower() != '.pdf':
                     raise ValueError(f"Not a PDF file: {pdf_file}")
                 
+                # 0. 건너뛰기 체크
+                output_file = self.processed_dir / f"{pdf_file.stem}_kg.json"
+                if skip_existing and output_file.exists():
+                    logger.info(f"Skipping existing PDF KG: {pdf_file.name}")
+                    success += 1
+                    continue
+
                 # PDFParserAgent로 파싱
                 logger.info(f"Parsing PDF: {pdf_file}")
                 result = self.pdf_parser.parse(str(pdf_file))  # parse_pdf_to_kg → parse 수정
@@ -341,15 +361,14 @@ class KGConstructionAgent:
                     "file_type": "pdf"
                 })
                 
-                # JSON 저장
-                output_file = self.processed_dir / f"{pdf_file.stem}_kg.json"
-                kg.save_to_json(str(output_file))
+                # PDF parser가 이미 _kg.json을 저장하므로 여기서 추가 저장 불필요
                 
                 logger.info(
                     f"PDF parsed: {pdf_file.name} → "
                     f"{len(kg.entities)} entities, {len(kg.relations)} relations"
                 )
                 success += 1
+
                 
             except Exception as e:
                 logger.error(f"Failed to parse {pdf_file}: {str(e)}")

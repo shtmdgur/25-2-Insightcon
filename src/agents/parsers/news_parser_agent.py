@@ -131,7 +131,9 @@ class NewsParserAgent(BaseParserAgent):
         file_path: Path
     ) -> KnowledgeGraph:
         """
-        DataFrame을 Knowledge Graph로 변환
+        DataFrame을 Knowledge Graph로 변환 (v3.2: 전체 KG 추출 방식)
+        
+        LLM에 뉴스 배치를 전송하고, 반환된 전체 KG(entities + relations)를 활용합니다.
         
         Args:
             df: 뉴스 DataFrame
@@ -140,8 +142,11 @@ class NewsParserAgent(BaseParserAgent):
         Returns:
             KnowledgeGraph 객체
         """
-        entities = []
-        relations = []
+        import json
+        import os
+        from google import genai
+        from google.genai import types
+        from src.models.nodes import get_kg_json_schema
         
         # 컬럼명 소문자로 정규화
         df.columns = [col.lower() for col in df.columns]
@@ -160,18 +165,120 @@ class NewsParserAgent(BaseParserAgent):
         
         self.logger.info(f"Processing {sample_size} news items out of {len(df)}")
         
+        # LLM이 없으면 수동 KG 생성으로 폴백
+        if not self.llm:
+            return self._create_kg_manual_fallback(sampled_df, file_path)
+        
+        # 뉴스 배치를 텍스트로 구성
+        news_texts = []
         for idx, row in sampled_df.iterrows():
-            # Issue 엔티티 생성 (Signal Layer)
+            date_str = row['date'].strftime('%Y-%m-%d')
+            title = str(row.get('title', ''))[:config.max_title_length]
+            content = str(row.get('content', row.get('description', ''))).strip()[:500]
+            keyword = str(row.get('keyword', '')).strip()
+            
+            news_item = f"""[뉴스 {len(news_texts)+1}]
+날짜: {date_str}
+제목: {title}
+본문: {content}
+키워드: {keyword}
+"""
+            news_texts.append(news_item)
+        
+        batch_text = "\n---\n".join(news_texts)
+        
+        # YAML에서 프롬프트 로드
+        from src.config.prompt_loader import PROMPTS
+        prompt_tmpl = PROMPTS.get('news_parser', {}).get('kg_extraction', {}).get('instruction', '')
+        
+        if not prompt_tmpl:
+            self.logger.warning("Prompt not found in YAML, using fallback")
+            return self._create_kg_manual_fallback(sampled_df, file_path)
+        
+        # 프롬프트 구성 (뉴스 배치 주입)
+        full_prompt = prompt_tmpl.format(news_text=batch_text)
+        
+        try:
+            # Google Genai SDK 직접 호출 (Structured Output)
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+            
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[{"role": "user", "parts": [{"text": full_prompt}]}],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=get_kg_json_schema()
+                )
+            )
+            
+            # JSON 파싱
+            kg_json = json.loads(response.text)
+            
+            self.logger.debug(f"LLM returned {len(kg_json.get('entities', []))} entities, {len(kg_json.get('relations', []))} relations")
+            
+            # KnowledgeGraph 객체 생성
+            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
+            
+            # 엔티티 정규화 + 타입 교정 (v3.1)
+            from src.utils.entity_matcher import EntityMatcher
+            normalizer = EntityMatcher()
+            for entity in knowledge_graph.entities:
+                entity.name = normalizer.match(entity.name)
+                # 타입 교정 (master_entities.yaml 기반)
+                entity_info = normalizer.get_entity_info(entity.name)
+                if entity_info and entity_info.get('type'):
+                    try:
+                        master_type = NodeType(entity_info['type'])
+                        if entity.type != master_type:
+                            self.logger.info(f"Type corrected: {entity.name} {entity.type.value} -> {master_type.value}")
+                            entity.type = master_type
+                    except ValueError:
+                        pass  # NodeType enum에 없는 경우 무시
+            
+            # 관계의 subject/object도 정규화
+            for relation in knowledge_graph.relations:
+                relation.subject = normalizer.match(relation.subject)
+                relation.object = normalizer.match(relation.object)
+            
+            # 메타데이터 추가
+            knowledge_graph.metadata = {
+                "source_file": str(file_path),
+                "file_type": "news_csv",
+                "total_news": len(df),
+                "sampled_news": sample_size,
+                "date_range": f"{df['date'].min().strftime('%Y-%m-%d')} ~ {df['date'].max().strftime('%Y-%m-%d')}",
+                "extraction_method": "llm_full_kg"
+            }
+            
+            return knowledge_graph
+            
+        except Exception as e:
+            self.logger.error(f"LLM KG extraction failed: {str(e)}")
+            self.logger.info("Falling back to manual KG creation")
+            return self._create_kg_manual_fallback(sampled_df, file_path)
+    
+    def _create_kg_manual_fallback(
+        self,
+        df: pd.DataFrame,
+        file_path: Path
+    ) -> KnowledgeGraph:
+        """
+        LLM 실패 시 수동 KG 생성 (기존 로직 보존)
+        """
+        from src.config.parser_config import get_config
+        config = get_config('news')
+        
+        entities = []
+        relations = []
+        
+        for idx, row in df.iterrows():
             date_str = row['date'].strftime('%Y-%m-%d')
             title = str(row.get('title', ''))[:config.max_title_length]
             keyword = str(row.get('keyword', '')).strip()
             
-            # 제목에서 의미있는 키워드 추출
+            # Issue 엔티티 생성
             title_short = self._extract_issue_keyword(title)
             issue_name = f"Issue_{title_short}_{date_str}"
-            
-            # 본문 데이터 가져오기 (content 우선, 없으면 description)
-            content_full = str(row.get('content', row.get('description', ''))).strip()
             
             issue_entity = Entity(
                 name=issue_name,
@@ -188,74 +295,15 @@ class NewsParserAgent(BaseParserAgent):
             )
             entities.append(issue_entity)
             
-            # LLM 기반 affected_entities 추출 및 관계 생성
-            
-            if self.event_extractor and self.llm:
-                # LLM으로 affected_entities 추출
-                try:
-                    affected_entities = self._extract_affected_entities(
-                        title=title,
-                        description=content_full,  # 원문 전체 전달
-                        keyword=keyword
-                    )
-                    
-                    for company_name in affected_entities:
-                        # v3.0: LLM 추출 결과 정규화
-                        from src.utils.ticker_mapping import resolve_entity_name, get_node_type
-                        normalized_name = resolve_entity_name(company_name)
-                        node_type = get_node_type(normalized_name)
-                        
-                        # Agent 노드가 없으면 생성 (MATCH 실패 방지)
-                        agent_entity = Entity(
-                            name=normalized_name,
-                            type=node_type,
-                            confidence=0.7  # LLM 추출이므로 낮은 신뢰도
-                        )
-                        entities.append(agent_entity)
-                        
-                        relation = Relation(
-                            subject=normalized_name,  # 정규화된 이름 사용
-                            predicate=RelationType.HAS_SIGNAL,
-                            object=issue_entity.name,
-                            date=date_str,
-                            source=str(file_path),
-                            properties={
-                                "weight": issue_entity.properties['time_decay_weight']
-                            }
-                        )
-                        relations.append(relation)
-                        
-                except Exception as e:
-                    self.logger.warning(f"LLM extraction failed: {str(e)}. Using keyword fallback.")
-                    # Fallback: keyword 사용 (정규화 적용)
-                    if keyword:
-                        from src.utils.ticker_mapping import resolve_entity_name, get_node_type
-                        normalized_keyword = resolve_entity_name(keyword)
-                        node_type = get_node_type(normalized_keyword)
-                        
-                        agent_entity = Entity(
-                            name=normalized_keyword,
-                            type=node_type,
-                            confidence=0.6
-                        )
-                        entities.append(agent_entity)
-                        
-                        relation = Relation(
-                            subject=normalized_keyword,
-                            predicate=RelationType.HAS_SIGNAL,
-                            object=issue_entity.name,
-                            date=date_str,
-                            source=str(file_path),
-                            properties={
-                                "weight": issue_entity.properties['time_decay_weight']
-                            }
-                        )
-                        relations.append(relation)
-            else:
-                # LLM 없이: keyword 기반 매핑 (정규화 적용)
-                if keyword:
-                    from src.utils.ticker_mapping import resolve_entity_name, get_node_type
-                    normalized_keyword = resolve_entity_name(keyword)
+            # keyword 기반 관계 생성
+            if keyword:
+                from src.utils.ticker_mapping import resolve_entity_name, get_node_type
+                keywords = [k.strip() for k in keyword.split(',') if k.strip()]
+                
+                for k in keywords:
+                    if self._is_invalid_company_name(k):
+                        continue
+                    normalized_keyword = resolve_entity_name(k)
                     node_type = get_node_type(normalized_keyword)
                     
                     agent_entity = Entity(
@@ -270,14 +318,11 @@ class NewsParserAgent(BaseParserAgent):
                         predicate=RelationType.HAS_SIGNAL,
                         object=issue_entity.name,
                         date=date_str,
-                        source=str(file_path),
-                        properties={
-                            "weight": issue_entity.properties['time_decay_weight']
-                        }
+                        source=title,
+                        properties={"weight": issue_entity.properties['time_decay_weight']}
                     )
                     relations.append(relation)
         
-        # Knowledge Graph 생성
         kg = KnowledgeGraph(
             entities=entities,
             relations=relations,
@@ -285,12 +330,12 @@ class NewsParserAgent(BaseParserAgent):
                 "source_file": str(file_path),
                 "file_type": "news_csv",
                 "total_news": len(df),
-                "sampled_news": sample_size,
-                "date_range": f"{df['date'].min().strftime('%Y-%m-%d')} ~ {df['date'].max().strftime('%Y-%m-%d')}"
+                "extraction_method": "manual_fallback"
             }
         )
         
         return kg
+
     
     def _calculate_time_decay(self, event_date: str) -> float:
         """
@@ -394,9 +439,13 @@ class NewsParserAgent(BaseParserAgent):
             if hasattr(first_item, 'text'):
                 return first_item.text.strip()
             
-            # dict에서 text 키 추출
-            if isinstance(first_item, dict) and 'text' in first_item:
-                return first_item['text'].strip()
+            # dict에서 text 키 추출 (LangChain 형식)
+            if isinstance(first_item, dict):
+                if 'text' in first_item:
+                    return first_item['text'].strip()
+                # type이 'text'인 경우의 text 값 추출
+                if first_item.get('type') == 'text' and 'text' in first_item:
+                    return first_item['text'].strip()
             
             # 문자열인 경우
             if isinstance(first_item, str):
@@ -414,30 +463,41 @@ class NewsParserAgent(BaseParserAgent):
             if match:
                 return match.group(1).strip()
             
-            return ""
+            # 최후의 수단: 전체 문자열 반환
+            self.logger.debug(f"Could not extract text from list item: {type(first_item)} - {text_str[:100]}")
+            return text_str
         
         # dict인 경우
         if isinstance(content, dict):
-            return content.get('text', str(content)).strip()
+            if 'text' in content:
+                return content['text'].strip()
+            return str(content).strip()
         
-        # 객체인 경우
+        # 객체인 경우 (AIMessage 등)
         if hasattr(content, 'text'):
             return content.text.strip()
+        
+        # 문자열인 경우 그대로 반환
+        if isinstance(content, str):
+            return content.strip()
         
         return str(content).strip()
     
     def _is_invalid_company_name(self, name: str) -> bool:
         """
-        잘못된 회사명 필터링 (파싱 오류 결과물)
+        잘못된 회사명 필터링 (파싱 오류 결과물 및 불용어)
         """
         invalid_patterns = [
-            "'text':",
-            "text:",
-            "{",
-            "}",
-            "[",
-            "]",
+            "'text':", "text:", "{", "}", "[", "]", ":", 
+            "있습니다", "하는", "했다", "라며", "대로", "부터", "까지",
+            "라는", "보다", "위한", "통해", "대한", "전년", "대기", "이상"
         ]
+        
+        # 특수문자만 있거나 너무 긴 경우 (문장 오인)
+        import re
+        if len(name) > 20 and ' ' in name:
+            return True
+            
         return any(pattern in name for pattern in invalid_patterns) or len(name) < 2
     
     def _extract_affected_entities(
@@ -489,20 +549,58 @@ class NewsParserAgent(BaseParserAgent):
             
             response = self.llm.invoke(prompt)
             
-            # LLM 응답에서 텍스트 추출 (다양한 형태 처리)
+            # LLM 응답에서 텍스트 추출
             extracted_text = self._extract_text_from_response(response.content)
             
-            # 쉼표로 분리 및 정규화
-            companies = [
-                c.strip()
-                for c in extracted_text.split(',')
-                if c.strip() and not self._is_invalid_company_name(c.strip())
-            ][:3]  # 최대 3개
+            # 디버그: LLM 응답 원본 로깅
+            self.logger.debug(f"LLM raw response type: {type(response.content)}")
+            self.logger.debug(f"Extracted text (first 200 chars): {extracted_text[:200] if extracted_text else 'EMPTY'}")
             
-            self.logger.debug(f"LLM extracted: {companies}")
+            # JSON 파싱 시도 (v3.3: 디버깅 강화)
+            import json
+            import re
             
-            return companies if companies else [keyword]
+            companies = []
+            
+            # 0. 마크다운 코드블록 제거 (```json ... ``` 형태)
+            cleaned_text = re.sub(r'```(?:json)?\s*', '', extracted_text)
+            cleaned_text = re.sub(r'```', '', cleaned_text)
+            cleaned_text = cleaned_text.strip()
+            
+            # 1. JSON 형태인 경우 ({ "entities": [...] } 또는 [ "A", "B" ])
+            json_match = re.search(r'(\{[^{}]*"(?:entities|affected_entities)"[^{}]*\}|\[[^\[\]]*\])', cleaned_text, re.DOTALL)
+            if json_match:
+                try:
+                    data = json.loads(json_match.group(0))
+                    if isinstance(data, dict):
+                        if 'entities' in data:
+                            companies = [str(e) for e in data['entities']]
+                        elif 'affected_entities' in data:
+                            companies = [str(e) for e in data['affected_entities']]
+                    elif isinstance(data, list):
+                        companies = [str(e) for e in data]
+                    self.logger.debug(f"JSON parsed companies: {companies}")
+                except json.JSONDecodeError as e:
+                    self.logger.debug(f"JSON parse failed: {e}")
+            
+            # 2. JSON 파싱 실패 시 쉼표 기반 분리
+            if not companies:
+                clean_text = re.sub(r'[\"\'\[\]\{\}]', '', cleaned_text)
+                companies = [c.strip() for c in clean_text.split(',') if c.strip()]
+                self.logger.debug(f"Comma-split companies: {companies}")
+            
+            # 3. 유효성 검사 및 정제 (불용어 필터링)
+            valid_companies = [
+                c for c in companies 
+                if not self._is_invalid_company_name(c)
+            ][:3]
+            
+            self.logger.debug(f"Final valid companies: {valid_companies}")
+            
+            # 4. 결과 반환 (keyword 폴백 없음)
+            return valid_companies
             
         except Exception as e:
             self.logger.error(f"LLM extraction error: {str(e)}")
-            return [keyword] if keyword else []
+            # 예외 시에도 빈 리스트 반환 (keyword 폴백 제거)
+            return []

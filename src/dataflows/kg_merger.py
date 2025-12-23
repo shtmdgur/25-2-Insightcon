@@ -43,8 +43,21 @@ class KGMerger:
             try:
                 # 엔티티 병합 (정규화된 이름 기준)
                 for entity in kg.entities:
-                    # EntityMatcher로 정규화
+                    # EntityMatcher로 이름 및 타입 정규화
                     normalized_name = self.entity_matcher.match(entity.name)
+                    
+                    # v3.1: 마스터 데이터가 있으면 타입을 강제로 교정하여 병합 키 일치시킴
+                    entity_info = self.entity_matcher.get_entity_info(normalized_name)
+                    if entity_info and entity_info.get('type'):
+                        from ..models.nodes import NodeType
+                        try:
+                            master_type = NodeType(entity_info['type'])
+                            if entity.type != master_type:
+                                logger.debug(f"Merger corrected type: {normalized_name} {entity.type} -> {master_type}")
+                                entity.type = master_type
+                        except ValueError:
+                            pass
+
                     key = (normalized_name, entity.type)
                     
                     if key in all_entities:
@@ -60,6 +73,7 @@ class KGMerger:
                         # 새 엔티티 추가 (정규화된 이름으로)
                         entity.name = normalized_name
                         all_entities[key] = entity
+
                 
                 # 관계 병합 (정규화된 subject/object 기준)
                 for relation in kg.relations:

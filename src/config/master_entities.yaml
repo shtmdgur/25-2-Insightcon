@@ -13,11 +13,20 @@ korean_idm:
     type: IDM
     ticker: "005930"
     aliases:
-      - 삼성
       - 삼전
       - Samsung
       - Samsung Electronics
       - 삼성전자주식회사
+      - 삼성전자(주)
+      - 삼성 전자
+      - 삼성
+      - SamsungElectronics
+      - 삼성전자 우
+      - 삼성반도체
+      - 삼성메모리
+      - 삼성파운드리사업부
+      - 삼성 DS
+      - Samsung DS
 
   - name: SK하이닉스
     type: IDM
@@ -28,6 +37,14 @@ korean_idm:
       - SK 하이닉스
       - SK하이
       - 하이닉스반도체
+      - 에스케이하이닉스
+      - 에스케이하이닉스주식회사
+      - 에스케이하이닉스(주)
+      - SK Hynix Inc.
+      - SKHynix
+      - SK 하이닉스(주)
+      - SK하이닉스(주)
+      - 에스케이 하이닉스
 
 korean_foundry:
   - name: 삼성파운드리
@@ -35,6 +52,8 @@ korean_foundry:
     aliases:
       - Samsung Foundry
       - 삼성 파운드리
+      - 삼성전자 파운드리
+      - Samsung Foundry Business
 
 korean_fabless:
   - name: DB하이텍
@@ -44,6 +63,13 @@ korean_fabless:
       - 디비하이텍
       - DB하이
       - 디비하이
+      - 주식회사디비하이텍
+      - 주식회사 디비하이텍
+      - 디비하이텍(주)
+      - DB하이텍(주)
+      - DB Hitek
+      - 주식회사 DB하이텍
+      - DBHiTek
 
 # === 미국 기업 ===
 us_idm:
@@ -54,6 +80,8 @@ us_idm:
       - Intel
       - 인텔
       - 인텔코리아
+      - INTC
+      - Intel Corp
 
   - name: Micron Technology
     type: IDM
@@ -62,6 +90,18 @@ us_idm:
       - Micron
       - 마이크론
       - 마이크론테크놀로지
+      - Micron Tech
+      - MU
+      - 마이크론 테크놀로지
+
+  - name: Western Digital
+    type: IDM
+    ticker: WDC
+    aliases:
+      - WD
+      - 웨스턴디지털
+      - 웨스턴 디지털
+      - WDC
 
 us_fabless:
   - name: NVIDIA Corporation
@@ -72,6 +112,9 @@ us_fabless:
       - Nvidia
       - 엔비디아
       - 엔비디아코리아
+      - NVDA
+      - 엔비디아 코리아
+      - NVidia
 
   - name: Advanced Micro Devices
     type: FABLESS
@@ -80,6 +123,7 @@ us_fabless:
       - AMD
       - Amd
       - 에이엠디
+      - 어드밴스드마이크로디바이스
 
   - name: Qualcomm
     type: FABLESS
@@ -88,6 +132,7 @@ us_fabless:
       - 퀄컴
       - 퀄컴코리아
       - QCOM
+      - Qualcomm Inc
 
   - name: Broadcom
     type: FABLESS
@@ -95,6 +140,7 @@ us_fabless:
     aliases:
       - 브로드컴
       - AVGO
+      - Broadcom Inc
 
   - name: Apple
     type: FABLESS
@@ -102,6 +148,22 @@ us_fabless:
     aliases:
       - 애플
       - Apple Inc
+      - AAPL
+
+  - name: Marvell Technology
+    type: FABLESS
+    ticker: MRVL
+    aliases:
+      - Marvell
+      - 마벨
+      - MRVL
+
+  - name: MediaTek
+    type: FABLESS
+    ticker: "2454.TW"
+    aliases:
+      - 미디어텍
+      - MediaTek Inc
 
 # === 대만/아시아 기업 ===
 taiwan_foundry:
@@ -115,6 +177,8 @@ taiwan_foundry:
       - 타이완세미컨덕터
       - TSMC홀딩스
       - 台積電
+      - Taiwan Semiconductor Manufacturing
+      - TSM
 
   - name: United Microelectronics
     type: FOUNDRY
@@ -122,6 +186,7 @@ taiwan_foundry:
     aliases:
       - UMC
       - 유엠씨
+      - 대만UMC
 
 japan_memory:
   - name: Kioxia
@@ -133,14 +198,6 @@ japan_memory:
       - 도시바메모리
       - Toshiba Memory
 
-  - name: Western Digital
-    type: IDM
-    ticker: WDC
-    aliases:
-      - WD
-      - 웨스턴디지털
-      - 웨스턴 디지털
-
 taiwan_memory:
   - name: Nanya Technology
     type: IDM
@@ -148,6 +205,8 @@ taiwan_memory:
       - Nanya
       - 난야
       - 난야테크
+      - 난야테크놀로지
+      - Nanya Tech
 
 # === 장비/소재 기업 ===
 equipment:
@@ -158,6 +217,7 @@ equipment:
       - ASML
       - 에이에스엠엘
       - ASML Holdings
+      - ASML Holding NV
 
   - name: Applied Materials
     type: SUPPLIER
@@ -167,6 +227,7 @@ equipment:
       - 어플라이드머티리얼즈
       - AMAT
       - Applied
+      - 어플라이드 머티리얼즈
 
   - name: Lam Research
     type: SUPPLIER
@@ -175,6 +236,7 @@ equipment:
       - 램리서치
       - LRCX
       - Lam
+      - 램 리서치
 
   - name: Tokyo Electron
     type: SUPPLIER
@@ -183,6 +245,7 @@ equipment:
       - TEL
       - 도쿄일렉트론
       - 東京エレクトロン
+      - Tokyo Electron Limited
 
   - name: Texas Instruments
     type: SUPPLIER
@@ -190,6 +253,8 @@ equipment:
     aliases:
       - 텍사스인스트루먼트
       - 텍사스 인스트루먼트
+      - TXN
+      - TI
 
   - name: 한미반도체
     type: SUPPLIER
@@ -198,6 +263,59 @@ equipment:
       - Hanmi Semiconductor
       - Hanmi
       - Hanmi Semi
+      - 한미반도체(주)
+      - 한미반도체주식회사
+      - 한미
+      - HanmiSemi
+
+  - name: 원익IPS
+    type: SUPPLIER
+    ticker: "240810"
+    aliases:
+      - 원익아이피에스
+      - 원익IPS(주)
+      - Wonik IPS
+      - 원익
+
+  - name: 동진쎄미켐
+    type: SUPPLIER
+    ticker: "005290"
+    aliases:
+      - 동진쎄미켐(주)
+      - 동진
+      - Dongjin Semichem
+
+  - name: 리노공업
+    type: SUPPLIER
+    ticker: "058470"
+    aliases:
+      - 리노공업(주)
+      - LEENO Industrial
+      - 리노
+
+  - name: 피에스케이
+    type: SUPPLIER
+    ticker: "319660"
+    aliases:
+      - PSK
+      - PSK Inc
+      - 피에스케이(주)
+
+  - name: 테스
+    type: SUPPLIER
+    ticker: "095610"
+    aliases:
+      - TES
+      - 테스(주)
+      - TES Co
+
+  - name: 주성엔지니어링
+    type: SUPPLIER
+    ticker: "036930"
+    aliases:
+      - 주성
+      - Jusung Engineering
+      - 주성엔지니어링(주)
 
 # === 경제 지표 ===
 indicators:
@@ -208,6 +326,7 @@ indicators:
       - 달러 환율
       - 원/달러
       - USD/KRW 환율
+      - 환율
 
   - name: 10-Year Treasury Yield
     type: ECONOMIC_INDICATOR
@@ -215,6 +334,7 @@ indicators:
       - 미국 10년물 국채 금리
       - 10년물 금리
       - US10Y
+      - 미 국채금리
 
   - name: PHLX Semiconductor Sector
     type: ECONOMIC_INDICATOR
@@ -223,6 +343,7 @@ indicators:
       - 필라델피아 반도체 지수
       - 반도체지수
       - Philadelphia Semiconductor Index
+      - SOX지수
 
   - name: Federal Funds Rate
     type: ECONOMIC_INDICATOR
@@ -231,6 +352,90 @@ indicators:
       - 미국 기준금리
       - Fed Funds Rate
       - FFR
+      - 기준금리
+
+  - name: DRAM 현물가격
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - DRAM 스팟가격
+      - DRAM 현물가
+      - DRAM Spot
+      - DRAM가격
+
+  - name: DRAM 고정가격
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - DRAM 계약가
+      - DRAM 고정거래가격
+      - DRAM Contract Price
+
+  - name: NAND 현물가격
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - NAND 스팟가격
+      - NAND 현물가
+      - NAND Spot
+
+  - name: HBM
+    type: ECONOMIC_INDICATOR
+    aliases:
+      - 고대역폭메모리
+      - High Bandwidth Memory
+      - HBM3
+      - HBM3E
+      - HBM4
+
+# === 반도체 외 기업 (ETC) ===
+etc_companies:
+  - name: 현대자동차
+    type: ETC
+    ticker: "005380"
+    aliases:
+      - 현대차
+      - Hyundai
+      - Hyundai Motor
+      - 현대자동차(주)
+      - 현대모터
+
+  - name: LG에너지솔루션
+    type: ETC
+    ticker: "373220"
+    aliases:
+      - LG에너지
+      - LGES
+      - LG Energy Solution
+      - 엘지에너지솔루션
+
+  - name: 테슬라
+    type: ETC
+    ticker: TSLA
+    aliases:
+      - Tesla
+      - Tesla Inc
+      - 테슬라모터스
+
+  - name: 삼성SDI
+    type: ETC
+    ticker: "006400"
+    aliases:
+      - SDI
+      - 삼성에스디아이
+      - Samsung SDI
+
+  - name: SK온
+    type: ETC
+    aliases:
+      - SK On
+      - SKon
+      - 에스케이온
+
+  - name: 폭스콘
+    type: ETC
+    aliases:
+      - Foxconn
+      - 훙하이
+      - Hon Hai
+      - 鴻海
 
 # === Fuzzy Matching 설정 ===
 matching_config:

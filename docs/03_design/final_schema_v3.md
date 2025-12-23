@@ -1,6 +1,6 @@
-# 최종 스키마 v3.0
+# 최종 스키마 v3.1
 
-> **결정 사항**: 사용자 피드백 7개 항목 반영
+> **결정 사항**: 사용자 피드백 8개 항목 반영 (ETC 타입 추가 및 정규화 강화)
 
 ---
 
@@ -14,11 +14,11 @@
 
 3. **properties 확장 가능**: 정의된 properties 외에도 문서에서 발견한 추가 정보는 `properties: {}` 딕셔너리에 자유롭게 추가합니다.
 
-4. **타입 매핑 유연성**: 정확한 타입이 불분명할 경우 가장 가까운 타입을 선택하거나 `Organization`/`Issue`를 사용합니다.
+4. **타입 매핑 유연성**: 정확한 타입이 불분명할 경우 가장 가까운 타입을 선택하거나 `Organization`/`ETC`/`Issue`를 사용합니다.
 
 ---
 
-## 1. NodeType (11개)
+## 1. NodeType (12개)
 
 ### Agent Layer (정적)
 | Type | 설명 | 예시 (참고용) |
@@ -28,7 +28,8 @@
 | `Foundry` | 파운드리 | TSMC, DB하이텍 |
 | `OSAT` ✨ | 후공정 | ASE, Amkor, 하나마이크론 |
 | `Supplier` | 소부장 | ASML, 동진쎄미켐, 한미반도체 |
-| `Organization` | 기타 조직 | 정부기관, 협회, 기타 |
+| `Organization` | 기타 조직 | 정부기관(산자부), 협회(SEMI), 연구소 |
+| `ETC` ✨ | 반도체 외 기업 | 현대차, LG에너지솔루션, 테슬라 등 |
 
 ### Signal Layer (동적)
 | Type | 설명 | 추출 조건 (참고용) |
@@ -219,9 +220,10 @@
 
 ## 변경 요약
 
-| 항목 | 기존 | 최종 |
-|------|------|------|
-| NodeType | 13개 | **11개** (-News, -Report) |
-| RelationType | 5개 | **8개** (+COMPETES_WITH, +PARTNERS_WITH, +INVESTS_IN) |
-| Entity Props | 다수 | **정리됨** (Issue 자유형식) |
-| Relation Props | 다수 | **간소화** (impact 통합, lag 자유형식) |
+| 항목 | 기존 (v2.0) | v3.0 | v3.1 (최종) |
+|------|------|------|------|
+| NodeType | 13개 | 11개 | **12개** (+ETC) |
+| RelationType | 5개 | 8개 | **8개** |
+| Entity Props | 다수 | 정리됨 | **정교화** (ETC 지원) |
+| 정규화 전략 | 휴리스틱 | Matcher | **강제 교정** (타입 정정 포함) |
+
