@@ -3,8 +3,21 @@ import json
 from pathlib import Path
 from collections import Counter
 
+import sys
+
 # JSON 로드
-kg_path = Path("data/merged_kg_20251224_0149.json")
+if len(sys.argv) > 1:
+    kg_path = Path(sys.argv[1])
+else:
+    # 폴백: 최신 파일 자동 검색
+    processed_dir = Path("data/processed")
+    files = sorted(processed_dir.glob("merged_kg_*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
+    if not files:
+        print("❌ No merged KG files found in data/processed/")
+        sys.exit(1)
+    kg_path = files[0]
+
+print(f"🔍 Analyzing: {kg_path}")
 with open(kg_path, 'r', encoding='utf-8') as f:
     data = json.load(f)
 
@@ -31,12 +44,12 @@ for t, count in relation_types.most_common():
     print(f"  - {t}: {count}개")
 
 # 샘플 엔티티 (Agent Layer)
-print("\n📌 Agent Layer 샘플 (IDM/Fabless/Foundry/Supplier):")
-agent_types = ['IDM', 'Fabless', 'Foundry', 'Supplier', 'OSAT']
+print("\n📌 Agent Layer 샘플 (IDM/Fabless/Foundry/Supplier/OSAT/ETC):")
+agent_types = ['IDM', 'Fabless', 'Foundry', 'Supplier', 'OSAT', 'ETC']
 for e in entities:
     if e['type'] in agent_types:
-        normalized = e.get('properties', {}).get('_normalized', False)
-        print(f"  - {e['name']} ({e['type']}) {'✅ 정규화됨' if normalized else ''}")
+        # v3.1: 마스터 데이터 정규화 여부 확인 속성이 다를 수 있으므로 일반 출력
+        print(f"  - {e['name']} ({e['type']})")
 
 # 샘플 관계 (HAS_SIGNAL)
 print("\n🔗 HAS_SIGNAL 관계 샘플:")

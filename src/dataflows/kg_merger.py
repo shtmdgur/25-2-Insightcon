@@ -68,7 +68,7 @@ class KGMerger:
                             if v is not None:
                                 existing.properties[k] = v
                         # confidence 최대값
-                        existing.confidence = max(existing.confidence, entity.confidence)
+                        existing.confidence = max(existing.confidence or 0.0, entity.confidence or 0.0)
                     else:
                         # 새 엔티티 추가 (정규화된 이름으로)
                         entity.name = normalized_name
@@ -85,8 +85,8 @@ class KGMerger:
                     if key in all_relations:
                         # 기존 관계와 병합
                         existing = all_relations[key]
-                        # weight 최대값
-                        existing.weight = max(existing.weight, relation.weight)
+                        # confidence 최대값 (v3.1: weight 대신 confidence 사용)
+                        existing.confidence = max(existing.confidence or 0.0, relation.confidence or 0.0)
                         # source 병합
                         if relation.source and existing.source != relation.source:
                             existing.source = f"{existing.source}, {relation.source}"

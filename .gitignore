@@ -57,6 +57,10 @@ data/processed/*
 !data/processed/.gitkeep
 data/onthology/*
 !data/onthology/.gitkeep
+data/master/*
+!data/master/.gitkeep
+data/preprocessed/*
+!data/preprocessed/.gitkeep
 
 # ============================================
 # Ontology Files (큰 파일은 LFS 사용 고려)
@@ -139,3 +143,13 @@ logs/
 .dmypy.json
 dmypy.json
 .ruff_cache/data/
+
+# ============================================
+# Temporary Test Scripts
+# ============================================
+verify_guardrails*.py
+verify_normalization_v3_1.py
+test_perfect_check.py
+sh_hybrid_*.py
+sh_hybrid_nodes.py
+sh_hybrid_kg_merger.py

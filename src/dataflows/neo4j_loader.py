@@ -57,7 +57,7 @@ class Neo4jKGLoader:
         with self.driver.session() as session:
             try:
                 # 모든 노드 타입에 대해 name 인덱스 생성
-                node_types = ["IDM", "Fabless", "Foundry", "OSAT", "Supplier", "Organization",
+                node_types = ["IDM", "Fabless", "Foundry", "OSAT", "Supplier", "Organization", "ETC",
                              "Earnings", "PriceMovement", "Disclosure", "Issue", "EconomicIndicator"]
                 
                 for node_type in node_types:
