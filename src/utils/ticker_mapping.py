@@ -202,23 +202,38 @@ def get_node_type(company_name: str) -> NodeType:
         company_name: 회사명 (예: "삼성전자", "NVIDIA Corporation")
     
     Returns:
-        NodeType (IDM/FABLESS/FOUNDRY/SUPPLIER/ECONOMIC_INDICATOR)
+        NodeType (IDM/FABLESS/FOUNDRY/SUPPLIER/OSAT/ETC/ORGANIZATION)
     """
-    # 정확한 매칭
+    from src.utils.entity_matcher import get_entity_matcher
+    matcher = get_entity_matcher()
+    
+    # 1. EntityMatcher (master_entities.yaml) 우선 시도
+    entity_info = matcher.get_entity_info(company_name)
+    if entity_info and entity_info.get('type'):
+        try:
+            return NodeType(entity_info['type'])
+        except ValueError:
+            pass
+
+    # 2. 정확한 매칭 (Legacy)
     if company_name in COMPANY_TO_NODE_TYPE:
         return COMPANY_TO_NODE_TYPE[company_name]
     
-    # 부분 매칭 (Fallback)
+    # 3. 부분 매칭 (Fallback)
     company_lower = company_name.lower()
     
-    if any(keyword in company_lower for keyword in ["nvidia", "amd", "qualcomm", "broadcom"]):
+    if any(keyword in company_lower for keyword in ["nvidia", "amd", "qualcomm", "broadcom", "marvell", "mediatek"]):
         return NodeType.FABLESS
-    elif "tsmc" in company_lower or "taiwan semi" in company_lower:
+    elif any(keyword in company_lower for keyword in ["tsmc", "umc", "smic", "foundry"]):
         return NodeType.FOUNDRY
-    elif any(keyword in company_lower for keyword in ["asml", "applied", "lam research"]):
+    elif any(keyword in company_lower for keyword in ["asml", "applied", "lam research", "tokyo electron", "한미반도체", "원익", "동진"]):
         return NodeType.SUPPLIER
-    elif any(keyword in company_lower for keyword in ["삼성", "samsung", "sk", "intel", "micron", "texas"]):
+    elif any(keyword in company_lower for keyword in ["ase", "amkor", "jcet", "하나마이크론", "에스에프에이"]):
+        return NodeType.OSAT
+    elif any(keyword in company_lower for keyword in ["삼성", "samsung", "sk", "intel", "micron", "texas", "kioxia", "nanya"]):
         return NodeType.IDM
+    elif any(keyword in company_lower for keyword in ["현대", "hyundai", "lg", "테슬라", "tesla", "폭스콘", "foxconn"]):
+        return NodeType.ETC
     
     # 기본값
     return NodeType.ORGANIZATION

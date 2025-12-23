@@ -155,11 +155,20 @@ class FundParserAgent(BaseParserAgent):
             if not ticker:
                 continue
             
-            # 회사명 결정 (shortName 우선, 없으면 ticker→회사명 매핑)
-            company_name = short_name if short_name else get_company_name(ticker)
+            # 회사명 정규화 (v3.1)
+            normalized_name = self.entity_matcher.match(short_name if short_name else get_company_name(ticker))
             
-            # NodeType 자동 분류
-            node_type = get_node_type(company_name)
+            # NodeType 자동 분류 - EntityMatcher 정보 우선
+            entity_info = self.entity_matcher.get_entity_info(normalized_name)
+            if entity_info and entity_info.get('type'):
+                try:
+                    node_type = NodeType(entity_info['type'])
+                except ValueError:
+                    node_type = get_node_type(normalized_name)
+            else:
+                node_type = get_node_type(normalized_name)
+            
+            company_name = normalized_name
             
             # 옵션 A: Company 노드 속성 업데이트 (정적 KG) - Hybrid KG 권장
             if not self.save_as_snapshot:

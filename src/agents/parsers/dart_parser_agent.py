@@ -13,7 +13,7 @@ from datetime import datetime
 
 from .base_parser_agent import BaseParserAgent
 from src.models.nodes import KnowledgeGraph, Entity, Relation, NodeType, RelationType
-from src.dataflows.entity_normalizer import get_entity_normalizer
+from src.utils.entity_matcher import EntityMatcher  # v3.1: EntityNormalizer 대신 사용
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class DARTParserAgent(BaseParserAgent):
         """
         super().__init__(name="DARTParserAgent")
         self.dart_dir = dart_dir
-        self.normalizer = get_entity_normalizer()
+        self.normalizer = EntityMatcher()  # v3.1: 공통 EntityMatcher 사용
     
     def parse(self, file_path: Path) -> KnowledgeGraph:
         """
@@ -190,13 +190,24 @@ class DARTParserAgent(BaseParserAgent):
             if not corp_name:
                 continue
             
-            normalized_name_dict = self.normalizer.normalize_entity(corp_name)
-            normalized_name = normalized_name_dict["canonical_name"]
+            normalized_name = self.normalizer.match(corp_name)
+
             
-            # ticker_mapping으로 NodeType 결정
-            from src.utils.ticker_mapping import get_node_type, normalize_company_name
-            clean_name = normalize_company_name(corp_name)
-            node_type = get_node_type(clean_name)
+            # ✅ 수정 v2: master_entities.yaml 기반 타입 결정 (정규화와 동일 소스)
+            entity_info = self.normalizer.get_entity_info(corp_name)
+            if entity_info and entity_info.get('type'):
+                # master_entities.yaml에서 타입 가져오기
+                from src.models.nodes import NodeType
+                try:
+                    node_type = NodeType(entity_info['type'])
+                except ValueError:
+                    # 타입 문자열이 Enum에 없으면 폴백
+                    from src.utils.ticker_mapping import get_node_type
+                    node_type = get_node_type(normalized_name)
+            else:
+                # 매칭 실패 시 ticker_mapping 폴백
+                from src.utils.ticker_mapping import get_node_type
+                node_type = get_node_type(normalized_name)
             
             entity = Entity(
                 name=normalized_name,
@@ -211,6 +222,7 @@ class DARTParserAgent(BaseParserAgent):
                 confidence=1.0
             )
             entities.append(entity)
+
         
         return entities
     
@@ -235,8 +247,8 @@ class DARTParserAgent(BaseParserAgent):
                 ticker = str(row.get('ticker', '')).strip().zfill(6)
                 corp_name = str(row.get('corp_name', '')).strip()
                 if ticker and corp_name:
-                    norm_res = self.normalizer.normalize_entity(corp_name)
-                    ticker_map[ticker] = norm_res["canonical_name"]
+                    normalized_name = self.normalizer.match(corp_name)
+                    ticker_map[ticker] = normalized_name
         
         for idx, row in disclosure_df.iterrows():
             ticker = str(row.get('ticker', '')).strip().zfill(6)
@@ -265,7 +277,15 @@ class DARTParserAgent(BaseParserAgent):
             )
             entities.append(signal_entity)
             
-            company_name = ticker_map.get(ticker, ticker)
+            # ✅ 수정: ticker_map에 없더라도 최소한 corp_name으로부터 정규화 시도
+            corp_name = str(row.get('corp_name', '')).strip()
+            if ticker in ticker_map:
+                company_name = ticker_map[ticker]
+            elif corp_name:
+                company_name = self.normalizer.match(corp_name)
+            else:
+                company_name = ticker # 최후의 수단
+                
             relation = Relation(
                 subject=company_name,
                 predicate=RelationType.HAS_SIGNAL,
@@ -310,8 +330,8 @@ class DARTParserAgent(BaseParserAgent):
                 corp_code = str(row.get('corp_code', '')).strip().zfill(8)
                 corp_name = str(row.get('corp_name', '')).strip()
                 if corp_code and corp_name:
-                    norm_res = self.normalizer.normalize_entity(corp_name)
-                    corp_code_map[corp_code] = norm_res["canonical_name"]
+                    normalized_name = self.normalizer.match(corp_name)
+                    corp_code_map[corp_code] = normalized_name
         
         for idx, row in financial_df.iterrows():
             # corp_code를 8자리 문자열로 정규화 (leading zero 보존)
@@ -364,7 +384,16 @@ class DARTParserAgent(BaseParserAgent):
             )
             entities.append(metric_entity)
             
-            company_name = corp_code_map.get(corp_code, corp_code)
+            # ✅ 수정: corp_code_map에 없더라도 최소한 corp_name으로부터 정규화 시도
+            corp_name = str(row.get('corp_name', '')).strip()
+            
+            if corp_code in corp_code_map:
+                company_name = corp_code_map[corp_code]
+            elif corp_name:
+                company_name = self.normalizer.match(corp_name)
+            else:
+                company_name = corp_code # 최후의 수단
+                
             relation = Relation(
                 subject=company_name,
                 predicate=RelationType.HAS_SIGNAL,

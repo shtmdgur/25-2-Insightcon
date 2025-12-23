@@ -43,8 +43,21 @@ class KGMerger:
             try:
                 # 엔티티 병합 (정규화된 이름 기준)
                 for entity in kg.entities:
-                    # EntityMatcher로 정규화
+                    # EntityMatcher로 이름 및 타입 정규화
                     normalized_name = self.entity_matcher.match(entity.name)
+                    
+                    # v3.1: 마스터 데이터가 있으면 타입을 강제로 교정하여 병합 키 일치시킴
+                    entity_info = self.entity_matcher.get_entity_info(normalized_name)
+                    if entity_info and entity_info.get('type'):
+                        from ..models.nodes import NodeType
+                        try:
+                            master_type = NodeType(entity_info['type'])
+                            if entity.type != master_type:
+                                logger.debug(f"Merger corrected type: {normalized_name} {entity.type} -> {master_type}")
+                                entity.type = master_type
+                        except ValueError:
+                            pass
+
                     key = (normalized_name, entity.type)
                     
                     if key in all_entities:
@@ -55,11 +68,12 @@ class KGMerger:
                             if v is not None:
                                 existing.properties[k] = v
                         # confidence 최대값
-                        existing.confidence = max(existing.confidence, entity.confidence)
+                        existing.confidence = max(existing.confidence or 0.0, entity.confidence or 0.0)
                     else:
                         # 새 엔티티 추가 (정규화된 이름으로)
                         entity.name = normalized_name
                         all_entities[key] = entity
+
                 
                 # 관계 병합 (정규화된 subject/object 기준)
                 for relation in kg.relations:
@@ -71,8 +85,8 @@ class KGMerger:
                     if key in all_relations:
                         # 기존 관계와 병합
                         existing = all_relations[key]
-                        # weight 최대값
-                        existing.weight = max(existing.weight, relation.weight)
+                        # confidence 최대값 (v3.1: weight 대신 confidence 사용)
+                        existing.confidence = max(existing.confidence or 0.0, relation.confidence or 0.0)
                         # source 병합
                         if relation.source and existing.source != relation.source:
                             existing.source = f"{existing.source}, {relation.source}"

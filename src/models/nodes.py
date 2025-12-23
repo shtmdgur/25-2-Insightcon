@@ -9,14 +9,15 @@ from enum import Enum
 
 
 class NodeType(str, Enum):
-    """허용된 노드 타입 (Hybrid KG Architecture v3.0)"""
+    """허용된 노드 타입 (Hybrid KG Architecture v3.1)"""
     # Agent Layer (정적)
     IDM = "IDM"
     FABLESS = "Fabless"
     FOUNDRY = "Foundry"
     OSAT = "OSAT"  # ✨ 신규: 후공정 (ASE, Amkor, 하나마이크론)
     SUPPLIER = "Supplier"
-    ORGANIZATION = "Organization"
+    ORGANIZATION = "Organization"  # 정부기관, 협회 전용
+    ETC = "ETC"  # ✨ v3.1: 반도체 외 기업 (현대차, LG에너지솔루션 등)
     
     # Signal Layer (동적)
     EARNINGS = "Earnings"
