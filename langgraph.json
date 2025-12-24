@@ -1,0 +1,11 @@
+{
+    "name": "insightcon-debate",
+    "description": "Multi-Agent Debate Workflow for Investment Analysis",
+    "graphs": {
+        "debate": "./src/pipeline/debate_workflow.py:create_debate_workflow_for_studio"
+    },
+    "dependencies": [
+        "."
+    ],
+    "env": ".env"
+}

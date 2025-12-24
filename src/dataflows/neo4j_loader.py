@@ -67,6 +67,54 @@ class Neo4jKGLoader:
                 logger.info("✅ Indexes created/verified for all node types")
             except Exception as e:
                 logger.warning(f"Index creation failed (may already exist): {e}")
+        
+        # Vector Index 생성 (gemini-embedding-001: 768차원)
+        self._ensure_vector_index()
+    
+    def _ensure_vector_index(self):
+        """
+        Neo4j Vector Index 생성 (gemini-embedding-001: 768차원)
+        
+        이 인덱스는 embedding 속성에 대한 벡터 검색을 지원합니다.
+        """
+        with self.driver.session() as session:
+            try:
+                # 모든 노드에 대한 범용 Vector Index 생성 시도
+                # Neo4j 5.x+ 필요
+                vector_query = """
+                    CREATE VECTOR INDEX entity_embedding_index IF NOT EXISTS
+                    FOR (n:Issue)
+                    ON (n.embedding)
+                    OPTIONS {
+                        indexConfig: {
+                            `vector.dimensions`: 768,
+                            `vector.similarity_function`: 'cosine'
+                        }
+                    }
+                """
+                session.run(vector_query)
+                
+                # 주요 노드 타입별 Vector Index 생성
+                for node_type in ["Earnings", "PriceMovement", "Disclosure", "EconomicIndicator"]:
+                    try:
+                        query = f"""
+                            CREATE VECTOR INDEX {node_type.lower()}_embedding_index IF NOT EXISTS
+                            FOR (n:{node_type})
+                            ON (n.embedding)
+                            OPTIONS {{
+                                indexConfig: {{
+                                    `vector.dimensions`: 768,
+                                    `vector.similarity_function`: 'cosine'
+                                }}
+                            }}
+                        """
+                        session.run(query)
+                    except Exception:
+                        pass  # 개별 인덱스 실패는 무시
+                
+                logger.info("✅ Vector indexes created/verified")
+            except Exception as e:
+                logger.warning(f"Vector index creation failed (requires Neo4j 5.x+): {e}")
     
     def close(self):
         """드라이버 종료"""
@@ -130,7 +178,7 @@ class Neo4jKGLoader:
             return stats
 
     def _batch_upsert_static_entities(self, session, node_type: str, entities: List[Entity]):
-        """정적 엔티티 배치 MERGE (null로 기존값 덮어쓰기 방지)"""
+        """정적 엔티티 배치 MERGE (null로 기존값 덮어쓰기 방지, 청킹 적용)"""
         
         query = f"""
         UNWIND $batch as row
@@ -147,7 +195,7 @@ class Neo4jKGLoader:
             n.last_updated = datetime()
         ON MATCH SET n += row.properties
         """
-        batch_data = [
+        all_data = [
             {
                 "name": e.name,
                 "confidence": e.confidence,
@@ -158,14 +206,20 @@ class Neo4jKGLoader:
                 "embedding": e.embedding
             } for e in entities
         ]
-        session.run(query, batch=batch_data)
+        
+        # 청킹 처리: batch_size 단위로 분할 주입
+        for i in range(0, len(all_data), self.batch_size):
+            chunk = all_data[i:i + self.batch_size]
+            session.run(query, batch=chunk)
+            if len(all_data) > self.batch_size:
+                logger.debug(f"Static {node_type}: chunk {i//self.batch_size + 1}/{(len(all_data)-1)//self.batch_size + 1}")
     
     def _filter_null_properties(self, props: dict) -> dict:
         """null 값을 필터링하여 기존 값을 보호"""
         return {k: v for k, v in props.items() if v is not None}
 
     def _batch_create_dynamic_entities(self, session, node_type: str, entities: List[Entity]):
-        """동적 엔티티 배치 MERGE (v3.0: 날짜 기반 갱신)"""
+        """동적 엔티티 배치 MERGE (v3.0: 날짜 기반 갱신, 청킹 적용)"""
         from datetime import datetime as dt
         now = dt.now().isoformat()
         
@@ -189,7 +243,7 @@ class Neo4jKGLoader:
                           THEN row.date ELSE n.data_date END,
             n.last_updated = datetime($now)
         """
-        batch_data = [
+        all_data = [
             {
                 "name": e.name,
                 "date": e.date,
@@ -199,7 +253,13 @@ class Neo4jKGLoader:
                 "embedding": e.embedding
             } for e in entities
         ]
-        session.run(query, batch=batch_data, now=now)
+        
+        # 청킹 처리: batch_size 단위로 분할 주입
+        for i in range(0, len(all_data), self.batch_size):
+            chunk = all_data[i:i + self.batch_size]
+            session.run(query, batch=chunk, now=now)
+            if len(all_data) > self.batch_size:
+                logger.debug(f"Dynamic {node_type}: chunk {i//self.batch_size + 1}/{(len(all_data)-1)//self.batch_size + 1}")
     
     def _build_entity_properties(self, e: Entity) -> dict:
         """엔티티 속성 dict 생성 (null 필터링 옵션 적용)"""
@@ -221,7 +281,7 @@ class Neo4jKGLoader:
         return base_props
 
     def _batch_create_relations(self, session, predicate: str, relations: List[Relation]) -> int:
-        """관계 배치 MERGE (v3.0: 히스토리 누적 + 최신값 저장)"""
+        """관계 배치 MERGE (v3.0: 히스토리 누적 + 최신값 저장, 청킹 적용)"""
         query = f"""
         UNWIND $batch as row
         MATCH (source {{name: row.subject}})
@@ -234,7 +294,7 @@ class Neo4jKGLoader:
         SET r += row.latest_props
         RETURN count(r) as created
         """
-        batch_data = [
+        all_data = [
             {
                 "subject": r.subject,
                 "object": r.object,
@@ -244,21 +304,27 @@ class Neo4jKGLoader:
                 "latest_props": self._build_latest_props(r)
             } for r in relations
         ]
-        result = session.run(query, batch=batch_data)
-        # summary.counters.relationships_created는 MERGE 시 이미 존재하면 0으로 나올 수 있음
-        # 실제 쿼리 결과인 count(r)을 사용
-        created = result.single()["created"]
+        
+        # 청킹 처리: batch_size 단위로 분할 주입
+        total_created = 0
+        for i in range(0, len(all_data), self.batch_size):
+            chunk = all_data[i:i + self.batch_size]
+            result = session.run(query, batch=chunk)
+            created = result.single()["created"]
+            total_created += created
+            if len(all_data) > self.batch_size:
+                logger.debug(f"Relations {predicate}: chunk {i//self.batch_size + 1}/{(len(all_data)-1)//self.batch_size + 1}")
+        
         requested = len(relations)
-        logger.info(f"Created/merged {created}/{requested} {predicate} relationships")
+        logger.info(f"Created/merged {total_created}/{requested} {predicate} relationships")
         
         # MATCH 실패 감지
-        if created < requested:
-            logger.warning(f"⚠️ {requested - created} {predicate} relationships failed - source/target nodes may not exist")
-            # 샘플 출력으로 원인 노드 파악 지원
+        if total_created < requested:
+            logger.warning(f"⚠️ {requested - total_created} {predicate} relationships failed - source/target nodes may not exist")
             if len(relations) > 0:
                 logger.debug(f"Sample subjects: {[r.subject for r in relations[:3]]}")
         
-        return created
+        return total_created
     
     def _build_relation_properties(self, r: Relation) -> dict:
         """관계 속성 dict 생성 (null 필터링 옵션 적용)"""

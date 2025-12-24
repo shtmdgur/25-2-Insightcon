@@ -266,7 +266,7 @@ class KnowledgeGraph(BaseModel):
 RELATION_SCHEMA: Dict[RelationType, Dict[str, List[NodeType]]] = {
     RelationType.AFFECTS: {
         "domain": [NodeType.ECONOMIC_INDICATOR, NodeType.ISSUE, NodeType.EARNINGS, NodeType.DISCLOSURE],
-        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER],
+        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER, NodeType.ETC],
     },
     RelationType.TRIGGERED_BY: {
         "domain": [NodeType.EARNINGS, NodeType.PRICE_MOVEMENT, NodeType.DISCLOSURE, NodeType.ISSUE],
@@ -328,6 +328,7 @@ ENTITY_TYPE_PROPERTIES = {
     NodeType.PRICE_MOVEMENT: ["direction", "magnitude", "is_significant", "trigger"],
     NodeType.DISCLOSURE: ["direction", "sentiment"],
     NodeType.ISSUE: ["description"],
+    NodeType.ETC: ["ticker", "description"],  # v3.1: 반도체 외 기업
 }
 
 # 관계 타입별 의미 있는 속성 정의 (v3.0)

@@ -6,7 +6,7 @@ authors = [
     {name = "shtmdgur",email = "tony34036@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     # PDF 처리 (Phase 0)
     "pymupdf4llm>=0.2.0",  # 최신 레이아웃 처리 기능
@@ -17,7 +17,7 @@ dependencies = [
     "langchain-neo4j>=0.6.0",  # 최신 안정 버전
     
     # 그래프 데이터베이스
-    "neo4j>=5.0.0",
+    "neo4j>=5.24.0",
     "neo4j-graphrag>=1.10.0",  # 최신 스키마 기반 KGC 기능
     
     # 유틸리티
@@ -30,7 +30,8 @@ dependencies = [
     "langchain-google-vertexai>=2.0.0",  # Vertex AI LangChain 통합
     
     # LLM SDK (신규 Google GenAI SDK)
-    "google-genai>=1.0.0",  # google-generativeai 대체 (2025+ 표준)
+    "google-genai>=1.0.0",  # google-genai는 2025+ 표준
+    "google-generativeai>=0.8.0", # 사용자 요청 추가
     "google-cloud-aiplatform>=1.70.0",  # Vertex AI 최신 기능
     
     # Phase 0: CSV 및 데이터 처리
@@ -51,14 +52,22 @@ dependencies = [
     # Phase 2: 에러 핸들링
     "tenacity>=8.2.0",  # Retry 전략
     
-    # Phase 3: PDF Export 및 리포트 생성 (필요시 활성화)
-    # "weasyprint>=60.0",  # Markdown → PDF 변환 (무거운 패키지, Phase 3에서 활성화)
+    # Phase 3: PDF Export 및 리포트 생성
+    "weasyprint>=60.0",  # Markdown → PDF 변환
     "markdown>=3.5",  # Markdown 파싱
     "jinja2>=3.1",  # 템플릿 엔진
     
     # Phase 3: Graph 시각화
     "pyvis>=0.3.2",  # NetworkX 시각화
     "networkx>=3.0",  # 그래프 분석
+    
+    # Phase 4: Web App
+    "streamlit>=1.39.0",  # Streamlit 데모 앱
+    
+    # Phase 5: LangGraph CLI/Studio
+    "langgraph-cli[inmem]>=0.4.0",  # LangGraph 개발 서버
+    "langgraph-api>=0.6.0",  # API 서버
+    "langgraph-sdk>=0.2.0",  # SDK
 ]
 
 [tool.poetry]

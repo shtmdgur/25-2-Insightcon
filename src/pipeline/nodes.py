@@ -394,8 +394,7 @@ def report_generation_node(state: ReportState) -> ReportState:
         
         # 리포트 헤더
         report_parts.append("# 금융 분석 리포트\n")
-        report_parts.append(f"**질의**: {state.get('query', '')}\n")
-        report_parts.append(f"**리포트 타입**: {state.get('report_type', 'sector')}\n\n")
+        report_parts.append(f"**질의**: {state.get('query', '')}\n\n")
         
         # 섹터 분석 추가
         if state.get('sector_analysis'):

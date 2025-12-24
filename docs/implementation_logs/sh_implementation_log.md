@@ -2394,3 +2394,111 @@ TASK_TO_MODEL = {
 ---
 
 **완성도**: KG 스키마 고도화 및 최적화 완료, Schema v3.1 반영 ✅
+
+---
+
+# Phase 7: E2E 파이프라인 고도화 및 서비스 레이어 구축
+
+**날짜**: 2025-12-24 13:00-14:00  
+**작업 시간**: 약 1시간
+
+## 7.1 스키마-코드 정합성 수정 ✅
+
+### 수정 파일 및 내용
+
+| 파일 | 변경 내용 |
+|-----|----------|
+| `src/models/nodes.py` | `RELATION_SCHEMA["AFFECTS"]["range"]`에 `NodeType.ETC` 추가, `ENTITY_TYPE_PROPERTIES`에 `ETC` 타입 추가 |
+| `src/pipeline/state.py` | `ReportState`에 `ticker`, `impact_paths` 필드 추가 (prompts.yaml 호환) |
+
+## 7.2 Vector Search 구현 ✅
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|-----|----------|
+| `src/agents/base_debate_agent.py` | `_vector_search()` 메서드 실제 구현 (placeholder → Gemini embedding + Neo4j Vector Index 쿼리) |
+| `src/dataflows/neo4j_loader.py` | `_ensure_vector_index()` 메서드 추가 (768차원 Vector Index 자동 생성) |
+
+### 임베딩 모델 통일
+- 기존: `text-embedding-004`
+- 변경: `gemini-embedding-001` (768차원 동일, 호환)
+
+**수정 파일**: `pdf_parser_agent.py`, `news_parser_agent.py`, `base_debate_agent.py`
+
+## 7.3 News Parser 임베딩 지원 ✅
+
+**파일**: `src/agents/parsers/news_parser_agent.py`  
+**내용**: `_enrich_with_embeddings()` 메서드 추가. 뉴스 파싱 시 Entity에 임베딩 자동 생성.
+
+## 7.4 PipelineService 레이어 구축 ✅
+
+**신규 파일**: `src/services/pipeline_service.py`, `src/services/__init__.py`
+
+### 핵심 기능
+
+1. **3가지 실행 모드**:
+   - `FULL`: KG 구축 + Debate
+   - `QUERY_ONLY`: 기존 KG로 Debate만
+   - `DOCUMENT_QUERY`: 새 문서 + 기존 KG + Debate
+
+2. **Checkpoint 콜백**:
+   - `MODE_SELECTION`, `TARGET_SELECTION`, `KG_COMPLETE`, `DEBATE_ROUND`, `JUDGE_RESULT`, `FINAL_REPORT`
+   - Streamlit/FastAPI에서 중간 결과 표시 가능
+
+3. **상태 직렬화**:
+   - `save_state()`: 현재 상태 JSON 저장
+   - `load_state()`: 중단된 작업 재개
+
+## 7.5 Streamlit 데모 앱 ✅
+
+**신규 파일**: `app/streamlit_demo.py`
+
+**기능**:
+- 모드 선택 UI (query_only, full, document_query)
+- 타겟 기업 입력
+- PDF 문서 업로드
+- 실시간 진행 상태 표시 (Progress Bar + 체크포인트)
+- 최종 리포트 마크다운 렌더링
+
+## 7.6 E2E 테스트 스크립트 ✅
+
+**신규 파일**: `test/e2e/test_full_pipeline.py`
+
+**사용법**:
+```bash
+# 기본 실행 (삼성전자, 테스트 모드)
+poetry run python test/e2e/test_full_pipeline.py
+
+# KG 구축 스킵 (기존 Neo4j 데이터 사용)
+poetry run python test/e2e/test_full_pipeline.py --skip-kg
+
+# 특정 기업 분석
+poetry run python test/e2e/test_full_pipeline.py --target "SK하이닉스"
+```
+
+---
+
+## Phase 7 생성 파일 (5개)
+
+| 파일 | 설명 |
+|-----|------|
+| `src/services/pipeline_service.py` | PipelineService 클래스 (Streamlit/FastAPI 연동) |
+| `src/services/__init__.py` | 모듈 초기화 |
+| `app/streamlit_demo.py` | Streamlit 데모 앱 |
+| `test/e2e/test_full_pipeline.py` | E2E 통합 테스트 |
+
+## Phase 7 수정 파일 (6개)
+
+| 파일 | 변경 내용 |
+|-----|----------|
+| `src/models/nodes.py` | ETC 타입 스키마 정합성 |
+| `src/pipeline/state.py` | ticker, impact_paths 필드 |
+| `src/agents/base_debate_agent.py` | Vector Search 구현, 모델명 변경 |
+| `src/agents/parsers/pdf_parser_agent.py` | 모델명 변경 |
+| `src/agents/parsers/news_parser_agent.py` | 임베딩 생성 메서드 추가 |
+| `src/dataflows/neo4j_loader.py` | Vector Index 자동 생성 |
+
+---
+
+**완성도**: E2E 파이프라인 전체 구현 완료, Streamlit 연동 가능 ✅

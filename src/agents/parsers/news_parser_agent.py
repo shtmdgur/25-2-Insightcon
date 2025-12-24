@@ -284,6 +284,12 @@ class NewsParserAgent(BaseParserAgent):
                     "title": title[:100]
                 }
                 
+                # Embedding 생성 (gemini-embedding-001)
+                try:
+                    self._enrich_with_embeddings(row_kg)
+                except Exception as emb_e:
+                    self.logger.warning(f"행 {row_idx} embedding 생성 실패: {emb_e}")
+                
                 # 개별 JSON 저장
                 row_kg.save_to_json(str(row_output_file))
                 
@@ -684,7 +690,6 @@ class NewsParserAgent(BaseParserAgent):
             ][:3]
             
             self.logger.debug(f"Final valid companies: {valid_companies}")
-            
             # 4. 결과 반환 (keyword 폴백 없음)
             return valid_companies
             
@@ -692,3 +697,47 @@ class NewsParserAgent(BaseParserAgent):
             self.logger.error(f"LLM extraction error: {str(e)}")
             # 예외 시에도 빈 리스트 반환 (keyword 폴백 제거)
             return []
+    
+    def _enrich_with_embeddings(self, kg: KnowledgeGraph):
+        """
+        KnowledgeGraph의 엔티티에 임베딩 추가 (gemini-embedding-001)
+        
+        Args:
+            kg: Knowledge Graph 객체
+        """
+        import os
+        from google import genai
+        
+        valid_entities = [e for e in kg.entities if e.name and len(e.name.strip()) > 0]
+        if not valid_entities:
+            return
+        
+        try:
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            
+            # 엔티티 이름 + 설명을 결합하여 임베딩 생성
+            texts = []
+            for e in valid_entities:
+                text = e.name
+                if e.description:
+                    text += f": {e.description}"
+                texts.append(text)
+            
+            # Batch 임베딩 (한 번에 최대 100개)
+            batch_size = 100
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                batch_entities = valid_entities[i:i + batch_size]
+                
+                response = client.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=batch_texts
+                )
+                
+                for entity, embedding in zip(batch_entities, response.embeddings):
+                    entity.embedding = embedding.values
+            
+            self.logger.debug(f"Generated embeddings for {len(valid_entities)} entities")
+            
+        except Exception as e:
+            self.logger.warning(f"Embedding 생성 실패: {e}")

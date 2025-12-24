@@ -19,6 +19,39 @@ class PriceDataLoader:
     def __init__(self, data_dir: str = "data/preprocessed/price"):
         self.data_dir = Path(data_dir)
         self._cache: Dict[str, pd.DataFrame] = {}
+        self._entity_matcher = None  # Lazy load
+    
+    def _resolve_ticker(self, name_or_ticker: str) -> str:
+        """
+        기업명 또는 ticker를 실제 ticker로 변환
+        
+        Args:
+            name_or_ticker: 기업명(삼성전자) 또는 ticker(005930.KS)
+            
+        Returns:
+            ticker (005930.KS)
+        """
+        # 이미 ticker 형식인 경우 그대로 반환
+        if any(c.isdigit() for c in name_or_ticker) or name_or_ticker.startswith('^'):
+            return name_or_ticker
+        
+        # EntityMatcher로 기업명 → ticker 변환
+        try:
+            if self._entity_matcher is None:
+                from src.utils.entity_matcher import get_entity_matcher
+                self._entity_matcher = get_entity_matcher()
+            
+            entity_info = self._entity_matcher.get_entity_info(name_or_ticker)
+            if entity_info and entity_info.get('ticker'):
+                ticker = entity_info['ticker']
+                # .KS 확장자 추가 (한국 주식의 경우)
+                if ticker.isdigit():
+                    ticker = f"{ticker}.KS"
+                return ticker
+        except Exception as e:
+            logger.debug(f"EntityMatcher failed for {name_or_ticker}: {e}")
+        
+        return name_or_ticker
         
     def get_context(self, ticker: str, date: str) -> str:
         """
@@ -54,14 +87,20 @@ class PriceDataLoader:
         """Loads and caches dataframe for the given ticker."""
         if ticker in self._cache:
             return self._cache[ticker]
+        
+        # 기업명 → ticker 변환 시도 (삼성전자 → 005930.KS)
+        actual_ticker = self._resolve_ticker(ticker)
             
         # Try finding the file
         # Pattern 1: {ticker}_states.csv (Standard)
-        file_path = self.data_dir / f"{ticker}_states.csv"
+        file_path = self.data_dir / f"{actual_ticker}_states.csv"
         
         if not file_path.exists():
-            # Pattern 2: Maybe hidden file or slightly different name?
-            # Creating a fallback search if needed, but strict naming is better for now.
+            # Pattern 2: {ticker} only (without extension like .KS)
+            base_ticker = actual_ticker.split('.')[0]
+            file_path = self.data_dir / f"{base_ticker}_states.csv"
+        
+        if not file_path.exists():
             logger.warning(f"Price file not found: {file_path}")
             return None
             

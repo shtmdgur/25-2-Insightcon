@@ -111,6 +111,9 @@ class BaseDebateAgent(ABC):
                 except Exception as e:
                     market_context = f"[Price 조회 실패: {e}]"
         
+        # correlation 정보 추출 (impact_paths에서)
+        correlation_summary = self._extract_correlation_summary(impact_paths)
+        
         return {
             "agents": self._extract_nodes_by_type(state, ["IDM", "Fabless", "Foundry", "OSAT"]),
             "suppliers": self._extract_nodes_by_type(state, ["Supplier"]),
@@ -120,7 +123,8 @@ class BaseDebateAgent(ABC):
             "macros": self._extract_nodes_by_type(state, ["EconomicIndicator"]),
             "impact_paths": impact_paths,
             "query": state.get("query", ""),
-            "market_context": market_context  # Price DB 시장 데이터 (초기 조회 또는 state 값)
+            "market_context": market_context,  # Price DB 시장 데이터
+            "correlation": correlation_summary  # 상관관계 요약 정보
         }
 
     def _find_impact_paths(self, target_company: str, debate_count: int = 1, cached_paths: Dict[int, List[Dict]] = None) -> List[Dict]:
@@ -181,13 +185,65 @@ class BaseDebateAgent(ABC):
 
     def _vector_search(self, query: str, limit: int = 10) -> List[str]:
         """
-        [Vector Search Placeholder]
-        - Neo4j Vector Index 또는 외부 벡터 DB를 활용하여 관련 노드 검색
-        - 현재는 placeholder로 유지 (향후 embedding 모델 연결 시 구현)
+        [Vector Search Implementation]
+        Neo4j Vector Index를 활용하여 쿼리와 유사한 노드 검색
+        
+        Args:
+            query: 검색 쿼리 (기업명 또는 이슈)
+            limit: 반환할 최대 노드 수
+        
+        Returns:
+            유사한 노드 이름 리스트
         """
-        # TODO: Implement vector embedding search
-        # return ["Node_ID_1", "Node_ID_2"]
-        return []
+        if not self.neo4j:
+            return []
+        
+        try:
+            # 1. 쿼리 임베딩 생성 (Gemini embedding)
+            from google import genai
+            import os
+            
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            result = client.models.embed_content(
+                model="gemini-embedding-001",
+                contents=query
+            )
+            query_embedding = result.embeddings[0].values
+            
+            # 2. Neo4j Vector Index 쿼리
+            with self.neo4j.driver.session() as session:
+                # Vector Index가 존재하는 경우에만 쿼리 (없으면 fallback)
+                vector_query = """
+                    CALL db.index.vector.queryNodes('entity_embedding_index', $limit, $embedding)
+                    YIELD node, score
+                    RETURN node.name as name, score
+                    ORDER BY score DESC
+                """
+                try:
+                    result = session.run(vector_query, {
+                        "embedding": query_embedding,
+                        "limit": limit
+                    })
+                    return [record["name"] for record in result if record["name"]]
+                except Exception as e:
+                    # Vector Index가 없는 경우 이름 기반 검색으로 fallback
+                    if "index" in str(e).lower() or "procedure" in str(e).lower():
+                        print(f"[INFO] Vector Index 미구성, 이름 기반 검색으로 fallback")
+                        fallback_query = """
+                            MATCH (n)
+                            WHERE n.name CONTAINS $query
+                            RETURN n.name as name
+                            LIMIT $limit
+                        """
+                        result = session.run(fallback_query, {"query": query, "limit": limit})
+                        return [record["name"] for record in result if record["name"]]
+                    raise
+        except ImportError:
+            print("[경고] google-genai 패키지 없음, 벡터 검색 스킵")
+            return []
+        except Exception as e:
+            print(f"[경고] Vector Search 실패: {e}")
+            return []
     
     def _process_path_record(self, record) -> Optional[Dict]:
         """Neo4j Path 레코드를 딕셔너리로 변환 (공통 로직)"""
@@ -243,6 +299,60 @@ class BaseDebateAgent(ABC):
         except Exception as e:
             print(f"[경고] Path 처리 실패: {e}")
             return None
+    
+    def _extract_correlation_summary(self, impact_paths: List[Dict]) -> str:
+        """
+        Impact Paths에서 correlation 정보 추출 및 요약
+        
+        Args:
+            impact_paths: _find_impact_paths()에서 반환된 경로 목록
+            
+        Returns:
+            상관관계 요약 문자열 (예: "DIRECT: 5건, INVERSE: 2건")
+        """
+        if not impact_paths:
+            return "상관관계 데이터 없음"
+        
+        correlation_counts = {"DIRECT": 0, "INVERSE": 0, "null": 0}
+        correlation_details = []
+        
+        for path in impact_paths:
+            rels = path.get("relationships", [])
+            for rel in rels:
+                props = rel.get("properties", {})
+                corr = props.get("correlation")
+                
+                if corr == "DIRECT":
+                    correlation_counts["DIRECT"] += 1
+                    # 세부 정보 추출
+                    rel_type = rel.get("type", "UNKNOWN")
+                    correlation_details.append(f"{rel_type}(DIRECT)")
+                elif corr == "INVERSE":
+                    correlation_counts["INVERSE"] += 1
+                    rel_type = rel.get("type", "UNKNOWN")
+                    correlation_details.append(f"{rel_type}(INVERSE)")
+                else:
+                    correlation_counts["null"] += 1
+        
+        # 요약 문자열 생성
+        summary_parts = []
+        if correlation_counts["DIRECT"] > 0:
+            summary_parts.append(f"DIRECT(정방향): {correlation_counts['DIRECT']}건")
+        if correlation_counts["INVERSE"] > 0:
+            summary_parts.append(f"INVERSE(역방향): {correlation_counts['INVERSE']}건")
+        
+        if not summary_parts:
+            return "상관관계 정보 미포함"
+        
+        summary = ", ".join(summary_parts)
+        
+        # 상위 5개 세부 정보 추가
+        if correlation_details:
+            top_details = correlation_details[:5]
+            summary += f" | 예시: {', '.join(top_details)}"
+        
+        return summary
+
     
     def _build_chain_text(self, nodes: List[Dict], rels: List[Dict]) -> str:
         """노드-관계 체인을 텍스트로 변환 (LLM 가독성)"""
@@ -331,28 +441,25 @@ class BaseDebateAgent(ABC):
         # 2. 데이터 컨텍스트 포맷팅
         data_context = self._format_data_context(data)
         
-        # 3. 템플릿 채우기 (안전한 포맷팅)
-        try:
-            prompt = template.format(
-                ticker=query,
-                data_context=data_context,
-                bull_history=history, # Synthesizer 등에서 필요할 수 있음
-                bear_history=history, 
-                critical_paths=str(data.get("impact_paths", [])) # Synthesizer용
-            )
-        except KeyError as e:
-            # 포맷 키 불일치 시 상세 경고 및 단순 대체 시도
-            print(f"[경고] 프롬프트 템플릿 키 누락: {e}. 기본 포맷으로 대체합니다.")
-            prompt = template.replace("{ticker}", query).replace("{data_context}", data_context)
+        # 3. 템플릿 채우기 (안전한 문자열 대체 - format() 대신 replace() 사용)
+        # format()은 데이터에 중괄호가 있으면 오류 발생 가능
+        prompt = template
+        prompt = prompt.replace("{ticker}", str(query))
+        prompt = prompt.replace("{data_context}", str(data_context))
+        prompt = prompt.replace("{bull_history}", str(history))
+        prompt = prompt.replace("{bear_history}", str(history))
+        prompt = prompt.replace("{critical_paths}", str(data.get("impact_paths", [])))
+        prompt = prompt.replace("{correlation}", str(data.get("correlation", "상관관계 데이터 없음")))
+        prompt = prompt.replace("{market_context}", str(data.get("market_context", "시장 컨텍스트 없음")))
+        prompt = prompt.replace("{round_num}", str(data.get("round_num", 1)))
+        prompt = prompt.replace("{history}", str(history))
 
         # [옵션] 상대방 반박 추가 (Bull/Bear)
         if opponent_arg:
             rebuttal_template = self.prompts.get("debate_agents", {}).get("base", {}).get("opponent_rebuttal", "")
             if rebuttal_template:
-                try:
-                    prompt += "\n" + rebuttal_template.format(opponent_arg=opponent_arg)
-                except KeyError:
-                    prompt += f"\n[상대방의 주장]\n{opponent_arg}\n"
+                rebuttal = rebuttal_template.replace("{opponent_arg}", str(opponent_arg))
+                prompt += "\n" + rebuttal
             
         return prompt
 

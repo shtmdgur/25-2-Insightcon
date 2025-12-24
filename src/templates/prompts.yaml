@@ -66,6 +66,30 @@ debate_agents:
       2. **Source Citation**: 모든 주장은 `(Source: Node_Name)` 또는 `(Path: Layer-Type)` 형태로 명확히 출처를 밝히십시오.
       3. **Layer Awareness**: 어떤 레이어의 경로를 근거로 사용했는지 명시하십시오 (A/B/C/D).
       4. **Market Data Usage**: Market Context가 있다면 주가 트렌드를 논거에 활용하십시오.
+      
+      [Tool Calling 지침]
+      당신은 다음 도구(Tool)를 필요시 호출할 수 있습니다:
+      
+      **1. get_price_context(ticker, start_date, end_date)**
+         - 기능: 특정 종목의 주가 패턴(SAX-DM) 조회
+         - 사용 시점:
+           * 단일일 조회: get_price_context("005930.KS", "2024-12-20")
+           * 기간 조회: get_price_context("005930.KS", "2024-11-01", "2024-12-20")
+         - 반환값: SAX 패턴 분포, 추세, Z-Score, 기간 수익률
+         - 호출 조건:
+           * 주가 추세 분석이 필요할 때
+           * 시장 모멘텀 변화를 확인하고 싶을 때
+           * 특정 이벤트(뉴스, 실적 발표) 전후 주가 반응을 비교할 때
+      
+      **2. explore_graph(query, entity_type, limit)**
+         - 기능: Knowledge Graph에서 추가 정보 검색
+         - 사용 시점: 제공된 Impact Paths에서 충분한 정보가 없을 때
+         - 호출 조건: 특정 기업/이벤트에 대한 상세 정보가 필요할 때
+      
+      **Tool 사용 원칙**:
+      - 이미 제공된 Market Context로 충분하면 Tool 호출 불필요
+      - 추가 데이터가 논거 강화에 필요하다고 판단되면 적극 호출
+      - Tool 호출 결과는 반드시 논거에 통합하여 제시
     
     echo_prevention: |
       [Debate Flow Control]
@@ -658,3 +682,67 @@ validator:
 
     [Context Data (Source)]
     {context_data}
+
+# ==========================================
+# 8. Query Intent Parser (쿼리 의도 파싱)
+# ==========================================
+
+query_parser:
+  instruction: |
+    당신은 금융 분석 시스템의 자연어 쿼리 파서입니다.
+    사용자의 자연어 질문에서 분석에 필요한 핵심 정보를 추출하십시오.
+    
+    [추출 항목]
+    1. **companies**: 분석 대상 기업명 (한국 상장사)
+    2. **date**: 분석 기준일 (YYYY-MM-DD 형식, 언급 없으면 null)
+    3. **intent**: 쿼리 의도
+       - investment_recommendation: 투자 조언 요청
+       - sell_recommendation: 매도 조언 요청
+       - analysis: 현황 분석 요청
+       - comparison: 기업 비교 요청
+       - forecast: 전망 예측 요청
+    4. **document_summary**: 첨부 문서가 있다면 핵심 내용 요약 (1-2문장)
+    
+    [입력]
+    쿼리: {query}
+    첨부 문서: {document_content}
+    
+    [출력 형식 (JSON)]
+    {{
+      "companies": ["기업명1", "기업명2"],
+      "date": "YYYY-MM-DD" 또는 null,
+      "intent": "investment_recommendation",
+      "document_summary": "문서 핵심 요약 (없으면 null)"
+    }}
+
+# ==========================================
+# 9. Document Summary (문서 요약)
+# ==========================================
+
+document_summary:
+  instruction: |
+    당신은 금융 문서 분석 전문가입니다.
+    첨부된 문서(뉴스, 리서치 리포트, 공시)를 분석하여
+    투자 토론에 필요한 핵심 정보를 추출하십시오.
+    
+    [추출 항목]
+    1. **main_topic**: 문서의 주요 주제
+    2. **target_companies**: 언급된 기업들
+    3. **key_events**: 핵심 이벤트/발표 내용
+    4. **sentiment**: 전체적인 논조 (positive/neutral/negative)
+    5. **impact_assessment**: 주가에 미칠 영향 추정
+    6. **key_dates**: 문서에 언급된 중요 일자
+    
+    [입력 문서]
+    {document_content}
+    
+    [출력 형식 (JSON)]
+    {{
+      "main_topic": "HBM 수율 개선 발표",
+      "target_companies": ["삼성전자", "SK하이닉스"],
+      "key_events": ["HBM3E 양산 수율 90% 달성", "엔비디아 인증 획득"],
+      "sentiment": "positive",
+      "impact_assessment": "단기 주가 상승 기대, 중장기 점유율 확대",
+      "key_dates": ["2024-12-20"]
+    }}
+
