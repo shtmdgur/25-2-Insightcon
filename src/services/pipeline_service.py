@@ -244,10 +244,10 @@ class PipelineService:
         from src.config.llm_config import get_model
         from src.dataflows.neo4j_loader import Neo4jKGLoader
         
-        # LLM 초기화
+        # LLM 초기화 (Task에 맞는 모델 사용)
         self._llm = ChatGoogleGenerativeAI(
-            model=get_model("debate"),
-            temperature=0.7
+            model=get_model("bull_argument"), # 토론용 고성능 모델
+            temperature=0.2
         )
         
         # Neo4j 연결
@@ -346,44 +346,44 @@ class PipelineService:
         config: PipelineConfig,
         on_checkpoint: CheckpointCallback
     ) -> Dict[str, Any]:
-        """Debate 워크플로우 실행"""
-        from src.agents.bull_agent import BullAgent
-        from src.agents.bear_agent import BearAgent
-        from src.agents.judge_agent import JudgeAgent
-        from src.agents.synthesizer_agent import SynthesizerAgent
-        from src.pipeline.debate_workflow import create_debate_workflow
-        from src.pipeline.state import ReportState
+        """Debate 워크플로우 실행 (Streaming 지원)"""
+        from src.pipeline.debate_workflow import create_debate_workflow_for_studio
         
-        # Agents 초기화
-        bull = BullAgent(llm=self._llm, neo4j_connection=self._neo4j_conn)
-        bear = BearAgent(llm=self._llm, neo4j_connection=self._neo4j_conn)
-        judge = JudgeAgent(llm=self._llm)
-        synthesizer = SynthesizerAgent(llm=self._llm)
+        # 스튜디오 용 팩토리 함수를 사용하여 모든 에이전트 도구 연동 보장
+        workflow = create_debate_workflow_for_studio()
         
-        # Workflow 생성
-        workflow = create_debate_workflow(
-            bull_agent=bull,
-            bear_agent=bear,
-            synthesizer_agent=synthesizer,
-            judge_agent=judge
-        )
-        
-        # 초기 상태
+        # 초기 상태 생성
         initial_state = self._create_initial_state(config)
         
-        # 실행
-        final_state = workflow.invoke(initial_state)
+        # 결과 저장을 위한 변수들
+        final_state = initial_state
+        judge_result = None
         
-        # 결과 추출
+        # 스트리밍 실행으로 사용자 인터랙션 지원
+        for event in workflow.stream(initial_state, stream_mode="updates"):
+            for node_name, output in event.items():
+                final_state.update(output)
+                
+                # 노드별 체크포인트 발행
+                message = f"에이전트 실행 중: {node_name}"
+                cp_type = CheckpointType.DEBATE_ROUND
+                
+                if node_name == "judge":
+                    judge_result = output.get("debate_state", {}).get("judge_result")
+                    cp_type = CheckpointType.JUDGE_RESULT
+                    message = f"판결 완료: {judge_result.get('decision') if judge_result else 'N/A'}"
+                elif node_name == "synthesizer":
+                    cp_type = CheckpointType.FINAL_REPORT
+                    message = "리포트 생성 완료"
+                
+                on_checkpoint(CheckpointData(
+                    checkpoint_type=cp_type,
+                    message=message,
+                    data={"node": node_name, "output": output}
+                ))
+        
         debate_state = final_state.get("debate_state", {})
-        judge_result = debate_state.get("judge_result", {})
-        
-        # Judge 결과 checkpoint
-        on_checkpoint(CheckpointData(
-            checkpoint_type=CheckpointType.JUDGE_RESULT,
-            message=f"판결: {judge_result.get('decision', 'N/A')}",
-            data=judge_result
-        ))
+        judge_result = judge_result or debate_state.get("judge_result", {})
         
         return {
             "rounds": debate_state.get("debate_count", 0),
@@ -394,12 +394,12 @@ class PipelineService:
     
     def _create_initial_state(self, config: PipelineConfig) -> Dict:
         """ReportState 초기화"""
-        return {
             "query": config.target_company,
             "ticker": config.ticker,
             "target_companies": [config.target_company],
             "target_date": config.target_date,
             "document": config.document_path,
+            "document_summary": None,  # [NEW] 문서 요약 정보
             "impact_paths": None,
             "parsed_text": None,
             "file_uri": None,
@@ -414,19 +414,7 @@ class PipelineService:
             "trend_analysis": None,
             "event_analysis": None,
             "analyst_reports": None,
-            "debate_state": {
-                "bull_history": "",
-                "bear_history": "",
-                "full_history": "",
-                "current_bull_arg": None,
-                "current_bear_arg": None,
-                "debate_count": 0,
-                "should_continue": True,
-                "cached_paths": {},
-                "debate_trace": [],
-                "judge_result": None,
-                "validation_result": None
-            },
+            "debate_state": None,  # initialize_debate 노드에서 생성하도록 None 설정
             "synthesis_report": None,
             "sector_analysis": None,
             "company_analysis": None,

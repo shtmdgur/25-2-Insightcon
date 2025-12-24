@@ -84,24 +84,24 @@ class BaseDebateAgent(ABC):
         1. GraphRAG 결과 파싱
         2. 범용 영향 경로(Impact Paths) 탐색 결과 병합 (Progressive Expansion)
         """
-        target_company = state.get("target_companies", [None])[0]
+        target_companies = state.get("target_companies", [])
+        target_company = target_companies[0] if target_companies else None
+
         
         # 토론 라운드 및 캐시 추출 (Progressive Path Expansion)
         debate_state = state.get("debate_state", {})
         debate_count = debate_state.get("debate_count", 1)
         cached_paths = debate_state.get("cached_paths", {})
         
-        # Impact Paths 조회 (캐시 활용)
+        # Impact Paths 조회 (캐시 활용, 날짜 필터링 추가)
         impact_paths = []
+        target_date = state.get("target_date")
         if target_company:
-            impact_paths = self._find_impact_paths(target_company, debate_count, cached_paths)
-            # 현재 라운드 결과를 캐시에 저장 (State 업데이트는 Workflow에서 처리)
-            # 여기서는 반환만 하고, Workflow가 state["debate_state"]["cached_paths"][round] = paths 저장
+            impact_paths = self._find_impact_paths(target_company, debate_count, cached_paths, target_date)
         
         # 초기 Price 컨텍스트 조회 (target_date가 있는 경우)
         market_context = state.get("market_context", "")
         if not market_context:
-            target_date = state.get("target_date")
             ticker = target_company if target_company else state.get("query", "")
             if target_date and ticker:
                 try:
@@ -124,21 +124,22 @@ class BaseDebateAgent(ABC):
             "impact_paths": impact_paths,
             "query": state.get("query", ""),
             "market_context": market_context,  # Price DB 시장 데이터
-            "correlation": correlation_summary  # 상관관계 요약 정보
+            "correlation": correlation_summary,  # 상관관계 요약 정보
+            "document_summary": state.get("document_summary")  # [NEW] 문서 요약 정보
         }
 
-    def _find_impact_paths(self, target_company: str, debate_count: int = 1, cached_paths: Dict[int, List[Dict]] = None) -> List[Dict]:
+    def _find_impact_paths(self, target_company: str, debate_count: int = 1, cached_paths: Dict[int, List[Dict]] = None, target_date: str = None) -> List[Dict]:
         """
         [Layered Traversal Strategy - Schema v3.0]
         
-        레이어별 관계 탐색:
+        레이어별 관계 탐색 (날짜 필터링 포함):
         1. Agent → Signal (HAS_SIGNAL): 기업 직접 시그널
         2. Signal → Signal (TRIGGERED_BY): 인과 체인
         3. Macro → Agent (AFFECTS): 거시경제 영향
         4. Agent ↔ Agent (COMPETES_WITH, PARTNERS_WITH, SUPPLIES): 경쟁/협력/공급망
         
-        벡터 임베딩 활용 (Agentic Search):
-        - query embedding과 node embedding의 코사인 유사도를 기반으로 관련 노드/경로 우선 탐색
+        날짜 필터링 로직:
+        - Signal 노드(Earnings, Issue 등)는 date 속성이 target_date보다 작거나 같은 경우만 포함
         """
         if not self.neo4j:
             return []
@@ -161,18 +162,26 @@ class BaseDebateAgent(ABC):
         
         new_paths = []
         
-        # ===== Broad Search: 모든 관계 탐색 (LLM이 Cognitive Filtering) =====
-        # 라운드별 hop 깊이로 탐색, LLM이 관련성 판단
+        # ===== Broad Search: 모든 관계 탐색 (날짜 필터링 추가) =====
+        # Signal 성격의 노드들은 기준일(target_date) 이전 데이터만 가져옴
+        date_filter = ""
+        if target_date:
+            # 경로 내의 모든 노드 중 date가 있는 노드는 target_date 이하인 경우만 검사
+            date_filter = "AND ALL(node in nodes(path) WHERE node.date IS NULL OR node.date <= $target_date)"
+
         broad_query = f"""
             MATCH path = (n)-[r*1..{max_hops}]-(target)
-            WHERE target.name = $name
+            WHERE target.name = $name {date_filter}
             RETURN path
             LIMIT {total_limit}
         """
         
         try:
             with self.neo4j.driver.session() as session:
-                result = session.run(broad_query, {"name": target_company})
+                params = {"name": target_company}
+                if target_date:
+                    params["target_date"] = target_date
+                result = session.run(broad_query, params)
                 for record in result:
                     path_data = self._process_path_record(record)
                     if path_data:
@@ -399,18 +408,26 @@ class BaseDebateAgent(ABC):
         target_company = state.get("target_companies", [None])[0]
         
         try:
+            target_date = state.get("target_date")
             with self.neo4j.driver.session() as session:
                 # 타겟 기업과 연결된 특정 타입 노드 조회
                 for node_type in types:
+                    date_filter = ""
+                    if target_date:
+                        date_filter = "AND (n.date IS NULL OR n.date <= $target_date)"
+
                     query = f"""
                         MATCH (n:{node_type})
-                        WHERE n.name IS NOT NULL
+                        WHERE n.name IS NOT NULL {date_filter}
                         OPTIONAL MATCH (n)-[r]-(target)
                         WHERE target.name = $target
                         RETURN DISTINCT n
                         LIMIT {NODE_EXTRACT_LIMIT}
                     """
-                    result = session.run(query, {"target": target_company or ""})
+                    params = {"target": target_company or ""}
+                    if target_date:
+                        params["target_date"] = target_date
+                    result = session.run(query, params)
                     for record in result:
                         n = record["n"]
                         if hasattr(n, 'items'):
@@ -478,7 +495,8 @@ class BaseDebateAgent(ABC):
             price_move_count=len(data.get("price_moves", [])),
             issue_count=len(data.get("issues", [])),
             macro_count=len(data.get("macros", [])),
-            path_count=len(data.get("impact_paths", []))
+            path_count=len(data.get("impact_paths", [])),
+            document_context=self._format_document_summary(data.get("document_summary"))
         )
         
         details = []
@@ -517,6 +535,24 @@ class BaseDebateAgent(ABC):
             details.append(market_context)
                 
         return summary + "\n".join(details)
+    
+    def _format_document_summary(self, doc_sum: Optional[Dict[str, Any]]) -> str:
+        """
+        문서 요약 정보를 텍스트로 변환
+        """
+        if not doc_sum or not isinstance(doc_sum, dict):
+            return "제공된 추가 문서 컨텍스트 없음"
+            
+        topic = doc_sum.get("main_topic", "알 수 없음")
+        points = doc_sum.get("key_points", [])
+        
+        formatted = f"- **주요 주제**: {topic}\n"
+        if points:
+            formatted += "- **핵심 내용**:\n"
+            for p in points:
+                formatted += f"  * {p}\n"
+        
+        return formatted
         
     def _parse_response(self, response: Any) -> Dict[str, str]:
         """LLM 응답 처리 (단순 텍스트 반환)"""

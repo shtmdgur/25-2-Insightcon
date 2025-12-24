@@ -8,9 +8,9 @@ from typing import Optional
 
 
 @tool
-def explore_graph(target: str, hops: int = 2, limit: int = 20, relation_filter: Optional[str] = None) -> str:
+def explore_graph(target: str, hops: int = 2, limit: int = 20, relation_filter: Optional[str] = None, now_date: Optional[str] = None) -> str:
     """
-    특정 엔티티를 중심으로 Knowledge Graph를 탐색합니다.
+    특정 엔티티를 중심으로 Knowledge Graph를 탐색합니다. (시간 제한 분석 지원)
     
     Args:
         target: 탐색 중심 엔티티 이름 (예: "삼성전자", "NVIDIA")
@@ -18,13 +18,14 @@ def explore_graph(target: str, hops: int = 2, limit: int = 20, relation_filter: 
         limit: 반환할 경로 수 (1~50, 기본값 20)
         relation_filter: 특정 관계만 탐색 (선택). 
                          예: "SUPPLIES", "COMPETES_WITH", "AFFECTS"
+        now_date: 분석 기준일 (YYYY-MM-DD, 선택). 이 날짜 이후의 데이터는 제외함.
     
     Returns:
         탐색된 경로들의 요약 (노드 타입, 관계 타입, 속성 포함)
     
     Examples:
         - explore_graph("삼성전자", hops=2, limit=10) → 2홉 내 10개 경로
-        - explore_graph("NVIDIA", hops=3, relation_filter="SUPPLIES") → 공급망만 탐색
+        - explore_graph("SK하이닉스", now_date="2024-10-11") → 과거 시점 기준 탐색
     """
     from src.utils.neo4j_client import Neo4jClient
     from src.models.nodes import RELATION_PROPERTIES_BY_TYPE
@@ -42,15 +43,22 @@ def explore_graph(target: str, hops: int = 2, limit: int = 20, relation_filter: 
         else:
             rel_pattern = f"[r*1..{hops}]"
         
+        # 시간 제한 필터 추가
+        date_filter = ""
+        params = {"name": target}
+        if now_date:
+            date_filter = "AND ALL(node in nodes(path) WHERE node.date IS NULL OR node.date <= $now_date)"
+            params["now_date"] = now_date
+            
         query = f"""
             MATCH path = (n)-{rel_pattern}-(target)
-            WHERE target.name = $name
+            WHERE target.name = $name {date_filter}
             RETURN path
             LIMIT {limit}
         """
         
         with neo4j.driver.session() as session:
-            result = session.run(query, {"name": target})
+            result = session.run(query, params)
             paths = []
             
             for record in result:

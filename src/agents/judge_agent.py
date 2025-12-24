@@ -49,7 +49,8 @@ class JudgeAgent(BaseDebateAgent):
             bull_history=bull_history,
             bear_history=bear_history,
             critical_paths=impact_paths,
-            market_context=state.get("market_context", "No market data available.")
+            market_context=state.get("market_context", "No market data available."),
+            document_context=self._format_document_summary(data.get("document_summary"))
         )
         
         # 4. LLM 실행

@@ -35,9 +35,19 @@ class QueryIntentParser:
     
     # 알려진 기업명 (확장 가능)
     KNOWN_COMPANIES = [
-        "삼성전자", "SK하이닉스", "LG전자", "네이버", "카카오",
-        "현대차", "기아", "삼성SDI", "LG에너지솔루션", "포스코홀딩스",
-        "삼성바이오로직스", "셀트리온", "KB금융", "신한지주", "하나금융"
+        # 반도체
+        "삼성전자", "SK하이닉스", "한미반도체", "리노공업", "ISC", "테스", 
+        "원익IPS", "주성엔지니어링", "피에스케이", "HPSP", "DB하이텍",
+        # IT/플랫폼
+        "네이버", "카카오", "LG전자", "삼성SDI",
+        # 자동차/2차전지
+        "현대차", "기아", "LG에너지솔루션", "삼성SDI", "에코프로비엠", "포스코퓨처엠",
+        # 바이오
+        "삼성바이오로직스", "셀트리온", "SK바이오팜",
+        # 산업재/에너지
+        "포스코홀딩스", "HD현대", "한화에어로스페이스",
+        # 금융
+        "KB금융", "신한지주", "하나금융", "우리금융"
     ]
     
     # 의도 키워드 매핑
@@ -55,13 +65,13 @@ class QueryIntentParser:
         """
         self.llm = llm
     
-    def parse(self, query: str, document_path: Optional[str] = None) -> Dict[str, Any]:
+    def parse(self, query: str, document: Optional[str] = None) -> Dict[str, Any]:
         """
         자연어 쿼리 파싱
         
         Args:
             query: 사용자 자연어 쿼리
-            document_path: 첨부 문서 경로 (선택)
+            document: 첨부 문서 경로 또는 직접 입력된 텍스트 (선택)
             
         Returns:
             파싱 결과 딕셔너리
@@ -71,23 +81,43 @@ class QueryIntentParser:
             "target_companies": [],
             "target_date": None,
             "intent": "analysis",  # 기본값
-            "document_path": document_path
+            "document": document,
+            "document_content": None
         }
         
-        # 1. 기업명 추출
+        # 1. 문서 처리 (경로인 경우 내용 로드)
+        doc_content = None
+        if document:
+            from pathlib import Path
+            try:
+                path = Path(document)
+                if path.exists() and path.is_file():
+                    # 텍스트 파일 읽기 (PDF는 별도 파서 권장하지만 여기서는 기본 텍스트 추출 시도)
+                    if path.suffix.lower() in ['.txt', '.md', '.csv']:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            doc_content = f.read()
+                else:
+                    # 파일이 없으면 직접 입력된 텍스트로 간주
+                    doc_content = document
+            except Exception:
+                doc_content = document
+        
+        result["document_content"] = doc_content
+        
+        # 2. 기업명 추출 (의도 보강 전 기본 추출)
         result["target_companies"] = self._extract_companies(query)
         
-        # 2. 날짜 추출
+        # 3. 날짜 추출
         result["target_date"] = self._extract_date(query)
         
-        # 3. 의도 추출
+        # 4. 의도 추출
         result["intent"] = self._extract_intent(query)
         
-        # 4. LLM으로 보완 (옵션)
-        if self.llm and not result["target_companies"]:
-            result = self._enhance_with_llm(query, result)
+        # 5. LLM으로 보완 (옵션)
+        if self.llm:
+            result = self._enhance_with_llm(query, result, doc_content)
         
-        # 5. 기본값 설정
+        # 6. 기본값 설정
         if not result["target_date"]:
             result["target_date"] = datetime.now().strftime("%Y-%m-%d")
         
@@ -96,8 +126,9 @@ class QueryIntentParser:
     def _extract_companies(self, query: str) -> List[str]:
         """기업명 추출 (규칙 기반)"""
         companies = []
+        query_lower = query.lower().replace(" ", "")
         for company in self.KNOWN_COMPANIES:
-            if company in query:
+            if company.lower().replace(" ", "") in query_lower:
                 companies.append(company)
         return companies
     

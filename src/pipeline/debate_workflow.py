@@ -62,7 +62,18 @@ def create_debate_workflow(
         
     if validator_agent:
         workflow.add_edge("synthesizer", "validator")
-        workflow.add_edge("validator", END)
+        
+        def should_retry_synthesis(state: ReportState):
+            val_res = state["debate_state"].get("validation_result", {})
+            if val_res.get("decision") == "fail" and state.get("retry_count", 0) < 2:
+                print(f"⚠️ Validation Failed. Retrying Synthesizer... (Retry: {state.get('retry_count', 0) + 1}/2)")
+                return "retry"
+            return "end"
+            
+        workflow.add_conditional_edges("validator", should_retry_synthesis, {
+            "retry": "synthesizer",
+            "end": END
+        })
     else:
         workflow.add_edge("synthesizer", END)
     
@@ -85,28 +96,47 @@ def initialize_debate(state: ReportState) -> ReportState:
     document_content = None
     
     if document:
-        doc_path = Path(document)
-        if doc_path.exists() and doc_path.is_file():
-            try:
-                # 텍스트 파일 읽기
-                if doc_path.suffix in ['.txt', '.md', '.csv']:
+        try:
+            doc_path = Path(document)
+            if doc_path.exists() and doc_path.is_file():
+                # 1. 파일인 경우
+                if doc_path.suffix.lower() in ['.txt', '.md', '.csv']:
                     with open(doc_path, 'r', encoding='utf-8') as f:
                         document_content = f.read()
-                    print(f"📄 문서 로드 완료: {doc_path.name} ({len(document_content)} chars)")
-                # PDF는 별도 파서 필요 (여기서는 경로만 표시)
-                elif doc_path.suffix == '.pdf':
-                    print(f"📄 PDF 문서: {doc_path.name} (Gemini PDF 파서 필요)")
-                    document_content = f"[PDF 문서: {doc_path.name}]"
-            except Exception as e:
-                print(f"⚠️ 문서 로드 실패: {e}")
-        else:
-            # document가 텍스트 내용 자체일 수 있음
-            if len(document) > 50:  # 최소 50자 이상이면 텍스트로 간주
+                    print(f"📄 텍스트 문서 로드 완료: {doc_path.name} ({len(document_content)} 자)")
+                elif doc_path.suffix.lower() == '.pdf':
+                    # PDF는 Gemini PDF 파서 사용 시도
+                    try:
+                        from src.agents.parsers.pdf_parser_agent import GeminiPDFParser
+                        print(f"📄 PDF 문서 인식: {doc_path.name} (분석 중...)")
+                        # PDF 파싱은 시간이 걸릴 수 있으므로, 여기서는 메타데이터 위주로 먼저 표시
+                        # 실제 KG 주입은 별도 프로세스에서 수행되지만, 토론용 텍스트가 필요함
+                        # 일단 경로 정보만 유지하고, Parser.parse_document에서 LLM이 파일을 직접 보게 할 수도 있음
+                        document_content = f"[PDF 파일: {doc_path.name}]"
+                    except ImportError:
+                        print(f"⚠️ GeminiPDFParser 로드 실패 (PDF 분석 불가)")
+                        document_content = f"[PDF 파일: {doc_path.name}]"
+            else:
+                # 2. 파일이 아니면 직접 입력된 텍스트로 간주
                 document_content = document
+                print(f"📄 직접 입력된 문서 컨텍스트 사용 ({len(document_content)} 자)")
+        except Exception as e:
+            # Path 변환 오류 등 발생 시 텍스트로 처리
+            document_content = document
+            print(f"📄 문서 텍스트 사용 ({len(document_content)} 자)")
     
-    # 1. 자연어 쿼리 파싱 (기업명, 날짜, 의도 추출)
+    # 1. 자연어 쿼리 파싱 (LLM을 사용하여 기업명, 날짜, 의도 추출)
     if query and not state.get("target_companies"):
-        parser = QueryIntentParser()
+        # LLM 초기화 (기업명 추출에 활용)
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from src.config.llm_config import get_model
+            llm = ChatGoogleGenerativeAI(model=get_model("debate"), temperature=0.0)
+            parser = QueryIntentParser(llm)  # LLM으로 기업명 추출!
+        except Exception as e:
+            print(f"⚠️ LLM 초기화 실패, 규칙 기반 파싱 사용: {e}")
+            parser = QueryIntentParser()
+        
         intent = parser.parse(query, document)
         
         # 파싱 결과로 state 업데이트 (없는 경우만)
@@ -119,7 +149,7 @@ def initialize_debate(state: ReportState) -> ReportState:
         
         print(f"💡 쿼리 의도: {intent['intent']}")
     
-    # 2. Document 요약 (LLM 사용, document_content가 있는 경우)
+    # 2. Document 요약 (document_content가 있는 경우)
     if document_content and len(document_content) > 100:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
@@ -159,6 +189,7 @@ def initialize_debate(state: ReportState) -> ReportState:
     }
     
     state["debate_state"] = debate_state
+    state["retry_count"] = 0 # 재시도 횟수 초기화
     return state
 
 
@@ -288,7 +319,15 @@ def validator_node(state: ReportState, agent: ValidatorAgent) -> Dict:
     debate_trace.append(f"Validator: {result.get('decision', 'fail')}")
     debate_state["debate_trace"] = debate_trace
     
-    return {"debate_state": debate_state}
+    # 실패 시 retry_count 증가
+    retry_count = state.get("retry_count", 0)
+    if result.get("decision") == "fail":
+        retry_count += 1
+    
+    return {
+        "debate_state": debate_state, 
+        "retry_count": retry_count
+    }
 
 
 # ========================================
@@ -357,6 +396,7 @@ def create_debate_workflow_for_studio():
     bear = BearAgent(llm, neo4j_conn)
     judge = JudgeAgent(llm, neo4j_conn)
     synthesizer = SynthesizerAgent(llm, neo4j_conn)
+    validator = ValidatorAgent(llm, neo4j_conn)
     
     # 워크플로우 생성 및 반환
     return create_debate_workflow(
@@ -364,6 +404,6 @@ def create_debate_workflow_for_studio():
         bear_agent=bear,
         judge_agent=judge,
         synthesizer_agent=synthesizer,
-        validator_agent=None
+        validator_agent=validator
     )
 

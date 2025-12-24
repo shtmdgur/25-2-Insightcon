@@ -61,11 +61,16 @@ debate_agents:
       - **Z-Score**: 통계적 유의성 (|Z| > 2: 유의미한 변동)
       - **활용**: 주가 트렌드/변동성을 기반으로 시장 심리 및 모멘텀 분석
       
-      [Data Integrity Rules]
-      1. **No Hallucination**: Graph 데이터에 없는 내용은 절대 추측하지 마시오. 데이터 부족 시 "데이터 부족(Insufficient Data)"으로 명시하십시오.
-      2. **Source Citation**: 모든 주장은 `(Source: Node_Name)` 또는 `(Path: Layer-Type)` 형태로 명확히 출처를 밝히십시오.
-      3. **Layer Awareness**: 어떤 레이어의 경로를 근거로 사용했는지 명시하십시오 (A/B/C/D).
-      4. **Market Data Usage**: Market Context가 있다면 주가 트렌드를 논거에 활용하십시오.
+      **7. [Document Context] (신규 업로드 문서 분석)**
+      {document_context}
+      
+      [Data Integrity & Context Rules (CRITICAL)]
+      1. **Query Alignment**: 모든 토론은 사용자의 목표 질문(`{query}`)에 대한 직접적인 해답을 찾는 방향으로 전개되어야 합니다.
+      2. **Document Priority**: 첨부된 문서(`[Document Context]`)가 있다면, 해당 문서의 내용을 최우선 핵심 근거로 삼으십시오. 그래프 데이터는 이 문서의 논리를 뒷받침하거나 보완하는 용도로 사용하십시오.
+      3. **No Hallucination**: Graph 데이터나 문서에 없는 내용은 절대 추측하지 마시오. 데이터 부족 시 "데이터 부족(Insufficient Data)"으로 명시하십시오.
+      4. **Source Citation**: 모든 주장은 `(Source: Node_Name)` 또는 `(Document)` 형태로 명확히 출처를 밝히십시오.
+      5. **Layer Awareness**: 어떤 레이어의 경로를 근거로 사용했는지 명시하십시오 (A/B/C/D).
+      6. **Market Data Usage**: Market Context가 있다면 주가 트렌드를 논거에 활용하십시오.
       
       [Tool Calling 지침]
       당신은 다음 도구(Tool)를 필요시 호출할 수 있습니다:
@@ -246,6 +251,7 @@ debate_agents:
       - **Bear's Arguments**: {bear_history}
       - **Evidence (Impact Paths)**: {critical_paths}
       - **Market Context (Price/Volume)**: {market_context}
+      - **Document Context**: {document_context}
 
       [CRITICAL RULE - Data Sufficiency Check]
       **BEFORE making any decision, check the following:**
@@ -298,6 +304,7 @@ debate_agents:
       [Input Data]
       - **Judge Verdict**: {rationale}
       - **Discussion History**: {history}
+      - **Document Context**: {document_context}
       - **Validated Impact Paths (Evidence)**: {evidence_paths}
 
       [Context]
@@ -316,9 +323,12 @@ debate_agents:
          - "좋아 보인다" 대신 "구조적 마진 개선이 가시화되고 있다"와 같은 전문 용어를 구사하십시오.
          - 문단은 두괄식(Bottom Line Up Front)으로 구성하십시오.
 
-      3. **Visual Thinking**:
-         - 텍스트로만 나열하지 말고, **Mermaid Diagram**을 사용하여 논리 구조를 시각화하십시오. (예: 인과 관계, Bull vs Bear 대립 구도)
-         - 핵심 수치나 비교는 반드시 **Markdown Table**을 사용하십시오.
+      3. **Strategic Visualization (Mermaid Mastery)**:
+          - 단순히 하나만 그리지 말고, 데이터의 성격에 따라 다음 3가지 중 1-2개를 반드시 포함하십시오.
+          - **(1) Impact Causality**: 진단한 핵심 이슈의 인과관계 (`graph TD`)
+          - **(2) Supply Chain/Relation Map**: 기업 간 공급방 및 경쟁 관계 (`graph LR`)
+          - **(3) Risk-Opportunity Matrix**: 리스크와 기회를 시각적으로 대조 (`pie` 또는 `quadrantChart` 형식이 어려울 경우 `table`과 `graph` 조합)
+          - 핵심 수치나 비교는 반드시 **Markdown Table**을 사용하십시오.
 
       4. **Structure (Strictly Follow)**:
 
@@ -343,15 +353,25 @@ debate_agents:
       ### Driver 2: [Factor Name]
       - **Thesis**: ...
       
-      ## 3. 논리적 인과관계 (Visual Logic Flow)
-      (아래 Mermaid 코드를 사용하여 핵심 인과관계를 그리십시오. Judge가 인용한 Impact Path를 시각화하는 것입니다. **노드 텍스트는 한국어를 사용하십시오.**)
+      ## 3. 전략적 시각화 (Strategic Visualization)
+      (아래 Mermaid 코드를 사용하여 핵심 인과관계 또는 공급망을 시각화하십시오. **노드 텍스트는 반드시 한국어를 사용하십시오.**)
       
+      ### Visual 1: 논리적 인과관계 (Impact Chain)
+      ```mermaid
+      graph TD
+          A[핵심 이슈] -->|트리거| B(시장 영향)
+          B -->|수익성| C{{재무 결과}}
+          C --> D[투자의견 반영]
+          style D fill:#f9f,stroke:#333,stroke-width:2px
+      ```
+
+      ### Visual 2: 핵심 관계망 (Supply Chain & Competitors)
+      (토론에서 언급된 핵심 기업 간의 관계를 그리십시오.)
       ```mermaid
       graph LR
-          A[핵심 이벤트/원인] -->|영향| B(중간 지표)
-          B -->|증가/감소| C{{재무적 결과}}
-          C -->|견인| D[주가 재평가]
-          style D fill:#f9f,stroke:#333,stroke-width:2px
+          Supplier[공급사] --[공급]--> Target[대상 기업]
+          Target --[경쟁]--> Competitor[경쟁사]
+          Macro[거시지표] --[영향]--> Target
       ```
 
       ## 4. 밸류에이션 및 리스크 (Valuation & Risks)
@@ -667,15 +687,16 @@ validator:
     Synthesizer가 작성한 리포트 초안(Draft)을 검토하고, **Pass(통과)** 또는 **Fail(수정 요청)**을 결정하십시오.
 
     [검수 기준 (Checklist)]
-    1. **Fact Check (Hallucination)**: 리포트에 제시된 수치나 정보가 토론 내용(Input Data)에 기반하는가? 없는 데이터를 지어내지 않았는가?
+    1. **Context Alignment (CRITICAL)**: 리포트가 사용자의 원래 쿼리({query})와 첨부 문서의 맥락을 충실히 반영하고 있는가? 핵심 이슈를 놓치지는 않았는가?
+    2. **Fact Check (Hallucination)**: 리포트에 제시된 수치나 정보가 토론 내용(Input Data) 및 문서(Document)에 기반하는가? 없는 데이터를 지어내지 않았는가?
        - 만약 구체적인 수치(e.g., "영업이익 12.3조")가 있는데 출처가 불분명하다면 **Fail**입니다.
-    2. **Logical Consistency**: "Valuation이 저평가"라고 하면서 "Growth가 낮다"는 식의 논리적 모순은 없는가?
-    3. **Style & Tone**: 문장이 전문적인가? "좋아요", "대박" 같은 비전문적 용어가 있는가? (Mermaid 문법 오류 포함)
+    3. **Logical Consistency**: "Valuation이 저평가"라고 하면서 "Growth가 낮다"는 식의 논리적 모순은 없는가?
+    4. **Style & Tone**: 문장이 전문적인가? "좋아요", "대박" 같은 비전문적 용어가 있는가? (Mermaid 문법 오류 포함)
 
     [Output Format]
     Return a JSON object with keys "decision" (pass/fail) and "feedback" (string).
     Do NOT use code blocks. Just raw JSON.
-    Example: { "decision": "pass", "feedback": "good" }
+    Example: {{ "decision": "pass", "feedback": "good" }}
 
     [Draft Report]
     {report_content}
