@@ -31,4 +31,6 @@ class BearAgent(BaseDebateAgent):
         response = self.llm.invoke(prompt)
         
         # 4. 응답 파싱
-        return self._parse_response(response)
+        result = self._parse_response(response)
+        result["retrieved_data"] = data
+        return result

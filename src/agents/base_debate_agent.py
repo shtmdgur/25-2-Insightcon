@@ -19,16 +19,19 @@ except ImportError:
 
 TOOLS_AVAILABLE = len(ALL_TOOLS) > 0
 
-# 토론 라운드별 검색 전략 (Broad Search → LLM Cognitive Filtering)
-# hop: 탐색 깊이, limit: 반환 경로 수
+# 토론 라운드별 검색 전략:
+# - 라운드 1: 넓고 얕게 (다양한 논점 수집)
+# - 라운드 2: 중간 깊이 (반박 근거 탐색)
+# - 라운드 3: 좁고 깊게 (핵심 인과 체인 추적)
+# hops: 최대 탐색 깊이 (가변 길이 경로 *..hops 사용)
 DEBATE_ROUND_STRATEGY = {
-    1: {"hops": 2, "limit": 30},  # 1라운드: 얕고 넓게 - 다양한 논점
-    2: {"hops": 3, "limit": 25},  # 2라운드: 중간 깊이
-    3: {"hops": 4, "limit": 20}   # 3라운드: 깊이 탐색 - 핵심 인과
+    1: {"hops": 3, "limit": 80},   # 1라운드: 넓게 시작 - 많은 논점
+    2: {"hops": 6, "limit": 50},   # 2라운드: 중간 깊이 - 반박 근거
+    3: {"hops": 10, "limit": 30}   # 3라운드: 최대 깊이 - 핵심 인과 체인
 }
 
-# 초기 노드 추출 시 타입당 최대 개수 (부족하면 LLM이 explore_graph Tool 호출)
-NODE_EXTRACT_LIMIT = 10
+# 초기 노드 추출 시 타입당 최대 개수
+NODE_EXTRACT_LIMIT = 30
 
 class BaseDebateAgent(ABC):
     """
@@ -115,17 +118,28 @@ class BaseDebateAgent(ABC):
         correlation_summary = self._extract_correlation_summary(impact_paths)
         
         return {
-            "agents": self._extract_nodes_by_type(state, ["IDM", "Fabless", "Foundry", "OSAT"]),
+            # === Agent Layer (모든 기업 타입) ===
+            "agents": self._extract_nodes_by_type(state, ["IDM", "Fabless", "Foundry", "OSAT", "Organization", "ETC"]),
             "suppliers": self._extract_nodes_by_type(state, ["Supplier"]),
+            
+            # === Signal Layer (모든 신호 타입) - 키 이름을 _format_data_context와 일치시킴 ===
             "earnings": self._extract_nodes_by_type(state, ["Earnings"]),
             "price_moves": self._extract_nodes_by_type(state, ["PriceMovement"]),
             "issues": self._extract_nodes_by_type(state, ["Issue", "Disclosure"]),
+            
+            # === Macro Layer ===
             "macros": self._extract_nodes_by_type(state, ["EconomicIndicator"]),
+            
+            # === 인과 경로 (핵심 정보) ===
             "impact_paths": impact_paths,
-            "query": state.get("query", ""),
-            "market_context": market_context,  # Price DB 시장 데이터
-            "correlation": correlation_summary,  # 상관관계 요약 정보
-            "document_summary": state.get("document_summary")  # [NEW] 문서 요약 정보
+            
+            # === 쿼리 및 컨텍스트 (키 이름 유지) ===
+            "query": state.get("query", ""),  # _format_data_context에서 "query" 키 사용
+            "target_company": target_company,
+            "target_date": state.get("target_date"),
+            "market_context": market_context,
+            "correlation": correlation_summary,
+            "document_summary": state.get("document_summary")
         }
 
     def _find_impact_paths(self, target_company: str, debate_count: int = 1, cached_paths: Dict[int, List[Dict]] = None, target_date: str = None) -> List[Dict]:
@@ -405,7 +419,8 @@ class BaseDebateAgent(ABC):
             return []
         
         nodes = []
-        target_company = state.get("target_companies", [None])[0]
+        target_companies = state.get("target_companies", [])
+        target_company = target_companies[0] if target_companies else state.get("query", "")  # Fallback to query
         
         try:
             target_date = state.get("target_date")
@@ -484,20 +499,25 @@ class BaseDebateAgent(ABC):
         """
         Data Dict를 프롬프트에 삽입할 텍스트로 변환 (기존 로직 + YAML Base Summary)
         """
-        base_summary_tpl = self.prompts.get("debate_agents", {}).get("base", {}).get("data_summary", "")
+        summary = self.prompts.get("debate_agents", {}).get("base", {}).get("data_summary", "")
         
-        # 기본 요약 생성 (prompts.yaml의 base.data_summary 키와 정확히 일치시켜야 함)
-        summary = base_summary_tpl.format(
-            query=data.get("query", "알 수 없음"),
-            agent_count=len(data.get("agents", [])),
-            supplier_count=len(data.get("suppliers", [])),
-            earnings_count=len(data.get("earnings", [])),
-            price_move_count=len(data.get("price_moves", [])),
-            issue_count=len(data.get("issues", [])),
-            macro_count=len(data.get("macros", [])),
-            path_count=len(data.get("impact_paths", [])),
-            document_context=self._format_document_summary(data.get("document_summary"))
-        )
+        # 안전한 문자열 대체 (format() 대신 replace() 사용 - 템플릿에 중괄호가 있어도 안전)
+        replacements = {
+            "{query}": str(data.get("query", "알 수 없음")),
+            "{agent_count}": str(len(data.get("agents", []))),
+            "{supplier_count}": str(len(data.get("suppliers", []))),
+            "{earnings_count}": str(len(data.get("earnings", []))),
+            "{price_move_count}": str(len(data.get("price_moves", []))),
+            "{issue_count}": str(len(data.get("issues", []))),
+            "{macro_count}": str(len(data.get("macros", []))),
+            "{path_count}": str(len(data.get("impact_paths", []))),
+            "{document_context}": str(self._format_document_summary(data.get("document_summary"))),
+            "{correlation}": str(data.get("correlation", "상관관계 데이터 없음")),
+            "{market_context}": str(data.get("market_context", "시장 컨텍스트 없음")),
+        }
+        
+        for placeholder, value in replacements.items():
+            summary = summary.replace(placeholder, value)
         
         details = []
         

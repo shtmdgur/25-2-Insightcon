@@ -115,7 +115,12 @@ class QueryIntentParser:
         
         # 5. LLM으로 보완 (옵션)
         if self.llm:
-            result = self._enhance_with_llm(query, result, doc_content)
+            # [FIX] 토큰 제한 방지를 위해 문서 내용 절삭
+            truncated_doc = None
+            if doc_content:
+                truncated_doc = doc_content[:50000] + ("..." if len(doc_content) > 50000 else "")
+            
+            result = self._enhance_with_llm(query, result, truncated_doc)
         
         # 6. 기본값 설정
         if not result["target_date"]:
@@ -213,6 +218,20 @@ JSON 형식으로 응답:
             import json
             content = response.content if hasattr(response, 'content') else str(response)
             
+            # Handle list content (Gemini API sometimes returns list)
+            if isinstance(content, list):
+                text_parts = []
+                for item in content:
+                    if isinstance(item, dict) and "text" in item:
+                        text_parts.append(item["text"])
+                    elif hasattr(item, "text"):
+                        text_parts.append(item.text)
+                    else:
+                        text_parts.append(str(item))
+                content = "".join(text_parts)
+            
+            content = str(content)
+            
             # JSON 추출
             json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
@@ -242,6 +261,9 @@ JSON 형식으로 응답:
         """
         if not self.llm:
             return {"error": "LLM이 초기화되지 않았습니다."}
+            
+        # [FIX] 토큰 제한 방지 (최대 5만자)
+        trimmed_content = document_content[:50000] + ("..." if len(document_content) > 50000 else "")
         
         try:
             from src.config.prompt_loader import PROMPTS

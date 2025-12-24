@@ -13,9 +13,25 @@ Markdown 리포트를 PDF로 변환합니다.
 """
 
 import os
+import sys
+import warnings
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+
+# WeasyPrint 경고 숨기기
+warnings.filterwarnings("ignore", message=".*WeasyPrint.*")
+os.environ['WEASYPRINT_QUIET'] = '1'
+
+# stderr를 임시로 숨기기 (WeasyPrint 가져올 때)
+_original_stderr = sys.stderr
+try:
+    sys.stderr = open(os.devnull, 'w')
+    import weasyprint  # noqa: F401
+except ImportError:
+    pass
+finally:
+    sys.stderr = _original_stderr
 
 
 class ReportExporter:
@@ -158,8 +174,6 @@ class ReportExporter:
             import markdown
             from weasyprint import HTML, CSS
         except ImportError:
-            print("❌ PDF 변환 라이브러리가 없습니다.")
-            print("   설치: pip install weasyprint markdown")
             return self._fallback_save_html(markdown_content, filename)
         
         # 파일명 생성
@@ -256,32 +270,3 @@ def export_report(markdown_content: str, filename: str = None) -> Optional[str]:
     """간편 PDF 내보내기"""
     exporter = ReportExporter()
     return exporter.export_to_pdf(markdown_content, filename)
-
-
-if __name__ == "__main__":
-    # 테스트
-    test_md = """
-# 삼성전자 (005930): BUY
-
-## 1. 결론 및 투자의견
-
-> **HBM 시장 확대에 따른 구조적 성장 국면 진입**
-
-- **Investment Rating**: **BUY**
-- **Target Potential**: Outperform 예상
-
-## 2. 핵심 투자 포인트
-
-### Driver 1: HBM 점유율 확대
-- **Thesis**: SK하이닉스 대비 캐파 확대 가속화
-- **Evidence**: Impact Path 인용
-
-| Metric | Assessment |
-|--------|------------|
-| Valuation | 저평가 |
-| Growth | 고성장 |
-"""
-    
-    result = export_report(test_md, "test_report.pdf")
-    if result:
-        print(f"테스트 완료: {result}")

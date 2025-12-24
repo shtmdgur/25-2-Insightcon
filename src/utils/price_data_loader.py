@@ -101,7 +101,7 @@ class PriceDataLoader:
             file_path = self.data_dir / f"{base_ticker}_states.csv"
         
         if not file_path.exists():
-            logger.warning(f"Price file not found: {file_path}")
+            logger.debug(f"Price file not found: {file_path}")
             return None
             
         try:

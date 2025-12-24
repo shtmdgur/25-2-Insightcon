@@ -131,7 +131,7 @@ def initialize_debate(state: ReportState) -> ReportState:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             from src.config.llm_config import get_model
-            llm = ChatGoogleGenerativeAI(model=get_model("debate"), temperature=0.0)
+            llm = ChatGoogleGenerativeAI(model=get_model("query_parsing"), temperature=0.0)
             parser = QueryIntentParser(llm)  # LLM으로 기업명 추출!
         except Exception as e:
             print(f"⚠️ LLM 초기화 실패, 규칙 기반 파싱 사용: {e}")
@@ -155,7 +155,7 @@ def initialize_debate(state: ReportState) -> ReportState:
             from langchain_google_genai import ChatGoogleGenerativeAI
             from src.config.llm_config import get_model
             
-            llm = ChatGoogleGenerativeAI(model=get_model("debate"), temperature=0.3)
+            llm = ChatGoogleGenerativeAI(model=get_model("query_parsing"), temperature=0.3)
             parser = QueryIntentParser(llm)
             doc_analysis = parser.parse_document(document_content)
             
@@ -218,11 +218,41 @@ def bull_node(state: ReportState, agent: BullAgent) -> Dict:
     debate_state["bull_history"] += f"\n\n## Round {round_num} - Bull\n{result['argument']}"
     debate_state["full_history"] += f"\n\n[Round {round_num} - Bull]\n{result['argument']}"
     
+    # [NEW] 범용 데이터(Impact Paths, Nodes)를 State에 누적 (Synthesizer 시각화용)
+    retrieved_data = result.get("retrieved_data", {})
+    if retrieved_data:
+        # Impact Paths 누적
+        state_paths = state.get("impact_paths", []) or []
+        new_paths = retrieved_data.get("impact_paths", [])
+        for p in new_paths:
+            if p not in state_paths:
+                state_paths.append(p)
+        state["impact_paths"] = state_paths
+        
+        # 엔티티 타입별 누적 (agents, suppliers, earnings, price_moves, issues, macros)
+        for key in ["agents", "suppliers", "earnings", "price_moves", "issues", "macros"]:
+            existing = state.get(key, []) or []
+            new_ones = retrieved_data.get(key, [])
+            for n in new_ones:
+                if n not in existing:
+                    existing.append(n)
+            state[key] = existing
+
     debate_trace = debate_state.get("debate_trace", [])
     debate_trace.append(f"Bull Round {round_num} 완료")
     debate_state["debate_trace"] = debate_trace
     
-    return {"debate_state": debate_state}
+    # 누적된 데이터들도 명시적으로 리턴하여 State 업데이트 강제
+    return {
+        "debate_state": debate_state, 
+        "impact_paths": state.get("impact_paths"),
+        "agents": state.get("agents"),
+        "suppliers": state.get("suppliers"),
+        "earnings": state.get("earnings"),
+        "price_moves": state.get("price_moves"),
+        "issues": state.get("issues"),
+        "macros": state.get("macros")
+    }
 
 
 def bear_node(state: ReportState, agent: BearAgent) -> Dict:
@@ -234,7 +264,7 @@ def bear_node(state: ReportState, agent: BearAgent) -> Dict:
     
     result = agent.argue(state, opponent_last_arg=opponent_arg)
     
-    # 실시간 토론 내용 출력 (10줄 미리보기)
+    # 실시간 토론 내용 출력
     argument = result["argument"]
     lines = argument.split('\n')
     preview_lines = lines[:]
@@ -250,14 +280,43 @@ def bear_node(state: ReportState, agent: BearAgent) -> Dict:
     debate_state["bear_history"] += f"\n\n## Round {round_num} - Bear\n{result['argument']}"
     debate_state["full_history"] += f"\n\n[Round {round_num} - Bear]\n{result['argument']}"
     
+    # [NEW] 범용 데이터(Impact Paths, Nodes)를 State에 누적
+    retrieved_data = result.get("retrieved_data", {})
+    if retrieved_data:
+        state_paths = state.get("impact_paths", []) or []
+        new_paths = retrieved_data.get("impact_paths", [])
+        for p in new_paths:
+            if p not in state_paths:
+                state_paths.append(p)
+        state["impact_paths"] = state_paths
+        
+        for key in ["agents", "suppliers", "earnings", "price_moves", "issues", "macros"]:
+            existing = state.get(key, []) or []
+            new_ones = retrieved_data.get(key, [])
+            for n in new_ones:
+                if n not in existing:
+                    existing.append(n)
+            state[key] = existing
+
     # 라운드 증가
     debate_state["debate_count"] += 1
     
     debate_trace = debate_state.get("debate_trace", [])
     debate_trace.append(f"Bear Round {debate_state['debate_count']} 완료")
-    debate_state["debate_trace"] = debate_trace
-    
-    return {"debate_state": debate_state}
+    debate_state["debate_trace"] = debate_state.get("debate_trace", []) # Safe check
+    debate_trace = debate_state["debate_trace"]
+    debate_state["debate_trace"] = debate_trace # Re-assign for clarity
+
+    return {
+        "debate_state": debate_state,
+        "impact_paths": state.get("impact_paths"),
+        "agents": state.get("agents"),
+        "suppliers": state.get("suppliers"),
+        "earnings": state.get("earnings"),
+        "price_moves": state.get("price_moves"),
+        "issues": state.get("issues"),
+        "macros": state.get("macros")
+    }
 
 
 def judge_node(state: ReportState, agent: JudgeAgent) -> Dict:
