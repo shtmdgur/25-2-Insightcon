@@ -23,6 +23,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Imports
 from langchain_google_genai import ChatGoogleGenerativeAI
+from src.config.llm_config import get_deep_model
 from src.pipeline.debate_workflow import create_debate_workflow
 from src.agents.bull_agent import BullAgent
 from src.agents.bear_agent import BearAgent
@@ -72,9 +73,9 @@ def main():
         llm = MagicMock()
         llm.invoke.return_value.content = "Mock LLM Response"
     else:
-        print("✅ Real LLM Initialized (gemini-3-pro-preview)")
+        print(f"✅ Real LLM Initialized ({get_deep_model()})")
         llm = ChatGoogleGenerativeAI(
-            model="gemini-3-pro-preview", 
+            model=get_deep_model(), 
             google_api_key=api_key,
             temperature=0.7 
         )

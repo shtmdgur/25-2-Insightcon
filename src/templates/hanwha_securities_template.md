@@ -51,28 +51,13 @@
 | :---: | :---: |
 | ![Debate Score]({{ score_chart_path }}) | ![Radar Chart]({{ radar_chart_path }}) |
 
+
+{% if financial_chart_path %}
 **[주요 지표 추이]**
 ![Financial Trend]({{ financial_chart_path }})
+{% endif %}
 
 ---
-
-### 참고 자료 (References & Provenance)
-
-> [!NOTE]
-> **Pipeline Test Mode**: 현재 외부 데이터 피드 미연결 상태입니다.
-> 
-> **Graph State**:
-> - Events: 0개 (실제 연동 시 증가 예정)
-> - Financial Metrics: 0개 (실제 연동 시 증가 예정)
-> - Market Context: Mock Signal (input to judicial agent during test)
-> 
-> **Next Steps**: FDR/FRED/공시시스템 API 연동 예정
-
-**Checked Impact Paths**:
-{{ graph_paths }}
-
-**Sources**:
-{{ sources }}
 
 ---
 

@@ -6,12 +6,14 @@ from typing import Dict, Optional
 import jinja2
 import os
 
-# WeasyPrint is optional
+# WeasyPrint is optional (requires GTK on Windows)
 try:
     from weasyprint import HTML, CSS
     WEASYPRINT_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError):
     WEASYPRINT_AVAILABLE = False
+    HTML = None
+    CSS = None
 
 class HanwhaSecuritiesReportFormatter:
     """한화투자증권 스타일 리포트 생성기"""
@@ -73,16 +75,16 @@ class HanwhaSecuritiesReportFormatter:
             investment_opinion=investment_opinion,
             executive_summary=self._generate_summary(synthesis),
             
-            # 재무 데이터 (Mock or Real) - 단위: 조원 (Trillion Won)
-            revenue_2023=f"{analysis_data.get('revenue_2023', 0):,}조원",
-            revenue_2024=f"{analysis_data.get('revenue_2024', 0):,}조원",
-            revenue_2025=f"{analysis_data.get('revenue_2025', 0):,}조원",
-            op_2023=f"{analysis_data.get('op_2023', 0):,}조원",
-            op_2024=f"{analysis_data.get('op_2024', 0):,}조원",
-            op_2025=f"{analysis_data.get('op_2025', 0):,}조원",
-            eps_2023=f"{analysis_data.get('eps_2023', 0):,}원",
-            eps_2024=f"{analysis_data.get('eps_2024', 0):,}원",
-            eps_2025=f"{analysis_data.get('eps_2025', 0):,}원",
+            # 재무 데이터 (실제 값이 없으면 "N/A" 반환)
+            revenue_2023=self._safe_format(analysis_data.get('revenue_2023'), "조원"),
+            revenue_2024=self._safe_format(analysis_data.get('revenue_2024'), "조원"),
+            revenue_2025=self._safe_format(analysis_data.get('revenue_2025'), "조원"),
+            op_2023=self._safe_format(analysis_data.get('op_2023'), "조원"),
+            op_2024=self._safe_format(analysis_data.get('op_2024'), "조원"),
+            op_2025=self._safe_format(analysis_data.get('op_2025'), "조원"),
+            eps_2023=self._safe_format(analysis_data.get('eps_2023'), "원"),
+            eps_2024=self._safe_format(analysis_data.get('eps_2024'), "원"),
+            eps_2025=self._safe_format(analysis_data.get('eps_2025'), "원"),
             
             # 분석 섹션
             business_structure=analysis_data.get('business_structure', 'N/A'),
@@ -130,6 +132,25 @@ class HanwhaSecuritiesReportFormatter:
             return "매도 (Sell)"
         else:
             return "중립 (Hold)"
+    
+    def _safe_format(self, value, unit: str = "") -> str:
+        """숫자 값을 안전하게 포맷팅 (비숫자 값은 N/A 반환)"""
+        if value is None:
+            return "N/A"
+        if isinstance(value, str):
+            # 이미 문자열인 경우 (N/A, 데이터 미연동 등)
+            if "N/A" in value or "미연동" in value or not value.strip():
+                return "N/A"
+            try:
+                value = float(value.replace(",", ""))
+            except ValueError:
+                return "N/A"
+        try:
+            if isinstance(value, (int, float)):
+                return f"{value:,.0f}{unit}"
+            return "N/A"
+        except (TypeError, ValueError):
+            return "N/A"
     
     def _extract_target_price(self, synthesis: str) -> int:
         """Synthesis에서 목표주가 추출"""

@@ -62,7 +62,18 @@ def create_debate_workflow(
         
     if validator_agent:
         workflow.add_edge("synthesizer", "validator")
-        workflow.add_edge("validator", END)
+        
+        def should_retry_synthesis(state: ReportState):
+            val_res = state["debate_state"].get("validation_result", {})
+            if val_res.get("decision") == "fail" and state.get("retry_count", 0) < 2:
+                print(f"⚠️ Validation Failed. Retrying Synthesizer... (Retry: {state.get('retry_count', 0) + 1}/2)")
+                return "retry"
+            return "end"
+            
+        workflow.add_conditional_edges("validator", should_retry_synthesis, {
+            "retry": "synthesizer",
+            "end": END
+        })
     else:
         workflow.add_edge("synthesizer", END)
     
@@ -74,7 +85,95 @@ def create_debate_workflow(
 # ============================================================
 
 def initialize_debate(state: ReportState) -> ReportState:
-    """토론 상태 초기화"""
+    """토론 상태 초기화, 자연어 쿼리 파싱, Document 처리"""
+    from datetime import datetime
+    from pathlib import Path
+    from src.utils.query_intent_parser import QueryIntentParser
+    
+    # 0. Document 내용 로드 (파일 경로인 경우)
+    query = state.get("query", "")
+    document = state.get("document")
+    document_content = None
+    
+    if document:
+        try:
+            doc_path = Path(document)
+            if doc_path.exists() and doc_path.is_file():
+                # 1. 파일인 경우
+                if doc_path.suffix.lower() in ['.txt', '.md', '.csv']:
+                    with open(doc_path, 'r', encoding='utf-8') as f:
+                        document_content = f.read()
+                    print(f"📄 텍스트 문서 로드 완료: {doc_path.name} ({len(document_content)} 자)")
+                elif doc_path.suffix.lower() == '.pdf':
+                    # PDF는 Gemini PDF 파서 사용 시도
+                    try:
+                        from src.agents.parsers.pdf_parser_agent import GeminiPDFParser
+                        print(f"📄 PDF 문서 인식: {doc_path.name} (분석 중...)")
+                        # PDF 파싱은 시간이 걸릴 수 있으므로, 여기서는 메타데이터 위주로 먼저 표시
+                        # 실제 KG 주입은 별도 프로세스에서 수행되지만, 토론용 텍스트가 필요함
+                        # 일단 경로 정보만 유지하고, Parser.parse_document에서 LLM이 파일을 직접 보게 할 수도 있음
+                        document_content = f"[PDF 파일: {doc_path.name}]"
+                    except ImportError:
+                        print(f"⚠️ GeminiPDFParser 로드 실패 (PDF 분석 불가)")
+                        document_content = f"[PDF 파일: {doc_path.name}]"
+            else:
+                # 2. 파일이 아니면 직접 입력된 텍스트로 간주
+                document_content = document
+                print(f"📄 직접 입력된 문서 컨텍스트 사용 ({len(document_content)} 자)")
+        except Exception as e:
+            # Path 변환 오류 등 발생 시 텍스트로 처리
+            document_content = document
+            print(f"📄 문서 텍스트 사용 ({len(document_content)} 자)")
+    
+    # 1. 자연어 쿼리 파싱 (LLM을 사용하여 기업명, 날짜, 의도 추출)
+    if query and not state.get("target_companies"):
+        # LLM 초기화 (기업명 추출에 활용)
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from src.config.llm_config import get_model
+            llm = ChatGoogleGenerativeAI(model=get_model("query_parsing"), temperature=0.0)
+            parser = QueryIntentParser(llm)  # LLM으로 기업명 추출!
+        except Exception as e:
+            print(f"⚠️ LLM 초기화 실패, 규칙 기반 파싱 사용: {e}")
+            parser = QueryIntentParser()
+        
+        intent = parser.parse(query, document)
+        
+        # 파싱 결과로 state 업데이트 (없는 경우만)
+        if intent["target_companies"] and not state.get("target_companies"):
+            state["target_companies"] = intent["target_companies"]
+            print(f"🏢 분석 대상 추출: {intent['target_companies']}")
+        
+        if intent["target_date"] and not state.get("target_date"):
+            state["target_date"] = intent["target_date"]
+        
+        print(f"💡 쿼리 의도: {intent['intent']}")
+    
+    # 2. Document 요약 (document_content가 있는 경우)
+    if document_content and len(document_content) > 100:
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from src.config.llm_config import get_model
+            
+            llm = ChatGoogleGenerativeAI(model=get_model("query_parsing"), temperature=0.3)
+            parser = QueryIntentParser(llm)
+            doc_analysis = parser.parse_document(document_content)
+            
+            if doc_analysis and not doc_analysis.get("error"):
+                print(f"📋 문서 분석 완료: {doc_analysis.get('main_topic', 'N/A')}")
+                # Document 요약을 state에 저장 (Debate에서 활용)
+                state["document_summary"] = doc_analysis
+        except Exception as e:
+            print(f"⚠️ 문서 분석 스킵: {e}")
+    
+    # 3. target_date 기본값 설정
+    if not state.get("target_date"):
+        state["target_date"] = datetime.now().strftime("%Y-%m-%d")
+        print(f"📅 분석 기준일 자동 설정: {state['target_date']}")
+    else:
+        print(f"📅 분석 기준일: {state['target_date']}")
+    
+    # 4. Debate 상태 초기화
     debate_state: DebateState = {
         "bull_history": "",
         "bear_history": "",
@@ -90,6 +189,7 @@ def initialize_debate(state: ReportState) -> ReportState:
     }
     
     state["debate_state"] = debate_state
+    state["retry_count"] = 0 # 재시도 횟수 초기화
     return state
 
 
@@ -102,17 +202,57 @@ def bull_node(state: ReportState, agent: BullAgent) -> Dict:
     
     result = agent.argue(state, opponent_last_arg=opponent_arg)
     
+    # 실시간 토론 내용 출력 (10줄 미리보기)
+    argument = result["argument"]
+    lines = argument.split('\n')
+    preview_lines = lines[:]
+    print("\n🔴 [Bull 주장]")
+    print("-" * 40)
+    for line in preview_lines:
+        print(line)
+    print("-" * 40)
+    
     # State 업데이트
     debate_state = state["debate_state"]
     debate_state["current_bull_arg"] = result["argument"]
     debate_state["bull_history"] += f"\n\n## Round {round_num} - Bull\n{result['argument']}"
     debate_state["full_history"] += f"\n\n[Round {round_num} - Bull]\n{result['argument']}"
     
+    # [NEW] 범용 데이터(Impact Paths, Nodes)를 State에 누적 (Synthesizer 시각화용)
+    retrieved_data = result.get("retrieved_data", {})
+    if retrieved_data:
+        # Impact Paths 누적
+        state_paths = state.get("impact_paths", []) or []
+        new_paths = retrieved_data.get("impact_paths", [])
+        for p in new_paths:
+            if p not in state_paths:
+                state_paths.append(p)
+        state["impact_paths"] = state_paths
+        
+        # 엔티티 타입별 누적 (agents, suppliers, earnings, price_moves, issues, macros)
+        for key in ["agents", "suppliers", "earnings", "price_moves", "issues", "macros"]:
+            existing = state.get(key, []) or []
+            new_ones = retrieved_data.get(key, [])
+            for n in new_ones:
+                if n not in existing:
+                    existing.append(n)
+            state[key] = existing
+
     debate_trace = debate_state.get("debate_trace", [])
     debate_trace.append(f"Bull Round {round_num} 완료")
     debate_state["debate_trace"] = debate_trace
     
-    return {"debate_state": debate_state}
+    # 누적된 데이터들도 명시적으로 리턴하여 State 업데이트 강제
+    return {
+        "debate_state": debate_state, 
+        "impact_paths": state.get("impact_paths"),
+        "agents": state.get("agents"),
+        "suppliers": state.get("suppliers"),
+        "earnings": state.get("earnings"),
+        "price_moves": state.get("price_moves"),
+        "issues": state.get("issues"),
+        "macros": state.get("macros")
+    }
 
 
 def bear_node(state: ReportState, agent: BearAgent) -> Dict:
@@ -124,20 +264,59 @@ def bear_node(state: ReportState, agent: BearAgent) -> Dict:
     
     result = agent.argue(state, opponent_last_arg=opponent_arg)
     
+    # 실시간 토론 내용 출력
+    argument = result["argument"]
+    lines = argument.split('\n')
+    preview_lines = lines[:]
+    print("\n🔵 [Bear 주장]")
+    print("-" * 40)
+    for line in preview_lines:
+        print(line)
+    print("-" * 40)
+    
     # State 업데이트
     debate_state = state["debate_state"]
     debate_state["current_bear_arg"] = result["argument"]
     debate_state["bear_history"] += f"\n\n## Round {round_num} - Bear\n{result['argument']}"
     debate_state["full_history"] += f"\n\n[Round {round_num} - Bear]\n{result['argument']}"
     
+    # [NEW] 범용 데이터(Impact Paths, Nodes)를 State에 누적
+    retrieved_data = result.get("retrieved_data", {})
+    if retrieved_data:
+        state_paths = state.get("impact_paths", []) or []
+        new_paths = retrieved_data.get("impact_paths", [])
+        for p in new_paths:
+            if p not in state_paths:
+                state_paths.append(p)
+        state["impact_paths"] = state_paths
+        
+        for key in ["agents", "suppliers", "earnings", "price_moves", "issues", "macros"]:
+            existing = state.get(key, []) or []
+            new_ones = retrieved_data.get(key, [])
+            for n in new_ones:
+                if n not in existing:
+                    existing.append(n)
+            state[key] = existing
+
     # 라운드 증가
     debate_state["debate_count"] += 1
     
     debate_trace = debate_state.get("debate_trace", [])
     debate_trace.append(f"Bear Round {debate_state['debate_count']} 완료")
-    debate_state["debate_trace"] = debate_trace
-    
-    return {"debate_state": debate_state}
+    debate_state["debate_trace"] = debate_state.get("debate_trace", []) # Safe check
+    debate_trace = debate_state["debate_trace"]
+    debate_state["debate_trace"] = debate_trace # Re-assign for clarity
+
+    return {
+        "debate_state": debate_state,
+        "impact_paths": state.get("impact_paths"),
+        "agents": state.get("agents"),
+        "suppliers": state.get("suppliers"),
+        "earnings": state.get("earnings"),
+        "price_moves": state.get("price_moves"),
+        "issues": state.get("issues"),
+        "macros": state.get("macros")
+    }
 
 
 def judge_node(state: ReportState, agent: JudgeAgent) -> Dict:
@@ -145,6 +324,18 @@ def judge_node(state: ReportState, agent: JudgeAgent) -> Dict:
     print(f"\n{'='*80}\n⚖️  Judge - Rendering Verdict...\n{'='*80}")
     
     result = agent.judge(state)
+    
+    # 실시간 판결 결과 출력
+    print("\n📢 [Judge 판결 결과]")
+    print("-" * 40)
+    print(f"   Decision: {result.get('decision', 'N/A')}")
+    print(f"   Score: {result.get('score', 'N/A')}/100")
+    print(f"   Confidence: {result.get('confidence_level', 'N/A')}")
+    print(f"   Winning Side: {result.get('winning_side', 'N/A')}")
+    rationale = result.get('rationale', '')
+    if rationale:
+        print(f"   Rationale: {rationale[:150]}..." if len(rationale) > 150 else f"   Rationale: {rationale}")
+    print("-" * 40)
     
     debate_state = state["debate_state"]
     debate_state["judge_result"] = result
@@ -187,7 +378,15 @@ def validator_node(state: ReportState, agent: ValidatorAgent) -> Dict:
     debate_trace.append(f"Validator: {result.get('decision', 'fail')}")
     debate_state["debate_trace"] = debate_trace
     
-    return {"debate_state": debate_state}
+    # 실패 시 retry_count 증가
+    retry_count = state.get("retry_count", 0)
+    if result.get("decision") == "fail":
+        retry_count += 1
+    
+    return {
+        "debate_state": debate_state, 
+        "retry_count": retry_count
+    }
 
 
 # ========================================
@@ -209,3 +408,61 @@ def update_cached_paths(state: ReportState, round_num: int, paths: list) -> Repo
     
     state["debate_state"]["cached_paths"][round_num] = paths
     return state
+
+
+def create_debate_workflow_for_studio():
+    """
+    LangGraph Studio/CLI용 워크플로우 생성
+    
+    langgraph.json에서 이 함수를 진입점으로 사용합니다.
+    환경변수에서 Neo4j, LLM 설정을 자동으로 로드합니다.
+    
+    Returns:
+        CompiledStateGraph: 컴파일된 Debate 워크플로우
+    """
+    import os
+    from dotenv import load_dotenv
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from src.dataflows.neo4j_loader import Neo4jKGLoader
+    from src.config.llm_config import get_model
+    
+    load_dotenv()
+    
+    # LLM 초기화
+    llm = ChatGoogleGenerativeAI(
+        model=get_model("debate"),
+        temperature=0.7
+    )
+    
+    # Neo4j 연결 (옵션)
+    neo4j_conn = None
+    try:
+        neo4j_uri = os.getenv("NEO4J_URI")
+        neo4j_user = os.getenv("NEO4J_USER", os.getenv("NEO4J_USERNAME", "neo4j"))
+        neo4j_password = os.getenv("NEO4J_PASSWORD")
+        
+        if neo4j_uri and neo4j_password:
+            neo4j_conn = Neo4jKGLoader(
+                uri=neo4j_uri,
+                user=neo4j_user,
+                password=neo4j_password
+            )
+    except Exception as e:
+        print(f"[경고] Neo4j 연결 실패: {e}")
+    
+    # Agent 초기화
+    bull = BullAgent(llm, neo4j_conn)
+    bear = BearAgent(llm, neo4j_conn)
+    judge = JudgeAgent(llm, neo4j_conn)
+    synthesizer = SynthesizerAgent(llm, neo4j_conn)
+    validator = ValidatorAgent(llm, neo4j_conn)
+    
+    # 워크플로우 생성 및 반환
+    return create_debate_workflow(
+        bull_agent=bull,
+        bear_agent=bear,
+        judge_agent=judge,
+        synthesizer_agent=synthesizer,
+        validator_agent=validator
+    )
+

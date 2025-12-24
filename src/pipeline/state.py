@@ -39,10 +39,12 @@ class ReportState(TypedDict):
     # 1. 입력 필드 (사용자 입력)
     # ========================================
     query: str  # 사용자 질의
+    ticker: Optional[str]  # 분석 대상 종목 코드 (e.g., "005930")
     target_companies: Optional[List[str]]  # 분석 대상 기업 목록
-    report_type: Literal["scan", "deep"]  # 분석 깊이 ("scan": Quick, "deep": Deep)
     target_date: Optional[str]  # 분석 기준 날짜 (YYYY-MM-DD, Price DB 조회용)
     document: Optional[str]  # 새로 처리할 문서 (파일 경로 또는 텍스트)
+    document_summary: Optional[Dict[str, Any]]  # [NEW] 문서 요약 정보 (주제, 키포인트 등)
+    impact_paths: Optional[List[str]]  # Debate Agent가 사용할 Impact Paths (prompts.yaml 호환)
     
     # ========================================
     # 2. Parser 결과 (Phase 0)

@@ -37,8 +37,16 @@ class JudgeAgent(BaseDebateAgent):
         bull_history = debate_state.get("bull_history", "")
         bear_history = debate_state.get("bear_history", "")
         
+        # [TOKEN LIMIT FIX] 히스토리 길이 제한 (각 15000자)
+        MAX_HISTORY_LEN = 15000
+        if len(bull_history) > MAX_HISTORY_LEN:
+            bull_history = bull_history[:MAX_HISTORY_LEN] + "\n\n[...이전 내용 생략...]"
+        if len(bear_history) > MAX_HISTORY_LEN:
+            bear_history = bear_history[:MAX_HISTORY_LEN] + "\n\n[...이전 내용 생략...]"
+        
         data = self._extract_data_from_state(state)
-        impact_paths = str(data.get("impact_paths", []))
+        # Impact paths도 길이 제한
+        impact_paths = str(data.get("impact_paths", []))[:5000]
         
         # 2. 템플릿 로드
         template = self.prompts.get("debate_agents", {}).get("judge", {}).get("instruction", "")
@@ -49,7 +57,8 @@ class JudgeAgent(BaseDebateAgent):
             bull_history=bull_history,
             bear_history=bear_history,
             critical_paths=impact_paths,
-            market_context=state.get("market_context", "No market data available.")
+            market_context=state.get("market_context", "No market data available."),
+            document_context=self._format_document_summary(data.get("document_summary"))
         )
         
         # 4. LLM 실행

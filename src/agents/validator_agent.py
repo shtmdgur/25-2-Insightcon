@@ -38,6 +38,7 @@ class ValidatorAgent(BaseDebateAgent):
 
         # 2. 프롬프트 구성
         prompt = template.format(
+            query=state.get("query", "알 수 없음"),
             report_content=report_content,
             context_data=context_data
         )

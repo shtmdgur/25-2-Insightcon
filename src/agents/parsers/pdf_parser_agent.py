@@ -285,14 +285,14 @@ class GeminiPDFParser(ParserInterface):
                 return
 
             # Batch 임베딩 생성 (text-embedding-004)
-            # 한 번에 최대 100개씩 처리 권장
+            # Batch 임베딩 생성 (gemini-embedding-001)
             batch_size = 100
             for i in range(0, len(texts), batch_size):
                 batch_texts = texts[i:i + batch_size]
                 batch_entities = valid_entities[i:i + batch_size]
                 
                 response = client.models.embed_content(
-                    model="text-embedding-004",
+                    model="gemini-embedding-001",
                     contents=batch_texts
                 )
                 

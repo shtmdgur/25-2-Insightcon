@@ -214,8 +214,8 @@ class KnowledgeGraph(BaseModel):
     """
     지식 그래프 모델
     """
-    entities: List[Entity] = Field(description="엔티티 목록")
-    relations: List[Relation] = Field(description="관계 목록")
+    entities: List[Entity] = Field(default_factory=list, description="엔티티 목록")
+    relations: List[Relation] = Field(default_factory=list, description="관계 목록")
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
         description="메타데이터"
@@ -247,13 +247,26 @@ class KnowledgeGraph(BaseModel):
         entities = [Entity.from_gemini_dict(e) for e in data.get("entities", [])]
         relations = [Relation.from_gemini_dict(r) for r in data.get("relations", [])]
         return cls(entities=entities, relations=relations)
+    
+    def merge(self, other: "KnowledgeGraph") -> None:
+        """
+        다른 KnowledgeGraph를 현재 객체에 병합
+        
+        Args:
+            other: 병합할 KnowledgeGraph 객체
+        
+        Note:
+            중복 엔티티/관계는 여기서 제거하지 않음 (Neo4j MERGE에서 처리)
+        """
+        self.entities.extend(other.entities)
+        self.relations.extend(other.relations)
 
 
 # 관계별 도메인/레인지 스키마 (v3.0)
 RELATION_SCHEMA: Dict[RelationType, Dict[str, List[NodeType]]] = {
     RelationType.AFFECTS: {
         "domain": [NodeType.ECONOMIC_INDICATOR, NodeType.ISSUE, NodeType.EARNINGS, NodeType.DISCLOSURE],
-        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER],
+        "range": [NodeType.IDM, NodeType.FABLESS, NodeType.FOUNDRY, NodeType.OSAT, NodeType.SUPPLIER, NodeType.ETC],
     },
     RelationType.TRIGGERED_BY: {
         "domain": [NodeType.EARNINGS, NodeType.PRICE_MOVEMENT, NodeType.DISCLOSURE, NodeType.ISSUE],
@@ -315,6 +328,7 @@ ENTITY_TYPE_PROPERTIES = {
     NodeType.PRICE_MOVEMENT: ["direction", "magnitude", "is_significant", "trigger"],
     NodeType.DISCLOSURE: ["direction", "sentiment"],
     NodeType.ISSUE: ["description"],
+    NodeType.ETC: ["ticker", "description"],  # v3.1: 반도체 외 기업
 }
 
 # 관계 타입별 의미 있는 속성 정의 (v3.0)

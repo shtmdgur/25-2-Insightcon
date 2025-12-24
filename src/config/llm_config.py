@@ -55,6 +55,7 @@ TASK_TO_MODEL: Dict[str, str] = {
     "event_analysis": MODELS["flash"],
     
     # 토론/추론 (Deep Think)
+    "debate": MODELS["deep"],
     "bull_argument": MODELS["deep"],
     "bear_argument": MODELS["deep"],
     "quality_check": MODELS["deep"],
@@ -62,7 +63,8 @@ TASK_TO_MODEL: Dict[str, str] = {
     "synthesis": MODELS["deep"],
     "final_report": MODELS["deep"],
     
-    # 배치 처리
+    # 쿼리 분석 및 유틸리티
+    "query_parsing": MODELS["flash"],
     "batch": MODELS["flash"],
 }
 

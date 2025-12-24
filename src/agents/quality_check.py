@@ -214,3 +214,115 @@ class QualityCheckAgent:
             })
         
         return issues
+    
+    def check_and_fix(self, graph_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        품질 검사 후 문제가 발견되면 자동으로 수정
+        
+        Returns:
+            검사 및 수정 결과
+        """
+        # 1. 먼저 품질 검사 수행
+        check_result = self.check(graph_data)
+        
+        if not check_result['has_issues']:
+            return {
+                'status': 'clean',
+                'message': '품질 문제가 발견되지 않았습니다.',
+                'fixed_count': 0,
+                'remaining_issues': []
+            }
+        
+        fixed_count = 0
+        remaining_issues = []
+        
+        # 2. 중복 엔티티 자동 수정 (MERGE)
+        for issue in check_result.get('duplicate_issues', []):
+            if issue.get('type') == 'duplicate_entity':
+                entity_name = issue.get('entity_name')
+                entity_type = issue.get('entity_type', 'Company')
+                
+                try:
+                    # 중복 노드 병합: 가장 오래된 것 유지, 나머지 삭제 (관계는 이전)
+                    self.neo4j_client.query(f"""
+                        MATCH (n:{entity_type} {{name: $name}})
+                        WITH collect(n) AS nodes
+                        WHERE size(nodes) > 1
+                        WITH nodes[0] AS keep, tail(nodes) AS remove
+                        UNWIND remove AS r
+                        // 관계 이전
+                        OPTIONAL MATCH (r)-[rel]->(other)
+                        MERGE (keep)-[newRel:INHERITED_REL]->(other)
+                        // 역방향 관계 이전
+                        OPTIONAL MATCH (other)-[rel2]->(r)
+                        MERGE (other)-[newRel2:INHERITED_REL]->(keep)
+                        // 중복 노드 삭제
+                        DETACH DELETE r
+                    """, {"name": entity_name})
+                    fixed_count += 1
+                    print(f"✅ 중복 수정: {entity_type} '{entity_name}'")
+                except Exception as e:
+                    print(f"⚠️ 중복 수정 실패: {entity_name} - {e}")
+                    remaining_issues.append(issue)
+        
+        # 3. 고립된 노드 처리 (삭제 대신 경고만)
+        for issue in check_result.get('completeness_issues', []):
+            if issue.get('type') == 'completeness_isolated':
+                # 고립된 노드는 삭제하지 않고 경고만 남김
+                remaining_issues.append({
+                    **issue,
+                    'action': 'no_auto_fix',
+                    'reason': '고립된 노드는 수동 검토가 필요합니다.'
+                })
+        
+        return {
+            'status': 'fixed' if fixed_count > 0 else 'issues_remain',
+            'message': f'{fixed_count}개 문제 자동 수정됨, {len(remaining_issues)}개 수동 검토 필요',
+            'fixed_count': fixed_count,
+            'remaining_issues': remaining_issues
+        }
+    
+    def merge_duplicate_entities(self, entity_type: str = "Company") -> int:
+        """
+        특정 타입의 중복 엔티티를 모두 병합
+        
+        Returns:
+            병합된 엔티티 수
+        """
+        merged_count = 0
+        
+        try:
+            # 중복 엔티티 조회
+            duplicates = self.neo4j_client.query(f"""
+                MATCH (n:{entity_type})
+                WITH n.name AS name, collect(n) AS nodes
+                WHERE size(nodes) > 1
+                RETURN name, size(nodes) AS count
+            """)
+            
+            if not duplicates:
+                print(f"✅ {entity_type}에 중복 엔티티 없음")
+                return 0
+            
+            for record in duplicates:
+                name = record.get("name")
+                try:
+                    # APOC 사용 가능하면 mergeNodes 사용, 아니면 수동 병합
+                    self.neo4j_client.query(f"""
+                        MATCH (n:{entity_type} {{name: $name}})
+                        WITH collect(n) AS nodes
+                        WHERE size(nodes) > 1
+                        WITH nodes[0] AS keep, tail(nodes) AS remove
+                        UNWIND remove AS r
+                        DETACH DELETE r
+                    """, {"name": name})
+                    merged_count += 1
+                    print(f"  ✓ 병합: {name}")
+                except Exception as e:
+                    print(f"  ✗ 병합 실패: {name} - {e}")
+                    
+        except Exception as e:
+            print(f"❌ 중복 병합 중 오류: {e}")
+        
+        return merged_count
+

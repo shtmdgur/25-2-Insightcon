@@ -40,6 +40,7 @@ from dotenv import load_dotenv
 from neo4j import GraphDatabase
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core import globals as langchain_globals
+from src.config.llm_config import get_deep_model
 
 # LangChain 디버그 모드 완전 비활성화
 langchain_globals.set_debug(False)
@@ -163,7 +164,7 @@ def main():
     # 2. LLM 초기화
     print("\n[2] Gemini LLM 초기화...")
     llm = ChatGoogleGenerativeAI(
-        model="gemini-3-pro-preview",
+        model=get_deep_model(),
         google_api_key=GEMINI_API_KEY,
         temperature=0.0,
         verbose=False  # 디버그 출력 억제

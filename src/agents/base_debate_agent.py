@@ -19,16 +19,19 @@ except ImportError:
 
 TOOLS_AVAILABLE = len(ALL_TOOLS) > 0
 
-# 토론 라운드별 검색 전략 (Broad Search → LLM Cognitive Filtering)
-# hop: 탐색 깊이, limit: 반환 경로 수
+# 토론 라운드별 검색 전략:
+# - 라운드 1: 넓고 얕게 (다양한 논점 수집)
+# - 라운드 2: 중간 깊이 (반박 근거 탐색)
+# - 라운드 3: 좁고 깊게 (핵심 인과 체인 추적)
+# hops: 최대 탐색 깊이 (가변 길이 경로 *..hops 사용)
 DEBATE_ROUND_STRATEGY = {
-    1: {"hops": 2, "limit": 30},  # 1라운드: 얕고 넓게 - 다양한 논점
-    2: {"hops": 3, "limit": 25},  # 2라운드: 중간 깊이
-    3: {"hops": 4, "limit": 20}   # 3라운드: 깊이 탐색 - 핵심 인과
+    1: {"hops": 3, "limit": 80},   # 1라운드: 넓게 시작 - 많은 논점
+    2: {"hops": 6, "limit": 50},   # 2라운드: 중간 깊이 - 반박 근거
+    3: {"hops": 10, "limit": 30}   # 3라운드: 최대 깊이 - 핵심 인과 체인
 }
 
-# 초기 노드 추출 시 타입당 최대 개수 (부족하면 LLM이 explore_graph Tool 호출)
-NODE_EXTRACT_LIMIT = 10
+# 초기 노드 추출 시 타입당 최대 개수
+NODE_EXTRACT_LIMIT = 30
 
 class BaseDebateAgent(ABC):
     """
@@ -84,24 +87,24 @@ class BaseDebateAgent(ABC):
         1. GraphRAG 결과 파싱
         2. 범용 영향 경로(Impact Paths) 탐색 결과 병합 (Progressive Expansion)
         """
-        target_company = state.get("target_companies", [None])[0]
+        target_companies = state.get("target_companies", [])
+        target_company = target_companies[0] if target_companies else None
+
         
         # 토론 라운드 및 캐시 추출 (Progressive Path Expansion)
         debate_state = state.get("debate_state", {})
         debate_count = debate_state.get("debate_count", 1)
         cached_paths = debate_state.get("cached_paths", {})
         
-        # Impact Paths 조회 (캐시 활용)
+        # Impact Paths 조회 (캐시 활용, 날짜 필터링 추가)
         impact_paths = []
+        target_date = state.get("target_date")
         if target_company:
-            impact_paths = self._find_impact_paths(target_company, debate_count, cached_paths)
-            # 현재 라운드 결과를 캐시에 저장 (State 업데이트는 Workflow에서 처리)
-            # 여기서는 반환만 하고, Workflow가 state["debate_state"]["cached_paths"][round] = paths 저장
+            impact_paths = self._find_impact_paths(target_company, debate_count, cached_paths, target_date)
         
         # 초기 Price 컨텍스트 조회 (target_date가 있는 경우)
         market_context = state.get("market_context", "")
         if not market_context:
-            target_date = state.get("target_date")
             ticker = target_company if target_company else state.get("query", "")
             if target_date and ticker:
                 try:
@@ -111,30 +114,46 @@ class BaseDebateAgent(ABC):
                 except Exception as e:
                     market_context = f"[Price 조회 실패: {e}]"
         
+        # correlation 정보 추출 (impact_paths에서)
+        correlation_summary = self._extract_correlation_summary(impact_paths)
+        
         return {
-            "agents": self._extract_nodes_by_type(state, ["IDM", "Fabless", "Foundry", "OSAT"]),
+            # === Agent Layer (모든 기업 타입) ===
+            "agents": self._extract_nodes_by_type(state, ["IDM", "Fabless", "Foundry", "OSAT", "Organization", "ETC"]),
             "suppliers": self._extract_nodes_by_type(state, ["Supplier"]),
+            
+            # === Signal Layer (모든 신호 타입) - 키 이름을 _format_data_context와 일치시킴 ===
             "earnings": self._extract_nodes_by_type(state, ["Earnings"]),
             "price_moves": self._extract_nodes_by_type(state, ["PriceMovement"]),
             "issues": self._extract_nodes_by_type(state, ["Issue", "Disclosure"]),
+            
+            # === Macro Layer ===
             "macros": self._extract_nodes_by_type(state, ["EconomicIndicator"]),
+            
+            # === 인과 경로 (핵심 정보) ===
             "impact_paths": impact_paths,
-            "query": state.get("query", ""),
-            "market_context": market_context  # Price DB 시장 데이터 (초기 조회 또는 state 값)
+            
+            # === 쿼리 및 컨텍스트 (키 이름 유지) ===
+            "query": state.get("query", ""),  # _format_data_context에서 "query" 키 사용
+            "target_company": target_company,
+            "target_date": state.get("target_date"),
+            "market_context": market_context,
+            "correlation": correlation_summary,
+            "document_summary": state.get("document_summary")
         }
 
-    def _find_impact_paths(self, target_company: str, debate_count: int = 1, cached_paths: Dict[int, List[Dict]] = None) -> List[Dict]:
+    def _find_impact_paths(self, target_company: str, debate_count: int = 1, cached_paths: Dict[int, List[Dict]] = None, target_date: str = None) -> List[Dict]:
         """
         [Layered Traversal Strategy - Schema v3.0]
         
-        레이어별 관계 탐색:
+        레이어별 관계 탐색 (날짜 필터링 포함):
         1. Agent → Signal (HAS_SIGNAL): 기업 직접 시그널
         2. Signal → Signal (TRIGGERED_BY): 인과 체인
         3. Macro → Agent (AFFECTS): 거시경제 영향
         4. Agent ↔ Agent (COMPETES_WITH, PARTNERS_WITH, SUPPLIES): 경쟁/협력/공급망
         
-        벡터 임베딩 활용 (Agentic Search):
-        - query embedding과 node embedding의 코사인 유사도를 기반으로 관련 노드/경로 우선 탐색
+        날짜 필터링 로직:
+        - Signal 노드(Earnings, Issue 등)는 date 속성이 target_date보다 작거나 같은 경우만 포함
         """
         if not self.neo4j:
             return []
@@ -157,18 +176,26 @@ class BaseDebateAgent(ABC):
         
         new_paths = []
         
-        # ===== Broad Search: 모든 관계 탐색 (LLM이 Cognitive Filtering) =====
-        # 라운드별 hop 깊이로 탐색, LLM이 관련성 판단
+        # ===== Broad Search: 모든 관계 탐색 (날짜 필터링 추가) =====
+        # Signal 성격의 노드들은 기준일(target_date) 이전 데이터만 가져옴
+        date_filter = ""
+        if target_date:
+            # 경로 내의 모든 노드 중 date가 있는 노드는 target_date 이하인 경우만 검사
+            date_filter = "AND ALL(node in nodes(path) WHERE node.date IS NULL OR node.date <= $target_date)"
+
         broad_query = f"""
             MATCH path = (n)-[r*1..{max_hops}]-(target)
-            WHERE target.name = $name
+            WHERE target.name = $name {date_filter}
             RETURN path
             LIMIT {total_limit}
         """
         
         try:
             with self.neo4j.driver.session() as session:
-                result = session.run(broad_query, {"name": target_company})
+                params = {"name": target_company}
+                if target_date:
+                    params["target_date"] = target_date
+                result = session.run(broad_query, params)
                 for record in result:
                     path_data = self._process_path_record(record)
                     if path_data:
@@ -181,13 +208,65 @@ class BaseDebateAgent(ABC):
 
     def _vector_search(self, query: str, limit: int = 10) -> List[str]:
         """
-        [Vector Search Placeholder]
-        - Neo4j Vector Index 또는 외부 벡터 DB를 활용하여 관련 노드 검색
-        - 현재는 placeholder로 유지 (향후 embedding 모델 연결 시 구현)
+        [Vector Search Implementation]
+        Neo4j Vector Index를 활용하여 쿼리와 유사한 노드 검색
+        
+        Args:
+            query: 검색 쿼리 (기업명 또는 이슈)
+            limit: 반환할 최대 노드 수
+        
+        Returns:
+            유사한 노드 이름 리스트
         """
-        # TODO: Implement vector embedding search
-        # return ["Node_ID_1", "Node_ID_2"]
-        return []
+        if not self.neo4j:
+            return []
+        
+        try:
+            # 1. 쿼리 임베딩 생성 (Gemini embedding)
+            from google import genai
+            import os
+            
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            result = client.models.embed_content(
+                model="gemini-embedding-001",
+                contents=query
+            )
+            query_embedding = result.embeddings[0].values
+            
+            # 2. Neo4j Vector Index 쿼리
+            with self.neo4j.driver.session() as session:
+                # Vector Index가 존재하는 경우에만 쿼리 (없으면 fallback)
+                vector_query = """
+                    CALL db.index.vector.queryNodes('entity_embedding_index', $limit, $embedding)
+                    YIELD node, score
+                    RETURN node.name as name, score
+                    ORDER BY score DESC
+                """
+                try:
+                    result = session.run(vector_query, {
+                        "embedding": query_embedding,
+                        "limit": limit
+                    })
+                    return [record["name"] for record in result if record["name"]]
+                except Exception as e:
+                    # Vector Index가 없는 경우 이름 기반 검색으로 fallback
+                    if "index" in str(e).lower() or "procedure" in str(e).lower():
+                        print(f"[INFO] Vector Index 미구성, 이름 기반 검색으로 fallback")
+                        fallback_query = """
+                            MATCH (n)
+                            WHERE n.name CONTAINS $query
+                            RETURN n.name as name
+                            LIMIT $limit
+                        """
+                        result = session.run(fallback_query, {"query": query, "limit": limit})
+                        return [record["name"] for record in result if record["name"]]
+                    raise
+        except ImportError:
+            print("[경고] google-genai 패키지 없음, 벡터 검색 스킵")
+            return []
+        except Exception as e:
+            print(f"[경고] Vector Search 실패: {e}")
+            return []
     
     def _process_path_record(self, record) -> Optional[Dict]:
         """Neo4j Path 레코드를 딕셔너리로 변환 (공통 로직)"""
@@ -244,6 +323,60 @@ class BaseDebateAgent(ABC):
             print(f"[경고] Path 처리 실패: {e}")
             return None
     
+    def _extract_correlation_summary(self, impact_paths: List[Dict]) -> str:
+        """
+        Impact Paths에서 correlation 정보 추출 및 요약
+        
+        Args:
+            impact_paths: _find_impact_paths()에서 반환된 경로 목록
+            
+        Returns:
+            상관관계 요약 문자열 (예: "DIRECT: 5건, INVERSE: 2건")
+        """
+        if not impact_paths:
+            return "상관관계 데이터 없음"
+        
+        correlation_counts = {"DIRECT": 0, "INVERSE": 0, "null": 0}
+        correlation_details = []
+        
+        for path in impact_paths:
+            rels = path.get("relationships", [])
+            for rel in rels:
+                props = rel.get("properties", {})
+                corr = props.get("correlation")
+                
+                if corr == "DIRECT":
+                    correlation_counts["DIRECT"] += 1
+                    # 세부 정보 추출
+                    rel_type = rel.get("type", "UNKNOWN")
+                    correlation_details.append(f"{rel_type}(DIRECT)")
+                elif corr == "INVERSE":
+                    correlation_counts["INVERSE"] += 1
+                    rel_type = rel.get("type", "UNKNOWN")
+                    correlation_details.append(f"{rel_type}(INVERSE)")
+                else:
+                    correlation_counts["null"] += 1
+        
+        # 요약 문자열 생성
+        summary_parts = []
+        if correlation_counts["DIRECT"] > 0:
+            summary_parts.append(f"DIRECT(정방향): {correlation_counts['DIRECT']}건")
+        if correlation_counts["INVERSE"] > 0:
+            summary_parts.append(f"INVERSE(역방향): {correlation_counts['INVERSE']}건")
+        
+        if not summary_parts:
+            return "상관관계 정보 미포함"
+        
+        summary = ", ".join(summary_parts)
+        
+        # 상위 5개 세부 정보 추가
+        if correlation_details:
+            top_details = correlation_details[:5]
+            summary += f" | 예시: {', '.join(top_details)}"
+        
+        return summary
+
+    
     def _build_chain_text(self, nodes: List[Dict], rels: List[Dict]) -> str:
         """노드-관계 체인을 텍스트로 변환 (LLM 가독성)"""
         chain_text = ""
@@ -286,21 +419,30 @@ class BaseDebateAgent(ABC):
             return []
         
         nodes = []
-        target_company = state.get("target_companies", [None])[0]
+        target_companies = state.get("target_companies", [])
+        target_company = target_companies[0] if target_companies else state.get("query", "")  # Fallback to query
         
         try:
+            target_date = state.get("target_date")
             with self.neo4j.driver.session() as session:
                 # 타겟 기업과 연결된 특정 타입 노드 조회
                 for node_type in types:
+                    date_filter = ""
+                    if target_date:
+                        date_filter = "AND (n.date IS NULL OR n.date <= $target_date)"
+
                     query = f"""
                         MATCH (n:{node_type})
-                        WHERE n.name IS NOT NULL
+                        WHERE n.name IS NOT NULL {date_filter}
                         OPTIONAL MATCH (n)-[r]-(target)
                         WHERE target.name = $target
                         RETURN DISTINCT n
                         LIMIT {NODE_EXTRACT_LIMIT}
                     """
-                    result = session.run(query, {"target": target_company or ""})
+                    params = {"target": target_company or ""}
+                    if target_date:
+                        params["target_date"] = target_date
+                    result = session.run(query, params)
                     for record in result:
                         n = record["n"]
                         if hasattr(n, 'items'):
@@ -331,28 +473,25 @@ class BaseDebateAgent(ABC):
         # 2. 데이터 컨텍스트 포맷팅
         data_context = self._format_data_context(data)
         
-        # 3. 템플릿 채우기 (안전한 포맷팅)
-        try:
-            prompt = template.format(
-                ticker=query,
-                data_context=data_context,
-                bull_history=history, # Synthesizer 등에서 필요할 수 있음
-                bear_history=history, 
-                critical_paths=str(data.get("impact_paths", [])) # Synthesizer용
-            )
-        except KeyError as e:
-            # 포맷 키 불일치 시 상세 경고 및 단순 대체 시도
-            print(f"[경고] 프롬프트 템플릿 키 누락: {e}. 기본 포맷으로 대체합니다.")
-            prompt = template.replace("{ticker}", query).replace("{data_context}", data_context)
+        # 3. 템플릿 채우기 (안전한 문자열 대체 - format() 대신 replace() 사용)
+        # format()은 데이터에 중괄호가 있으면 오류 발생 가능
+        prompt = template
+        prompt = prompt.replace("{ticker}", str(query))
+        prompt = prompt.replace("{data_context}", str(data_context))
+        prompt = prompt.replace("{bull_history}", str(history))
+        prompt = prompt.replace("{bear_history}", str(history))
+        prompt = prompt.replace("{critical_paths}", str(data.get("impact_paths", [])))
+        prompt = prompt.replace("{correlation}", str(data.get("correlation", "상관관계 데이터 없음")))
+        prompt = prompt.replace("{market_context}", str(data.get("market_context", "시장 컨텍스트 없음")))
+        prompt = prompt.replace("{round_num}", str(data.get("round_num", 1)))
+        prompt = prompt.replace("{history}", str(history))
 
         # [옵션] 상대방 반박 추가 (Bull/Bear)
         if opponent_arg:
             rebuttal_template = self.prompts.get("debate_agents", {}).get("base", {}).get("opponent_rebuttal", "")
             if rebuttal_template:
-                try:
-                    prompt += "\n" + rebuttal_template.format(opponent_arg=opponent_arg)
-                except KeyError:
-                    prompt += f"\n[상대방의 주장]\n{opponent_arg}\n"
+                rebuttal = rebuttal_template.replace("{opponent_arg}", str(opponent_arg))
+                prompt += "\n" + rebuttal
             
         return prompt
 
@@ -360,19 +499,25 @@ class BaseDebateAgent(ABC):
         """
         Data Dict를 프롬프트에 삽입할 텍스트로 변환 (기존 로직 + YAML Base Summary)
         """
-        base_summary_tpl = self.prompts.get("debate_agents", {}).get("base", {}).get("data_summary", "")
+        summary = self.prompts.get("debate_agents", {}).get("base", {}).get("data_summary", "")
         
-        # 기본 요약 생성 (prompts.yaml의 base.data_summary 키와 정확히 일치시켜야 함)
-        summary = base_summary_tpl.format(
-            query=data.get("query", "알 수 없음"),
-            agent_count=len(data.get("agents", [])),
-            supplier_count=len(data.get("suppliers", [])),
-            earnings_count=len(data.get("earnings", [])),
-            price_move_count=len(data.get("price_moves", [])),
-            issue_count=len(data.get("issues", [])),
-            macro_count=len(data.get("macros", [])),
-            path_count=len(data.get("impact_paths", []))
-        )
+        # 안전한 문자열 대체 (format() 대신 replace() 사용 - 템플릿에 중괄호가 있어도 안전)
+        replacements = {
+            "{query}": str(data.get("query", "알 수 없음")),
+            "{agent_count}": str(len(data.get("agents", []))),
+            "{supplier_count}": str(len(data.get("suppliers", []))),
+            "{earnings_count}": str(len(data.get("earnings", []))),
+            "{price_move_count}": str(len(data.get("price_moves", []))),
+            "{issue_count}": str(len(data.get("issues", []))),
+            "{macro_count}": str(len(data.get("macros", []))),
+            "{path_count}": str(len(data.get("impact_paths", []))),
+            "{document_context}": str(self._format_document_summary(data.get("document_summary"))),
+            "{correlation}": str(data.get("correlation", "상관관계 데이터 없음")),
+            "{market_context}": str(data.get("market_context", "시장 컨텍스트 없음")),
+        }
+        
+        for placeholder, value in replacements.items():
+            summary = summary.replace(placeholder, value)
         
         details = []
         
@@ -410,6 +555,24 @@ class BaseDebateAgent(ABC):
             details.append(market_context)
                 
         return summary + "\n".join(details)
+    
+    def _format_document_summary(self, doc_sum: Optional[Dict[str, Any]]) -> str:
+        """
+        문서 요약 정보를 텍스트로 변환
+        """
+        if not doc_sum or not isinstance(doc_sum, dict):
+            return "제공된 추가 문서 컨텍스트 없음"
+            
+        topic = doc_sum.get("main_topic", "알 수 없음")
+        points = doc_sum.get("key_points", [])
+        
+        formatted = f"- **주요 주제**: {topic}\n"
+        if points:
+            formatted += "- **핵심 내용**:\n"
+            for p in points:
+                formatted += f"  * {p}\n"
+        
+        return formatted
         
     def _parse_response(self, response: Any) -> Dict[str, str]:
         """LLM 응답 처리 (단순 텍스트 반환)"""

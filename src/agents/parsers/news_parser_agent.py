@@ -36,12 +36,19 @@ class NewsParserAgent(BaseParserAgent):
         self.use_batch = use_batch
         self.event_extractor = EventExtractor(llm, neo4j_client=None) if llm else None
     
-    def parse(self, file_path: Path) -> KnowledgeGraph:
+    def parse(
+        self, 
+        file_path: Path, 
+        output_dir: Path = None,
+        skip_existing: bool = False
+    ) -> KnowledgeGraph:
         """
         뉴스 CSV를 파싱하여 Knowledge Graph 추출
         
         Args:
             file_path: CSV 파일 경로 (Semiconductor_News_Raw_*.csv)
+            output_dir: 개별 JSON 저장 디렉토리 (기본: data/processed)
+            skip_existing: 이미 저장된 행은 건너뛰기
         
         Returns:
             KnowledgeGraph 객체 (Event 노드)
@@ -64,8 +71,8 @@ class NewsParserAgent(BaseParserAgent):
             # 필수 컬럼 검증
             self._validate_columns(df)
             
-            # Knowledge Graph 생성
-            kg = self._create_knowledge_graph(df, file_path)
+            # Knowledge Graph 생성 (개별 저장 모드)
+            kg = self._create_knowledge_graph(df, file_path, output_dir, skip_existing)
             
             self.logger.info(
                 f"News CSV parsed: {len(kg.entities)} entities, "
@@ -77,6 +84,54 @@ class NewsParserAgent(BaseParserAgent):
         except Exception as e:
             self.logger.error(f"Failed to parse news CSV {file_path}: {str(e)}")
             raise ValueError(f"News CSV parsing failed: {str(e)}")
+    
+    def batch_parse(
+        self, 
+        csv_files: list, 
+        output_dir: Path,
+        skip_existing: bool = False
+    ) -> dict:
+        """
+        여러 뉴스 CSV 파일 배치 파싱 (KGConstructionAgent 호환용)
+        
+        Args:
+            csv_files: CSV 파일 경로 리스트
+            output_dir: 결과 JSON 저장 디렉토리
+            skip_existing: 이미 결과 파일이 존재하면 건너뛰기
+        
+        Returns:
+            파싱 결과 통계 {'total': int, 'success': int, 'failed': int}
+        """
+        result = {'total': 0, 'success': 0, 'failed': 0}
+        
+        for csv_file in csv_files:
+            csv_path = Path(csv_file)
+            result['total'] += 1
+            
+            # 출력 파일 경로 (전체 CSV 병합 결과)
+            output_file = output_dir / f"{csv_path.stem}_kg.json"
+            
+            # 건너뛰기 체크 (전체 CSV 결과 기준)
+            if skip_existing and output_file.exists():
+                self.logger.info(f"Skipping existing News KG: {output_file.name}")
+                result['success'] += 1
+                continue
+            
+            try:
+                # 파싱 실행 (개별 행 저장 포함)
+                kg = self.parse(csv_path, output_dir, skip_existing)
+                
+                # 전체 병합 결과 JSON 저장
+                kg.save_to_json(str(output_file))
+                self.logger.info(f"Saved News KG to: {output_file}")
+                
+                result['success'] += 1
+                
+            except Exception as e:
+                self.logger.error(f"Failed to parse {csv_path.name}: {e}")
+                result['failed'] += 1
+        
+        return result
     
     def validate(self, data: Dict[str, Any]) -> bool:
         """
@@ -128,134 +183,173 @@ class NewsParserAgent(BaseParserAgent):
     def _create_knowledge_graph(
         self,
         df: pd.DataFrame,
-        file_path: Path
+        file_path: Path,
+        output_dir: Path = None,
+        skip_existing: bool = False
     ) -> KnowledgeGraph:
         """
-        DataFrame을 Knowledge Graph로 변환 (v3.2: 전체 KG 추출 방식)
-        
-        LLM에 뉴스 배치를 전송하고, 반환된 전체 KG(entities + relations)를 활용합니다.
-        
-        Args:
-            df: 뉴스 DataFrame
-            file_path: 원본 파일 경로
-        
-        Returns:
-            KnowledgeGraph 객체
+        DataFrame의 모든 행을 개별적으로 처리하여 Knowledge Graph로 변환 (v3.4)
+        각 행마다 개별 JSON 파일로 저장하여 중단 시 재개 가능
         """
         import json
         import os
         from google import genai
         from google.genai import types
-        from src.models.nodes import get_kg_json_schema
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from src.models.nodes import get_kg_json_schema, KnowledgeGraph
+        from src.utils.entity_matcher import EntityMatcher
         
-        # 컬럼명 소문자로 정규화
+        # 컬럼명 정규화 및 날짜 처리
         df.columns = [col.lower() for col in df.columns]
-        
-        # 날짜 파싱
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
-        df = df[df['date'].notna()]  # 날짜 없는 행 제거
-        df = df.sort_values('date', ascending=False)  # 최신순 정렬
+        df = df[df['date'].notna()].sort_values('date', ascending=False)
         
-        # 샘플링
+        # 설정 로드
         from src.config.parser_config import get_config
         config = get_config('news')
-        
         sample_size = min(config.sample_size, len(df))
         sampled_df = df.head(sample_size)
         
-        self.logger.info(f"Processing {sample_size} news items out of {len(df)}")
+        self.logger.info(f"뉴스 처리 시작: 총 {len(sampled_df)}행 (개별 파싱, 개별 저장)")
         
-        # LLM이 없으면 수동 KG 생성으로 폴백
-        if not self.llm:
-            return self._create_kg_manual_fallback(sampled_df, file_path)
+        normalizer = EntityMatcher()
+        final_kg = KnowledgeGraph()
         
-        # 뉴스 배치를 텍스트로 구성
-        news_texts = []
-        for idx, row in sampled_df.iterrows():
-            date_str = row['date'].strftime('%Y-%m-%d')
-            title = str(row.get('title', ''))[:config.max_title_length]
-            content = str(row.get('content', row.get('description', ''))).strip()[:500]
-            keyword = str(row.get('keyword', '')).strip()
-            
-            news_item = f"""[뉴스 {len(news_texts)+1}]
-날짜: {date_str}
-제목: {title}
-본문: {content}
-키워드: {keyword}
-"""
-            news_texts.append(news_item)
-        
-        batch_text = "\n---\n".join(news_texts)
+        # 출력 디렉토리 설정 (news_rows 서브폴더)
+        if output_dir is None:
+            output_dir = Path("data/processed")
+        news_output_dir = output_dir / "news_rows"
+        news_output_dir.mkdir(parents=True, exist_ok=True)
         
         # YAML에서 프롬프트 로드
         from src.config.prompt_loader import PROMPTS
         prompt_tmpl = PROMPTS.get('news_parser', {}).get('kg_extraction', {}).get('instruction', '')
         
-        if not prompt_tmpl:
-            self.logger.warning("Prompt not found in YAML, using fallback")
+        if not prompt_tmpl or not self.llm:
+            self.logger.warning("LLM 또는 프롬프트 누락으로 수동 폴백 실행")
             return self._create_kg_manual_fallback(sampled_df, file_path)
-        
-        # 프롬프트 구성 (뉴스 배치 주입)
-        full_prompt = prompt_tmpl.format(news_text=batch_text)
-        
-        try:
-            # Google Genai SDK 직접 호출 (Structured Output)
-            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
+        def process_and_save_row(row_idx, row):
+            """각 행을 처리하고 개별 JSON으로 저장"""
+            # 개별 파일 경로 생성 (CSV명_행번호_날짜.json)
+            date_str = row['date'].strftime('%Y-%m-%d')
+            row_output_file = news_output_dir / f"{file_path.stem}_row{row_idx}_{date_str}_kg.json"
             
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=[{"role": "user", "parts": [{"text": full_prompt}]}],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=get_kg_json_schema()
+            # skip_existing 체크
+            if skip_existing and row_output_file.exists():
+                try:
+                    existing_kg = KnowledgeGraph.load_from_json(str(row_output_file))
+                    return existing_kg, "skipped"
+                except Exception:
+                    pass  # 파일 손상 시 재처리
+            
+            try:
+                title = str(row.get('title', ''))[:config.max_title_length]
+                # content가 없으면 description 사용
+                content = str(row.get('content', row.get('description', ''))).strip()[:1000]
+                keyword = str(row.get('keyword', '')).strip()
+                
+                news_text = f"날짜: {date_str}\n제목: {title}\n본문: {content}\n키워드: {keyword}"
+                full_prompt = prompt_tmpl.format(news_text=news_text)
+                
+                from src.config.llm_config import get_model
+                client = genai.Client(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+                response = client.models.generate_content(
+                    model=get_model("news_parsing"),
+                    contents=[{"role": "user", "parts": [{"text": full_prompt}]}],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=get_kg_json_schema()
+                    )
                 )
-            )
-            
-            # JSON 파싱
-            kg_json = json.loads(response.text)
-            
-            self.logger.debug(f"LLM returned {len(kg_json.get('entities', []))} entities, {len(kg_json.get('relations', []))} relations")
-            
-            # KnowledgeGraph 객체 생성
-            knowledge_graph = KnowledgeGraph.from_gemini_dict(kg_json)
-            
-            # 엔티티 정규화 + 타입 교정 (v3.1)
-            from src.utils.entity_matcher import EntityMatcher
-            normalizer = EntityMatcher()
-            for entity in knowledge_graph.entities:
-                entity.name = normalizer.match(entity.name)
-                # 타입 교정 (master_entities.yaml 기반)
-                entity_info = normalizer.get_entity_info(entity.name)
-                if entity_info and entity_info.get('type'):
-                    try:
-                        master_type = NodeType(entity_info['type'])
-                        if entity.type != master_type:
-                            self.logger.info(f"Type corrected: {entity.name} {entity.type.value} -> {master_type.value}")
-                            entity.type = master_type
-                    except ValueError:
-                        pass  # NodeType enum에 없는 경우 무시
-            
-            # 관계의 subject/object도 정규화
-            for relation in knowledge_graph.relations:
-                relation.subject = normalizer.match(relation.subject)
-                relation.object = normalizer.match(relation.object)
-            
-            # 메타데이터 추가
-            knowledge_graph.metadata = {
-                "source_file": str(file_path),
-                "file_type": "news_csv",
-                "total_news": len(df),
-                "sampled_news": sample_size,
-                "date_range": f"{df['date'].min().strftime('%Y-%m-%d')} ~ {df['date'].max().strftime('%Y-%m-%d')}",
-                "extraction_method": "llm_full_kg"
+                
+                kg_dict = json.loads(response.text)
+                row_kg = KnowledgeGraph.from_gemini_dict(kg_dict)
+                
+                # 정규화
+                for entity in row_kg.entities:
+                    entity.name = normalizer.match(entity.name)
+                    entity.properties['source_date'] = date_str
+                    entity.properties['source_row'] = row_idx
+                for rel in row_kg.relations:
+                    rel.subject = normalizer.match(rel.subject)
+                    rel.object = normalizer.match(rel.object)
+                    rel.date = date_str
+                
+                # 메타데이터 추가
+                row_kg.metadata = {
+                    "source_file": str(file_path),
+                    "row_index": row_idx,
+                    "date": date_str,
+                    "title": title[:100]
+                }
+                
+                # Embedding 생성 (gemini-embedding-001)
+                try:
+                    self._enrich_with_embeddings(row_kg)
+                except Exception as emb_e:
+                    self.logger.warning(f"행 {row_idx} embedding 생성 실패: {emb_e}")
+                
+                # 개별 JSON 저장
+                row_kg.save_to_json(str(row_output_file))
+                
+                return row_kg, "success"
+            except Exception as e:
+                self.logger.error(f"행 {row_idx} 처리 실패: {e}")
+                return None, "failed"
+
+        # 병렬 처리 (속도 향상을 위해 5개씩 병렬 실행)
+        success_count = 0
+        fail_count = 0
+        skipped_count = 0
+        total = len(sampled_df)
+        
+        self.logger.info(f"📰 뉴스 LLM 파싱 시작 (max_workers=5, 총 {total}건, 개별 저장: {news_output_dir})")
+        
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_row = {
+                executor.submit(process_and_save_row, i, row): i 
+                for i, row in sampled_df.iterrows()
             }
             
-            return knowledge_graph
-            
-        except Exception as e:
-            self.logger.error(f"LLM KG extraction failed: {str(e)}")
-            self.logger.info("Falling back to manual KG creation")
-            return self._create_kg_manual_fallback(sampled_df, file_path)
+            processed_count = 0
+            for future in as_completed(future_to_row):
+                processed_count += 1
+                try:
+                    row_kg, status = future.result()
+                    if status == "success":
+                        final_kg.merge(row_kg)
+                        success_count += 1
+                    elif status == "skipped":
+                        if row_kg:
+                            final_kg.merge(row_kg)
+                        skipped_count += 1
+                    else:
+                        fail_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    self.logger.error(f"뉴스 행 처리 예외: {e}")
+                
+                # 5건마다 진행 로그
+                if processed_count % 5 == 0 or processed_count == total:
+                    self.logger.info(f"📰 뉴스 진행: {processed_count}/{total} (성공: {success_count}, 스킵: {skipped_count}, 실패: {fail_count})")
+
+        # 메타데이터 보강
+        final_kg.metadata = {
+            "source_file": str(file_path),
+            "total_rows": len(df),
+            "processed_rows": len(sampled_df),
+            "success_count": success_count,
+            "skipped_count": skipped_count,
+            "failed_count": fail_count,
+            "date_range": f"{df['date'].min().strftime('%Y-%m-%d')} ~ {df['date'].max().strftime('%Y-%m-%d')}",
+            "mode": "row_by_row_individual_save",
+            "output_dir": str(news_output_dir)
+        }
+        
+        self.logger.info(f"📰 뉴스 파싱 완료: 개별 JSON {success_count + skipped_count}개 저장됨 ({news_output_dir})")
+        
+        return final_kg
     
     def _create_kg_manual_fallback(
         self,
@@ -596,7 +690,6 @@ class NewsParserAgent(BaseParserAgent):
             ][:3]
             
             self.logger.debug(f"Final valid companies: {valid_companies}")
-            
             # 4. 결과 반환 (keyword 폴백 없음)
             return valid_companies
             
@@ -604,3 +697,47 @@ class NewsParserAgent(BaseParserAgent):
             self.logger.error(f"LLM extraction error: {str(e)}")
             # 예외 시에도 빈 리스트 반환 (keyword 폴백 제거)
             return []
+    
+    def _enrich_with_embeddings(self, kg: KnowledgeGraph):
+        """
+        KnowledgeGraph의 엔티티에 임베딩 추가 (gemini-embedding-001)
+        
+        Args:
+            kg: Knowledge Graph 객체
+        """
+        import os
+        from google import genai
+        
+        valid_entities = [e for e in kg.entities if e.name and len(e.name.strip()) > 0]
+        if not valid_entities:
+            return
+        
+        try:
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            
+            # 엔티티 이름 + 설명을 결합하여 임베딩 생성
+            texts = []
+            for e in valid_entities:
+                text = e.name
+                if e.description:
+                    text += f": {e.description}"
+                texts.append(text)
+            
+            # Batch 임베딩 (한 번에 최대 100개)
+            batch_size = 100
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                batch_entities = valid_entities[i:i + batch_size]
+                
+                response = client.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=batch_texts
+                )
+                
+                for entity, embedding in zip(batch_entities, response.embeddings):
+                    entity.embedding = embedding.values
+            
+            self.logger.debug(f"Generated embeddings for {len(valid_entities)} entities")
+            
+        except Exception as e:
+            self.logger.warning(f"Embedding 생성 실패: {e}")
