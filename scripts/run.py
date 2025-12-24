@@ -124,6 +124,10 @@ def run_json_injection():
         from src.models.nodes import KnowledgeGraph
         
         processed_dir = PROJECT_ROOT / "data" / "processed"
+        
+        # 로더 로깅 활성화 (진행상황 확인용)
+        logging.getLogger("src.dataflows.neo4j_loader").setLevel(logging.INFO)
+
         json_files = list(processed_dir.glob("**/*_kg.json"))
         
         if not json_files:
@@ -135,7 +139,8 @@ def run_json_injection():
         # 머지
         merger = KGMerger()
         kgs = []
-        for jf in json_files:
+        for i, jf in enumerate(json_files, 1):
+            print(f"   [{i}/{len(json_files)}] Loading {jf.name}...", end='\r')
             try:
                 kg = KnowledgeGraph.load_from_json(str(jf))
                 kgs.append(kg)
@@ -154,7 +159,12 @@ def run_json_injection():
         neo4j_user = os.getenv("NEO4J_USER", "neo4j")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
         
-        loader = Neo4jKGLoader(uri=neo4j_uri, user=neo4j_user, password=neo4j_password)
+        loader = Neo4jKGLoader(
+            uri=neo4j_uri, 
+            user=neo4j_user, 
+            password=neo4j_password,
+            batch_size=500  # 안정성을 위해 배치 크기 축소 (1000 -> 500)
+        )
         stats = loader.load_knowledge_graph(merged_kg)
         
         print(f"✅ Neo4j 주입 완료: {stats.get('static_nodes', 0)} static, {stats.get('dynamic_nodes', 0)} dynamic nodes")
