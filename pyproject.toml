@@ -64,10 +64,10 @@ dependencies = [
     # Phase 4: Web App
     "streamlit>=1.39.0",  # Streamlit 데모 앱
     
-    # Phase 5: LangGraph CLI/Studio
-    "langgraph-cli[inmem]>=0.4.0",  # LangGraph 개발 서버
-    "langgraph-api>=0.6.0",  # API 서버
-    "langgraph-sdk>=0.2.0",  # SDK
+    # Phase 5: LangGraph CLI/Studio (protobuf 충돌로 비활성화)
+    # "langgraph-cli[inmem]>=0.4.0",  # LangGraph 개발 서버
+    # "langgraph-api>=0.6.0",  # API 서버 (protobuf >= 6.32 요구)
+    # "langgraph-sdk>=0.2.0",  # SDK
 ]
 
 [tool.poetry]

@@ -43,6 +43,10 @@ class Neo4jKGLoader:
             self.driver = GraphDatabase.driver(uri, auth=(user, password))
             self.batch_size = batch_size
             self.store_null_properties = store_null_properties
+            
+            # Aura 인스턴스 Wake-up 대기 및 연결 검증
+            self._verify_connection_with_retry(max_retries=3, delay=2)
+            
             logger.info(f"Connected to Neo4j at {uri} (batch_size={batch_size}, store_null={store_null_properties})")
             
             # 성능 최적화: name 인덱스 생성
@@ -51,6 +55,24 @@ class Neo4jKGLoader:
         except (ServiceUnavailable, AuthError) as e:
             logger.error(f"Failed to connect to Neo4j: {str(e)}")
             raise
+    
+    def _verify_connection_with_retry(self, max_retries: int = 3, delay: int = 2):
+        """Aura 인스턴스 연결 검증 (Wake-up 대기 포함)"""
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                with self.driver.session() as session:
+                    result = session.run("RETURN 1 as test")
+                    result.single()
+                    return  # 성공
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Neo4j connection attempt {attempt + 1} failed, retrying in {delay}s: {e}")
+                    time.sleep(delay)
+                else:
+                    logger.error(f"Neo4j connection failed after {max_retries} attempts: {e}")
+                    raise
     
     def _ensure_indexes(self):
         """필수 인덱스 생성 (성능 최적화)"""

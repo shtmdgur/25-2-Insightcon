@@ -140,7 +140,7 @@ def run_e2e_pipeline(
                     
                     # Neo4j 주입
                     neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-                    neo4j_user = os.getenv("NEO4J_USER", "neo4j")
+                    neo4j_user = os.getenv("NEO4J_USERNAME", "neo4j")
                     neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
                     
                     loader = Neo4jKGLoader(uri=neo4j_uri, user=neo4j_user, password=neo4j_password)
@@ -196,7 +196,7 @@ def run_e2e_pipeline(
         
         # Neo4j 연결 (Debate Agent가 Impact Paths 쿼리에 사용)
         neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        neo4j_user = os.getenv("NEO4J_USER", "neo4j")
+        neo4j_user = os.getenv("NEO4J_USERNAME", "neo4j")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
         
         neo4j_conn = None
