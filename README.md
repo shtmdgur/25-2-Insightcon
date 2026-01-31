@@ -28,7 +28,7 @@
 - **Framework**: `LangChain`, `LangGraph` (Multi-Agent Workflow)
 - **Database**: `Neo4j` (Graph DBMS)
 - **Frontend**: `Streamlit` (Interactive Web App)
-- **LLM**: `Gemini-1.5-Pro` (Main Logic), `OpenAI` (Fallback)
+- **LLM**: `Gemini-3-Pro (Deep)` (Main Logic), `Gemini-3-Flash (Parsing)` (Parsing & KG)
 - **Tools**: `Poetry` (Dependency Management)
 
 ---
